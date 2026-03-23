@@ -4,6 +4,13 @@ import CryptoKit
 // MARK: - JWT Helper (HS256)
 /// Generates HS-256 signed JWT tokens matching AtsJwtService on the Laravel backend.
 /// Uses only Apple CryptoKit — no third-party dependencies.
+///
+/// CRITICAL: The WS server validates the JWT signature byte-for-byte.
+/// The JSON field order in the payload MUST exactly match the PHP backend:
+///   Header:  {"alg":"HS256","typ":"JWT"}
+///   Payload: {"sub":"...","company_id":...,"exp":...}
+/// Using JSONSerialization with .sortedKeys would produce alphabetical order
+/// (company_id, exp, sub) which generates a different signature → auth failure.
 enum JWTHelper {
 
     // MARK: - Public
@@ -22,31 +29,25 @@ enum JWTHelper {
         ttl: Int = AppConfig.wsJWTTTL
     ) -> String {
         let now = Int(Date().timeIntervalSince1970)
-        let payload: [String: Any] = [
-            "sub": sub,
-            "company_id": companyId,
-            "exp": now + ttl
-        ]
-        return sign(payload: payload, secret: secret)
-    }
+        let exp = now + ttl
 
-    // MARK: - Internal
+        // Header JSON — must match PHP: {"alg":"HS256","typ":"JWT"}
+        let headerJSON = #"{"alg":"HS256","typ":"JWT"}"#
 
-    /// Create a signed JWT from an arbitrary payload dictionary.
-    private static func sign(payload: [String: Any], secret: String) -> String {
-        // Header — always HS256
-        let header: [String: String] = [
-            "alg": "HS256",
-            "typ": "JWT"
-        ]
+        // Payload JSON — field order MUST match Laravel's AtsJwtService:
+        //   sub (string) → company_id (int) → exp (int)
+        // PHP's json_encode preserves array insertion order.
+        let payloadJSON = #"{"sub":"\#(sub)","company_id":\#(companyId),"exp":\#(exp)}"#
 
-        let headerB64 = base64url(jsonEncode(header))
-        let payloadB64 = base64url(jsonEncode(payload))
+        let headerB64 = base64url(Data(headerJSON.utf8))
+        let payloadB64 = base64url(Data(payloadJSON.utf8))
 
         let signingInput = "\(headerB64).\(payloadB64)"
 
         // HMAC-SHA256
-        let keyData = hexStringToData(secret)
+        // IMPORTANT: PHP's hash_hmac uses the secret as a raw UTF-8 string,
+        // NOT as hex-decoded bytes. We must do the same.
+        let keyData = Data(secret.utf8)
         let key = SymmetricKey(data: keyData)
         let signature = HMAC<SHA256>.authenticationCode(
             for: Data(signingInput.utf8),
@@ -58,13 +59,6 @@ enum JWTHelper {
     }
 
     // MARK: - Helpers
-
-    /// JSON-encode a dictionary to `Data`.
-    private static func jsonEncode(_ dict: [String: Any]) -> Data {
-        // Use sorted keys for deterministic output
-        let data = try? JSONSerialization.data(withJSONObject: dict, options: [.sortedKeys])
-        return data ?? Data()
-    }
 
     /// Standard Base64 → Base64-URL (no padding).
     private static func base64url(_ data: Data) -> String {
