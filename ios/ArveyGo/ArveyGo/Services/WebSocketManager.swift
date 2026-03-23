@@ -136,22 +136,15 @@ final class WebSocketManager: ObservableObject {
         clearAllTimers()
         closeSocket()
 
-        // Build URL with token query parameter
-        guard var urlComponents = URLComponents(string: wsURL) else {
+        // Build WebSocket URL as raw string.
+        // IMPORTANT: URLComponents converts wss:// → https:// which breaks
+        // WebSocket handshake. We must build the URL string manually.
+        let separator = wsURL.contains("?") ? "&" : "?"
+        let encodedToken = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? token
+        let fullURLString = "\(wsURL)\(separator)token=\(encodedToken)"
+
+        guard let url = URL(string: fullURLString) else {
             status = .error("Geçersiz WebSocket URL")
-            return
-        }
-
-        var queryItems = urlComponents.queryItems ?? []
-        queryItems.append(URLQueryItem(name: "token", value: token))
-        urlComponents.queryItems = queryItems
-
-        // Convert http(s) to ws(s)
-        if urlComponents.scheme == "http" { urlComponents.scheme = "ws" }
-        if urlComponents.scheme == "https" { urlComponents.scheme = "wss" }
-
-        guard let url = urlComponents.url else {
-            status = .error("URL oluşturulamadı")
             return
         }
 
@@ -159,11 +152,17 @@ final class WebSocketManager: ObservableObject {
         status = isReconnect ? .reconnecting(attempt: reconnectAttempt) : .connecting
         eventSubject.send(.statusChanged(status))
 
+        print("[WS] Connecting to: \(fullURLString)")
+
+        // Use URLRequest so we can set proper headers
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+
         let config = URLSessionConfiguration.default
         config.waitsForConnectivity = true
         session = URLSession(configuration: config)
 
-        webSocketTask = session?.webSocketTask(with: url)
+        webSocketTask = session?.webSocketTask(with: request)
         webSocketTask?.resume()
 
         // Start listening for messages
@@ -198,6 +197,7 @@ final class WebSocketManager: ObservableObject {
 
                 case .failure(let error):
                     // Socket disconnected
+                    print("[WS] Socket error: \(error.localizedDescription)")
                     if !self.manualClose {
                         self.handleDisconnect(error: error)
                     }
@@ -224,6 +224,7 @@ final class WebSocketManager: ObservableObject {
 
         switch type {
         case "snapshot":
+            print("[WS] Received snapshot")
             handleSnapshot(json)
         case "update":
             handleUpdate(json)
@@ -233,16 +234,19 @@ final class WebSocketManager: ObservableObject {
         case "auth_error":
             authFailed = true
             let msg = (json["message"] as? String) ?? "Yetkilendirme hatası"
+            print("[WS] Auth error: \(msg)")
             status = .error(msg)
             eventSubject.send(.statusChanged(status))
             closeSocket()
         case "error":
             let msg = (json["message"] as? String) ?? "Sunucu hatası"
+            print("[WS] Server error: \(msg)")
             status = .error(msg)
             eventSubject.send(.statusChanged(status))
             closeSocket()
             scheduleReconnect()
         default:
+            print("[WS] Unknown message type: \(type)")
             break
         }
     }
@@ -252,8 +256,12 @@ final class WebSocketManager: ObservableObject {
         clearSnapshotTimer()
         reconnectAttempt = 0
 
-        guard let vehiclesArray = json["vehicles"] as? [[String: Any]] else { return }
+        guard let vehiclesArray = json["vehicles"] as? [[String: Any]] else {
+            print("[WS] Snapshot has no vehicles array")
+            return
+        }
         let ts = (json["ts"] as? Int) ?? 0
+        print("[WS] Snapshot: \(vehiclesArray.count) vehicles, ts=\(ts)")
 
         // Replace all
         var newVehicles: [String: Vehicle] = [:]
