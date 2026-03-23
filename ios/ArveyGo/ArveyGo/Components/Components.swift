@@ -1,0 +1,177 @@
+import SwiftUI
+
+// MARK: - Status Badge
+struct StatusBadge: View {
+    let status: VehicleStatus
+
+    var body: some View {
+        Text(status.label)
+            .font(.system(size: 10, weight: .medium))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(status.color.opacity(0.1))
+            .foregroundColor(status.color)
+            .cornerRadius(20)
+    }
+}
+
+// MARK: - Metric Card
+struct MetricCard: View {
+    let metric: DashboardMetric
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(metric.value)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(metric.iconColor == AppTheme.online ? AppTheme.online : AppTheme.navy)
+
+                Spacer()
+
+                Image(systemName: metric.icon)
+                    .font(.system(size: 14))
+                    .foregroundColor(metric.iconColor)
+                    .frame(width: 32, height: 32)
+                    .background(metric.iconBg)
+                    .cornerRadius(8)
+            }
+
+            Text(metric.title)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(AppTheme.textMuted)
+
+            HStack(spacing: 3) {
+                Image(systemName: metric.changeType.icon)
+                    .font(.system(size: 8, weight: .semibold))
+                Text(metric.change)
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundColor(metric.changeType.color)
+            .padding(.top, 2)
+        }
+        .padding(16)
+        .background(AppTheme.surface)
+    }
+}
+
+// MARK: - Avatar Circle
+struct AvatarCircle: View {
+    let initials: String
+    let color: Color
+    let size: CGFloat
+
+    init(initials: String, color: Color = AppTheme.navy, size: CGFloat = 32) {
+        self.initials = initials
+        self.color = color
+        self.size = size
+    }
+
+    var body: some View {
+        Text(initials)
+            .font(.system(size: size * 0.35, weight: .semibold))
+            .foregroundColor(.white)
+            .frame(width: size, height: size)
+            .background(color)
+            .clipShape(Circle())
+    }
+}
+
+// MARK: - Card Container
+struct CardView<Content: View>: View {
+    let title: String
+    var count: String? = nil
+    var actionLabel: String? = nil
+    var action: (() -> Void)? = nil
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack {
+                HStack(spacing: 8) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(AppTheme.navy)
+
+                    if let count = count {
+                        Text(count)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(AppTheme.textMuted)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(AppTheme.bg)
+                            .cornerRadius(20)
+                    }
+                }
+
+                Spacer()
+
+                if let actionLabel = actionLabel {
+                    Button(action: { action?() }) {
+                        HStack(spacing: 4) {
+                            Text(actionLabel)
+                                .font(.system(size: 11, weight: .medium))
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .foregroundColor(AppTheme.indigo)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
+
+            content()
+        }
+        .background(AppTheme.surface)
+        .cornerRadius(14)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(AppTheme.borderSoft, lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Loading Spinner
+struct LoadingSpinner: View {
+    @State private var isAnimating = false
+
+    var body: some View {
+        Circle()
+            .trim(from: 0, to: 0.7)
+            .stroke(Color.white, lineWidth: 2.5)
+            .frame(width: 20, height: 20)
+            .rotationEffect(.degrees(isAnimating ? 360 : 0))
+            .animation(.linear(duration: 0.8).repeatForever(autoreverses: false), value: isAnimating)
+            .onAppear { isAnimating = true }
+    }
+}
+
+// MARK: - Language Switcher
+struct LanguageSwitcher: View {
+    @State private var selectedLang = "TR"
+    let languages = ["TR", "EN"]
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(languages, id: \.self) { lang in
+                Button(action: { selectedLang = lang }) {
+                    Text(lang)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(selectedLang == lang ? .white : AppTheme.textMuted)
+                        .frame(width: 36, height: 28)
+                        .background(selectedLang == lang ? AppTheme.navy : Color.clear)
+                        .cornerRadius(6)
+                }
+            }
+        }
+        .padding(3)
+        .background(AppTheme.bg)
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.borderSoft, lineWidth: 1)
+        )
+    }
+}
