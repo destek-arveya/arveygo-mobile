@@ -23,7 +23,13 @@ class AuthViewModel: ObservableObject {
     @Published var forgotEmail = ""
     @Published var resetSent = false
 
-    // Hardcoded admin credentials (matching Laravel)
+    // WebSocket config received from server (or generated locally)
+    @Published var wsConfig: WSConfig?
+
+    // Whether to use real API (true) or demo/fallback mode (false)
+    var useRealAPI: Bool = true
+
+    // Hardcoded admin credentials (matching Laravel — used as offline fallback)
     private let adminEmail = "admin@admin.com"
     private let adminPassword = "123"
 
@@ -49,8 +55,58 @@ class AuthViewModel: ObservableObject {
 
         isLoading = true
 
-        // Simulate network delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+        if useRealAPI {
+            loginViaAPI()
+        } else {
+            loginOffline()
+        }
+    }
+
+    // MARK: - Real API Login
+    private func loginViaAPI() {
+        Task {
+            do {
+                let response = try await APIService.shared.login(
+                    email: loginEmail,
+                    password: loginPassword
+                )
+
+                self.currentUser = response.user
+                self.isLoggedIn = true
+                self.isLoading = false
+
+                // Use server-provided WS config if available
+                if let serverWS = response.wsConfig {
+                    self.wsConfig = serverWS
+                } else {
+                    // Generate JWT locally (we have the shared secret)
+                    self.generateLocalWSConfig(for: response.user)
+                }
+
+                // Auto-connect WebSocket
+                connectWebSocket()
+
+            } catch let error as APIError {
+                self.isLoading = false
+                self.errorMessage = error.errorDescription
+
+                // If it's a network error, offer fallback to offline mode
+                if case .networkError = error {
+                    self.errorMessage = "Sunucuya bağlanılamadı. Çevrimdışı mod deneyin."
+                }
+            } catch {
+                self.isLoading = false
+
+                // Network failure → fall back to offline login
+                print("[Auth] API login failed, trying offline: \(error.localizedDescription)")
+                self.loginOffline()
+            }
+        }
+    }
+
+    // MARK: - Offline / Demo Login
+    private func loginOffline() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
             guard let self = self else { return }
             self.isLoading = false
 
@@ -60,6 +116,8 @@ class AuthViewModel: ObservableObject {
             if email == self.adminEmail && self.loginPassword == self.adminPassword {
                 self.currentUser = AppUser.dummy
                 self.isLoggedIn = true
+                self.generateLocalWSConfig(for: AppUser.dummy)
+                self.connectWebSocket()
                 return
             }
 
@@ -69,11 +127,39 @@ class AuthViewModel: ObservableObject {
                let user = self.registeredUsers.first(where: { $0.email == email }) {
                 self.currentUser = user
                 self.isLoggedIn = true
+                self.generateLocalWSConfig(for: user)
+                self.connectWebSocket()
                 return
             }
 
             self.errorMessage = "E-posta veya şifre hatalı"
         }
+    }
+
+    // MARK: - WebSocket Configuration
+
+    /// Generate JWT locally using the shared secret (for offline/fallback mode)
+    private func generateLocalWSConfig(for user: AppUser) {
+        let jwt = JWTHelper.issueLiveMapToken(
+            sub: user.id,
+            companyId: user.companyId
+        )
+        wsConfig = WSConfig(
+            url: AppConfig.wsURL,
+            token: jwt,
+            pingInterval: Int(AppConfig.wsPingInterval)
+        )
+    }
+
+    /// Connect to the WebSocket with current config
+    func connectWebSocket() {
+        guard let config = wsConfig else { return }
+        WebSocketManager.shared.connect(url: config.url, token: config.token)
+    }
+
+    /// Disconnect WebSocket
+    func disconnectWebSocket() {
+        WebSocketManager.shared.disconnect()
     }
 
     // MARK: - Register
@@ -156,6 +242,15 @@ class AuthViewModel: ObservableObject {
 
     // MARK: - Logout
     func logout() {
+        // Disconnect WebSocket
+        disconnectWebSocket()
+        wsConfig = nil
+
+        // Logout from API
+        if useRealAPI {
+            Task { await APIService.shared.logout() }
+        }
+
         withAnimation {
             isLoggedIn = false
             currentUser = nil

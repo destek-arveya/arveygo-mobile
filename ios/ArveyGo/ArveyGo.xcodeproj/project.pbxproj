@@ -25,6 +25,10 @@
 		AA000018 /* LiveMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000018 /* LiveMapView.swift */; };
 		AA000019 /* VehiclesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000019 /* VehiclesListView.swift */; };
 		AA000020 /* RouteHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000020 /* RouteHistoryView.swift */; };
+		AA000021 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000021 /* AppConfig.swift */; };
+		AA000022 /* JWTHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000022 /* JWTHelper.swift */; };
+		AA000023 /* WebSocketManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000023 /* WebSocketManager.swift */; };
+		AA000024 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000024 /* APIService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -48,6 +52,10 @@
 		BB000018 /* LiveMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveMapView.swift; sourceTree = "<group>"; };
 		BB000019 /* VehiclesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehiclesListView.swift; sourceTree = "<group>"; };
 		BB000020 /* RouteHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteHistoryView.swift; sourceTree = "<group>"; };
+		BB000021 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		BB000022 /* JWTHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JWTHelper.swift; sourceTree = "<group>"; };
+		BB000023 /* WebSocketManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketManager.swift; sourceTree = "<group>"; };
+		BB000024 /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -80,6 +88,7 @@
 				DD000005 /* Models */,
 				DD000006 /* Theme */,
 				DD000007 /* Components */,
+				DD000015 /* Services */,
 				DD000008 /* Resources */,
 				DD000010 /* Preview Content */,
 			);
@@ -191,6 +200,17 @@
 			path = Dashboard;
 			sourceTree = "<group>";
 		};
+		DD000015 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				BB000021 /* AppConfig.swift */,
+				BB000022 /* JWTHelper.swift */,
+				BB000023 /* WebSocketManager.swift */,
+				BB000024 /* APIService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -278,6 +298,10 @@
 				AA000018 /* LiveMapView.swift in Sources */,
 				AA000019 /* VehiclesListView.swift in Sources */,
 				AA000020 /* RouteHistoryView.swift in Sources */,
+				AA000021 /* AppConfig.swift in Sources */,
+				AA000022 /* JWTHelper.swift in Sources */,
+				AA000023 /* WebSocketManager.swift in Sources */,
+				AA000024 /* APIService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

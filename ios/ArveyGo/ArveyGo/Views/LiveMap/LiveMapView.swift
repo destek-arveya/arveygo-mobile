@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import Combine
 
 struct LiveMapView: View {
     @EnvironmentObject var authVM: AuthViewModel
@@ -81,6 +82,20 @@ struct LiveMapView: View {
                 .fullScreenCover(item: $detailVehicle) { vehicle in
                     VehicleDetailView(vehicle: vehicle)
                 }
+                .onAppear {
+                    // Connect WebSocket when map appears
+                    authVM.connectWebSocket()
+                    // If WS fails to deliver data, fall back to dummy
+                    vm.loadDummyDataIfNeeded()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                    // Reconnect when app returns to foreground
+                    WebSocketManager.shared.reconnect()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                    // Optionally disconnect in background to save battery
+                    // WebSocketManager.shared.disconnect()
+                }
             }
     }
 
@@ -111,12 +126,12 @@ struct LiveMapView: View {
     var topOverlay: some View {
         HStack(spacing: 6) {
             Spacer()
-            // WebSocket status chip
+            // WebSocket status chip (real-time)
             HStack(spacing: 5) {
                 Circle()
-                    .fill(Color.green)
+                    .fill(wsStatusColor)
                     .frame(width: 6, height: 6)
-                Text("Canlı")
+                Text(vm.wsStatus.label)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(AppTheme.navy)
             }
@@ -124,6 +139,14 @@ struct LiveMapView: View {
             .padding(.vertical, 6)
             .background(.ultraThinMaterial)
             .cornerRadius(20)
+            .onTapGesture {
+                // Tap to reconnect if disconnected/error
+                if case .error = vm.wsStatus {
+                    authVM.connectWebSocket()
+                } else if vm.wsStatus == .disconnected || vm.wsStatus == .idle {
+                    authVM.connectWebSocket()
+                }
+            }
 
             // Vehicle count chip
             HStack(spacing: 5) {
@@ -140,6 +163,15 @@ struct LiveMapView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
+    }
+
+    private var wsStatusColor: Color {
+        switch vm.wsStatus {
+        case .connected:    return .green
+        case .connecting, .reconnecting: return .orange
+        case .error:        return .red
+        default:            return .gray
+        }
     }
 
     // MARK: - Status Filter Bar (more visible)
@@ -284,7 +316,7 @@ struct LiveMapView: View {
                     // Right side
                     VStack(alignment: .trailing, spacing: 2) {
                         if vehicle.status == .online {
-                            Text("\(vehicle.todayKm) km/h")
+                            Text(vehicle.formattedSpeed)
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(AppTheme.navy)
                         }
@@ -346,7 +378,7 @@ struct LiveMapView: View {
                     // Info grid
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         infoCell(icon: "mappin.circle.fill", label: "Konum", value: vehicle.city, color: .blue)
-                        infoCell(icon: "speedometer", label: "Hız", value: vehicle.status == .online ? "\(vehicle.todayKm) km/h" : "0 km/h", color: .orange)
+                        infoCell(icon: "speedometer", label: "Hız", value: vehicle.formattedSpeed, color: .orange)
                         infoCell(icon: "road.lanes", label: "Bugün", value: vehicle.formattedTodayKm, color: AppTheme.indigo)
                         infoCell(icon: "key.fill", label: "Kontak", value: vehicle.kontakOn ? "Açık" : "Kapalı", color: vehicle.kontakOn ? AppTheme.online : AppTheme.offline)
                         infoCell(icon: "gauge.open.with.lines.needle.33percent", label: "Toplam Km", value: vehicle.formattedTotalKm + " km", color: AppTheme.navy)
@@ -453,7 +485,7 @@ struct VehicleMapPin: View {
                 Image(systemName: "car.fill")
                     .font(.system(size: isSelected ? 18 : 14, weight: .medium))
                     .foregroundColor(.white)
-                    .rotationEffect(.degrees(vehicle.status == .online ? -45 : 0))
+                    .rotationEffect(.degrees(vehicle.direction > 0 ? vehicle.direction - 90 : 0))
             }
 
             // Plate label
@@ -494,6 +526,10 @@ class LiveMapViewModel: ObservableObject {
     @Published var vehicles: [Vehicle] = []
     @Published var statusFilter: VehicleStatus? = nil
     @Published var searchText = ""
+    @Published var wsStatus: WSConnectionStatus = .idle
+
+    private var cancellables = Set<AnyCancellable>()
+    private let wsManager = WebSocketManager.shared
 
     var onlineCount: Int { vehicles.filter { $0.status == .online }.count }
     var offlineCount: Int { vehicles.filter { $0.status == .offline }.count }
@@ -509,14 +545,71 @@ class LiveMapViewModel: ObservableObject {
             result = result.filter {
                 $0.plate.lowercased().contains(q) ||
                 $0.model.lowercased().contains(q) ||
-                $0.driver.lowercased().contains(q)
+                $0.driver.lowercased().contains(q) ||
+                $0.imei.lowercased().contains(q)
             }
         }
         return result
     }
 
     init() {
-        loadDummyData()
+        subscribeToWebSocket()
+    }
+
+    // MARK: - WebSocket Subscription
+    private func subscribeToWebSocket() {
+        // Observe vehicle list from WebSocketManager
+        wsManager.$vehicleList
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] vehicleList in
+                guard let self = self else { return }
+                if !vehicleList.isEmpty {
+                    self.vehicles = vehicleList
+                }
+            }
+            .store(in: &cancellables)
+
+        // Observe connection status
+        wsManager.$status
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$wsStatus)
+
+        // Listen for specific events if needed
+        wsManager.eventSubject
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                guard let self = self else { return }
+                switch event {
+                case .snapshot(let vehicles, _, _):
+                    self.vehicles = vehicles
+                case .update(let vehicle, _):
+                    // Update single vehicle in list
+                    if let index = self.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
+                        self.vehicles[index] = vehicle
+                    } else {
+                        self.vehicles.append(vehicle)
+                    }
+                case .statusChanged(let status):
+                    self.wsStatus = status
+                case .pong:
+                    break
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    /// If no WS data after some time, load dummy data for preview
+    func loadDummyDataIfNeeded() {
+        guard vehicles.isEmpty else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            guard let self = self, self.vehicles.isEmpty else { return }
+            // Only load dummy if still no data after 3 seconds
+            if case .error = self.wsStatus {
+                self.loadDummyData()
+            } else if self.wsStatus == .idle || self.wsStatus == .disconnected {
+                self.loadDummyData()
+            }
+        }
     }
 
     func loadDummyData() {
