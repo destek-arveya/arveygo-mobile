@@ -87,13 +87,15 @@ private fun createVehiclePinBitmap(
     statusColor: Int,
     direction: Float,
     plate: String,
+    speed: String,
     isSelected: Boolean
 ): Bitmap {
     val density = context.resources.displayMetrics.density
     val baseSize = if (isSelected) 52 else 42
     val pinPx = (baseSize * density).toInt()
     val plateH = if (plate.isNotEmpty()) (18 * density).toInt() else 0
-    val totalH = pinPx + plateH + (4 * density).toInt()
+    val speedH = if (speed.isNotEmpty()) (16 * density).toInt() else 0
+    val totalH = pinPx + plateH + speedH + (6 * density).toInt()
     val totalW = maxOf(pinPx, (plate.length * 7 * density).toInt() + (16 * density).toInt())
     val bitmap = Bitmap.createBitmap(maxOf(totalW, pinPx), totalH, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
@@ -164,6 +166,31 @@ private fun createVehiclePinBitmap(
         )
         canvas.drawRoundRect(rectF, 3f * density, 3f * density, bgRect)
         canvas.drawText(plate, cx, textY, textPaint)
+    }
+
+    // Speed label below plate
+    if (speed.isNotEmpty()) {
+        val speedTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(220, 26, 35, 80) // Navy
+            textSize = 8f * density
+            typeface = Typeface.DEFAULT_BOLD
+            textAlign = Paint.Align.CENTER
+        }
+        val speedBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(230, 255, 255, 255)
+        }
+        val speedW = speedTextPaint.measureText(speed)
+        val sPadH = 4 * density
+        val sPadV = 2 * density
+        val speedY = pinPx + plateH + 10f * density
+        val sRectF = RectF(
+            cx - speedW / 2 - sPadH,
+            speedY - speedTextPaint.textSize - sPadV,
+            cx + speedW / 2 + sPadH,
+            speedY + sPadV
+        )
+        canvas.drawRoundRect(sRectF, 3f * density, 3f * density, speedBg)
+        canvas.drawText(speed, cx, speedY, speedTextPaint)
     }
 
     return bitmap
@@ -239,7 +266,7 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
 
             val existing = animatedMarkers[vehicle.id]
             if (existing != null) {
-                val bmp = createVehiclePinBitmap(context, statusColor, vehicle.direction.toFloat(), vehicle.plate, isSel)
+                val bmp = createVehiclePinBitmap(context, statusColor, vehicle.direction.toFloat(), vehicle.plate, vehicle.formattedSpeed, isSel)
                 existing.marker.icon = BitmapDrawable(context.resources, bmp)
                 existing.marker.title = vehicle.plate
                 existing.marker.snippet = "${vehicle.formattedSpeed} \u00b7 ${vehicle.status.label}"
@@ -250,7 +277,7 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
                     position = target
                     title = vehicle.plate
                     snippet = "${vehicle.formattedSpeed} \u00b7 ${vehicle.status.label}"
-                    val bmp = createVehiclePinBitmap(context, statusColor, vehicle.direction.toFloat(), vehicle.plate, isSel)
+                    val bmp = createVehiclePinBitmap(context, statusColor, vehicle.direction.toFloat(), vehicle.plate, vehicle.formattedSpeed, isSel)
                     icon = BitmapDrawable(context.resources, bmp)
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                     setOnMarkerClickListener { _, _ ->

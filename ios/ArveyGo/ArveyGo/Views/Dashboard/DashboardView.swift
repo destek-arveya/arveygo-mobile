@@ -90,6 +90,9 @@ struct DashboardView: View {
         .sheet(item: $selectedVehicle) { vehicle in
             VehicleDetailView(vehicle: vehicle)
         }
+        .onAppear {
+            authVM.connectWebSocket()
+        }
     }
 
     // MARK: - Greeting

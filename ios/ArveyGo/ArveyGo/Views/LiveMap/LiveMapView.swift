@@ -9,6 +9,7 @@ struct LiveMapView: View {
     @State private var selectedVehicle: Vehicle?
     @State private var showVehicleDetail = false
     @State private var detailVehicle: Vehicle?
+    @State private var hasFittedBounds = false
     @State private var mapCameraPosition: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 39.9, longitude: 32.8),
@@ -80,7 +81,34 @@ struct LiveMapView: View {
                     // Optionally disconnect in background to save battery
                     // WebSocketManager.shared.disconnect()
                 }
+                .onChange(of: vm.vehicles) { _, vehicles in
+                    fitBoundsIfNeeded(vehicles: vehicles)
+                }
             }
+    }
+
+    /// Fit map camera to show all vehicles on first load
+    private func fitBoundsIfNeeded(vehicles: [Vehicle]) {
+        guard !hasFittedBounds, !vehicles.isEmpty else { return }
+        hasFittedBounds = true
+
+        let lats = vehicles.map { $0.lat }
+        let lngs = vehicles.map { $0.lng }
+
+        guard let minLat = lats.min(), let maxLat = lats.max(),
+              let minLng = lngs.min(), let maxLng = lngs.max() else { return }
+
+        let centerLat = (minLat + maxLat) / 2.0
+        let centerLng = (minLng + maxLng) / 2.0
+        let spanLat = max((maxLat - minLat) * 1.3, 0.05)
+        let spanLng = max((maxLng - minLng) * 1.3, 0.05)
+
+        withAnimation(.easeInOut(duration: 0.8)) {
+            mapCameraPosition = .region(MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLng),
+                span: MKCoordinateSpan(latitudeDelta: spanLat, longitudeDelta: spanLng)
+            ))
+        }
     }
 
     // MARK: - Map Content
@@ -89,7 +117,7 @@ struct LiveMapView: View {
             ForEach(vm.filteredVehicles) { vehicle in
                 // Use animated coordinates for smooth movement
                 let coord = vm.animatedCoordinate(for: vehicle)
-                Annotation(vehicle.plate, coordinate: coord) {
+                Annotation("", coordinate: coord) {
                     Button(action: {
                         selectedVehicle = vehicle
                         withAnimation {
@@ -367,6 +395,17 @@ struct VehicleMapPin: View {
                 .background(
                     RoundedRectangle(cornerRadius: 3)
                         .fill(AppTheme.navy.opacity(0.9))
+                )
+
+            // Speed label
+            Text(vehicle.formattedSpeed)
+                .font(.system(size: isSelected ? 8 : 7, weight: .semibold))
+                .foregroundColor(AppTheme.navy)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.white.opacity(0.9))
                 )
         }
         .animation(.spring(response: 0.25), value: isSelected)

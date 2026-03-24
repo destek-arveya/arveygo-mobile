@@ -189,12 +189,31 @@ data class Vehicle(
             val ts = json.optInt("ts", 0)
             val batteryVoltage = if (json.has("battery_voltage")) json.optDouble("battery_voltage") else null
             val externalVoltage = if (json.has("external_voltage")) json.optDouble("external_voltage") else null
-            val temperatureC = when {
+
+            // Temperature: check top-level first, then fall back to sensors array
+            var temperatureC: Double? = when {
                 json.has("temperatureC") -> json.optDouble("temperatureC")
                 json.has("tempCurrent") -> json.optDouble("tempCurrent")
                 else -> null
             }
-            val humidityPct = if (json.has("humidityPct")) json.optDouble("humidityPct") else null
+            var humidityPct: Double? = if (json.has("humidityPct")) json.optDouble("humidityPct") else null
+
+            // If not at top level, look inside sensors array (backend sends sensor data here)
+            if (temperatureC == null && json.has("sensors")) {
+                val sensors = json.optJSONArray("sensors")
+                if (sensors != null) {
+                    for (i in 0 until sensors.length()) {
+                        val sensor = sensors.optJSONObject(i) ?: continue
+                        if (sensor.has("temperatureC")) {
+                            temperatureC = sensor.optDouble("temperatureC")
+                            if (humidityPct == null && sensor.has("humidityPct")) {
+                                humidityPct = sensor.optDouble("humidityPct")
+                            }
+                            break
+                        }
+                    }
+                }
+            }
 
             // Match web backend's 4-condition status logic
             val status = when {

@@ -37,6 +37,11 @@ fun DashboardScreen(onMenuClick: () -> Unit) {
     val alerts by vm.alerts.collectAsState()
     val selectedPeriod by vm.selectedPeriod.collectAsState()
 
+    // Connect WebSocket when dashboard appears
+    LaunchedEffect(Unit) {
+        authVM.connectWebSocket()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(

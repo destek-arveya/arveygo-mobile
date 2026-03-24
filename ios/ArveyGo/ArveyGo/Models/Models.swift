@@ -100,8 +100,23 @@ struct Vehicle: Identifiable, Hashable {
         let ts = (json["ts"] as? Int) ?? 0
         let batteryVoltage = json["battery_voltage"] as? Double
         let externalVoltage = json["external_voltage"] as? Double
-        let temperatureC = json["temperatureC"] as? Double ?? json["tempCurrent"] as? Double
-        let humidityPct = json["humidityPct"] as? Double
+
+        // Temperature: check top-level first, then fall back to sensors array
+        var temperatureC = json["temperatureC"] as? Double ?? json["tempCurrent"] as? Double
+        var humidityPct = json["humidityPct"] as? Double
+
+        // If not at top level, look inside sensors array (backend sends sensor data here)
+        if temperatureC == nil, let sensors = json["sensors"] as? [[String: Any]] {
+            for sensor in sensors {
+                if let temp = sensor["temperatureC"] as? Double {
+                    temperatureC = temp
+                    if humidityPct == nil {
+                        humidityPct = sensor["humidityPct"] as? Double
+                    }
+                    break
+                }
+            }
+        }
 
         // Determine status — matches web backend logic
         let status: VehicleStatus

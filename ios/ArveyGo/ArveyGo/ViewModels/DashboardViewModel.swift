@@ -10,6 +10,9 @@ class DashboardViewModel: ObservableObject {
     @Published var selectedPeriod: String = "today"
     @Published var isLoading = false
 
+    private var cancellables = Set<AnyCancellable>()
+    private let wsManager = WebSocketManager.shared
+
     var totalVehicles: Int { vehicles.count }
     var onlineCount: Int { vehicles.filter { $0.status == .online }.count }
     var offlineCount: Int { vehicles.filter { $0.status == .offline }.count }
@@ -72,7 +75,47 @@ class DashboardViewModel: ObservableObject {
     }
 
     init() {
-        loadDummyData()
+        subscribeToWebSocket()
+        loadDummyDriversAndAlerts()
+    }
+
+    // MARK: - WebSocket Subscription
+    private func subscribeToWebSocket() {
+        // Observe vehicle list from WebSocketManager
+        wsManager.$vehicleList
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] list in
+                guard let self = self else { return }
+                if !list.isEmpty {
+                    self.vehicles = list
+                }
+            }
+            .store(in: &cancellables)
+
+        // Also listen for individual events
+        wsManager.eventSubject
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                guard let self = self else { return }
+                switch event {
+                case .snapshot(let vehicles, _, _):
+                    self.vehicles = vehicles
+                case .update(let vehicle, _):
+                    if let idx = self.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
+                        self.vehicles[idx] = vehicle
+                    } else {
+                        self.vehicles.append(vehicle)
+                    }
+                default: break
+                }
+            }
+            .store(in: &cancellables)
+
+        // Fallback: load dummy vehicle data after 3 seconds if no WS data
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self = self, self.vehicles.isEmpty else { return }
+            self.loadDummyData()
+        }
     }
 
     func formatKm(_ km: Int) -> String {
@@ -83,7 +126,7 @@ class DashboardViewModel: ObservableObject {
     }
 
     func loadDummyData() {
-        // Same dummy data as the Laravel dashboard
+        // Same dummy data as the Laravel dashboard (vehicle fallback)
         vehicles = [
             Vehicle(id: "1", plate: "34 ABC 123", model: "Ford Transit", status: .online, kontakOn: true, totalKm: 48320, todayKm: 312, driver: "Ahmet Yılmaz", city: "İstanbul", lat: 41.0082, lng: 28.9784),
             Vehicle(id: "2", plate: "06 XYZ 789", model: "Mercedes Sprinter", status: .offline, kontakOn: false, totalKm: 92100, todayKm: 0, driver: "Mehmet Demir", city: "Ankara", lat: 39.9334, lng: 32.8597),
@@ -94,7 +137,10 @@ class DashboardViewModel: ObservableObject {
             Vehicle(id: "7", plate: "34 PRS 111", model: "Iveco Daily", status: .online, kontakOn: true, totalKm: 14220, todayKm: 241, driver: "Fatma Arslan", city: "İstanbul", lat: 41.0422, lng: 29.0083),
             Vehicle(id: "8", plate: "06 TUV 222", model: "Ford Transit Custom", status: .idle, kontakOn: false, totalKm: 38900, todayKm: 0, driver: "Hasan Koç", city: "Ankara", lat: 39.9208, lng: 32.8541),
         ]
+    }
 
+    /// Load dummy drivers & alerts (these don't come from WS)
+    func loadDummyDriversAndAlerts() {
         drivers = [
             DriverScore(id: "1", name: "Ahmet Yılmaz", plate: "34 ABC 123", score: 94, totalKm: 48320, color: AppTheme.navy),
             DriverScore(id: "2", name: "Zeynep Şahin", plate: "41 JKL 654", score: 91, totalKm: 22430, color: AppTheme.indigo),
