@@ -22,21 +22,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arveya.arveygo.LocalAuthViewModel
 import com.arveya.arveygo.models.*
+import com.arveya.arveygo.services.WebSocketManager
+import com.arveya.arveygo.services.WSEvent
 import com.arveya.arveygo.ui.components.AvatarCircle
 import com.arveya.arveygo.ui.theme.AppColors
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
-// ViewModel for VehiclesList — mirrors iOS VehiclesListViewModel exactly
+// ViewModel for VehiclesList — uses real WebSocket data, fallback to dummy
 class VehiclesListViewModel {
     val vehicles = mutableStateListOf<Vehicle>()
     var searchText by mutableStateOf("")
     var statusFilter by mutableStateOf<VehicleStatus?>(null)
     var groupFilter by mutableStateOf<String?>(null)
+    var _initialized = false
 
-    // Alert counts (dummy)
-    val expiredDocs = 2
-    val criticalDocs = 5
-    val wornTires = 3
-    val upcomingMaint = 4
+    // Alert counts
+    val expiredDocs get() = 0
+    val criticalDocs get() = 0
+    val wornTires get() = 0
+    val upcomingMaint get() = 0
 
     val groups: List<String>
         get() = vehicles.map { it.group }.distinct().sorted()
@@ -66,10 +72,11 @@ class VehiclesListViewModel {
         }
 
     init {
-        loadDummyData()
+        // Don't load dummy by default — wait for WS data via LaunchedEffect
     }
 
-    private fun loadDummyData() {
+    fun loadDummyData() {
+        if (vehicles.isNotEmpty()) return
         vehicles.addAll(
             listOf(
                 Vehicle("1", "34 ABC 123", "Ford Transit", VehicleStatus.ONLINE, true, 48320, 312, "Ahmet Yılmaz", "İstanbul", 41.0082, 28.9784),
@@ -92,6 +99,43 @@ fun VehiclesListScreen(onMenuClick: () -> Unit) {
     val user by authVM.currentUser.collectAsState()
     val vm = remember { VehiclesListViewModel() }
     var selectedVehicle by remember { mutableStateOf<Vehicle?>(null) }
+
+    // Subscribe to WebSocket vehicle data
+    LaunchedEffect(Unit) {
+        // Observe vehicle list from WS
+        launch {
+            WebSocketManager.vehicleList.collectLatest { list ->
+                if (list.isNotEmpty()) {
+                    vm.vehicles.clear()
+                    vm.vehicles.addAll(list)
+                }
+            }
+        }
+        // Also listen for individual events
+        launch {
+            WebSocketManager.events.collect { event ->
+                when (event) {
+                    is WSEvent.Snapshot -> {
+                        vm.vehicles.clear()
+                        vm.vehicles.addAll(event.vehicles)
+                    }
+                    is WSEvent.Update -> {
+                        val idx = vm.vehicles.indexOfFirst { it.id == event.vehicle.id }
+                        if (idx >= 0) vm.vehicles[idx] = event.vehicle
+                        else vm.vehicles.add(event.vehicle)
+                    }
+                    else -> {}
+                }
+            }
+        }
+        // Fallback: load dummy data after 3 seconds if no WS data
+        launch {
+            delay(3000)
+            if (vm.vehicles.isEmpty()) {
+                vm.loadDummyData()
+            }
+        }
+    }
 
     // If a vehicle is selected, show its detail
     selectedVehicle?.let { vehicle ->
@@ -441,6 +485,15 @@ private fun VehicleTableRow(vehicle: Vehicle, onClick: () -> Unit) {
                                 color = AppColors.TextMuted,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        vehicle.temperatureC?.let { temp ->
+                            Text(" • ", fontSize = 8.sp, color = AppColors.TextFaint)
+                            Text(
+                                "\uD83C\uDF21\uFE0F${"%.1f".format(temp)}°C",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (temp < 0) Color.Blue else if (temp < 30) AppColors.Online else Color.Red
                             )
                         }
                     }

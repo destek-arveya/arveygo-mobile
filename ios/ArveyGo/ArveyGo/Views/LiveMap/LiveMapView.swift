@@ -6,7 +6,6 @@ struct LiveMapView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @StateObject private var vm = LiveMapViewModel()
     @Binding var showSideMenu: Bool
-    @State private var showVehicleList = true
     @State private var selectedVehicle: Vehicle?
     @State private var showVehicleDetail = false
     @State private var detailVehicle: Vehicle?
@@ -56,14 +55,6 @@ struct LiveMapView: View {
                             size: 30
                         )
                     }
-                }
-                .sheet(isPresented: $showVehicleList) {
-                    vehicleListSheet
-                        .presentationDetents([.fraction(0.12), .fraction(0.35), .fraction(0.75)])
-                        .presentationDragIndicator(.visible)
-                        .presentationBackgroundInteraction(.enabled)
-                        .presentationCornerRadius(20)
-                        .interactiveDismissDisabled()
                 }
                 .sheet(item: $selectedVehicle) { vehicle in
                     vehiclePopupSheet(vehicle)
@@ -191,97 +182,6 @@ struct LiveMapView: View {
         }
     }
 
-    // MARK: - Vehicle List Sheet
-    var vehicleListSheet: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Araçlar")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(AppTheme.navy)
-                    Text("\(vm.filteredVehicles.count) araç listeleniyor")
-                        .font(.system(size: 11))
-                        .foregroundColor(AppTheme.textMuted)
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 10)
-
-            Divider()
-
-            // Vehicle list
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(vm.filteredVehicles) { vehicle in
-                        vehicleRow(vehicle)
-                    }
-                }
-            }
-        }
-    }
-
-    func vehicleRow(_ vehicle: Vehicle) -> some View {
-        VStack(spacing: 0) {
-            Button(action: {
-                selectedVehicle = vehicle
-                withAnimation {
-                    mapCameraPosition = .region(MKCoordinateRegion(
-                        center: CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng),
-                        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                    ))
-                }
-            }) {
-                HStack(spacing: 12) {
-                    // Status bar
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(vehicle.status.color)
-                        .frame(width: 3, height: 36)
-
-                    // Vehicle icon
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(vehicle.status.color.opacity(0.1))
-                            .frame(width: 36, height: 36)
-                        Image(systemName: "car.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(vehicle.status.color)
-                    }
-
-                    // Info
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(vehicle.plate)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(AppTheme.navy)
-                        Text(vehicle.model)
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.textMuted)
-                    }
-
-                    Spacer()
-
-                    // Right side
-                    VStack(alignment: .trailing, spacing: 2) {
-                        if vehicle.status == .online {
-                            Text(vehicle.formattedSpeed)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(AppTheme.navy)
-                        }
-                        StatusBadge(status: vehicle.status)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(selectedVehicle?.id == vehicle.id ? AppTheme.navy.opacity(0.04) : Color.clear)
-            }
-            .buttonStyle(.plain)
-
-            Divider().padding(.leading, 72)
-        }
-    }
-
     // MARK: - Vehicle Popup Sheet (half screen with detail button)
     func vehiclePopupSheet(_ vehicle: Vehicle) -> some View {
         VStack(spacing: 0) {
@@ -334,6 +234,19 @@ struct LiveMapView: View {
                         infoCell(icon: "antenna.radiowaves.left.and.right", label: "Sinyal", value: vehicle.status == .online ? "Güçlü" : "Yok", color: vehicle.status == .online ? AppTheme.online : AppTheme.textFaint)
                     }
                     .padding(.horizontal, 20)
+
+                    // Temperature row (if available)
+                    if let temp = vehicle.temperatureC {
+                        HStack(spacing: 10) {
+                            infoCell(icon: "thermometer.medium", label: "Sıcaklık", value: String(format: "%.1f°C", temp), color: temp < 0 ? .blue : temp < 30 ? AppTheme.online : .red)
+                            if let hum = vehicle.humidityPct {
+                                infoCell(icon: "humidity.fill", label: "Nem", value: "%\(Int(hum))", color: Color(red: 0.05, green: 0.65, blue: 0.88))
+                            } else {
+                                Spacer().frame(maxWidth: .infinity)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
 
                     // Quick actions row
                     HStack(spacing: 10) {

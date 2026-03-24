@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct VehiclesListView: View {
     @EnvironmentObject var authVM: AuthViewModel
@@ -272,6 +273,14 @@ struct VehiclesListView: View {
                                     .foregroundColor(AppTheme.textMuted)
                                     .lineLimit(1)
                             }
+                            if let temp = vehicle.temperatureC {
+                                Text("•")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(AppTheme.textFaint)
+                                Text(String(format: "🌡️%.1f°C", temp))
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(temp < 0 ? .blue : temp < 30 ? AppTheme.online : .red)
+                            }
                         }
                     }
                 }
@@ -407,11 +416,14 @@ class VehiclesListViewModel: ObservableObject {
     @Published var statusFilter: VehicleStatus? = nil
     @Published var groupFilter: String? = nil
 
-    // Alert counts (dummy)
-    let expiredDocs = 2
-    let criticalDocs = 5
-    let wornTires = 3
-    let upcomingMaint = 4
+    // Alert counts
+    var expiredDocs: Int { 0 }
+    var criticalDocs: Int { 0 }
+    var wornTires: Int { 0 }
+    var upcomingMaint: Int { 0 }
+
+    private var cancellables = Set<AnyCancellable>()
+    private let wsManager = WebSocketManager.shared
 
     var groups: [String] {
         Array(Set(vehicles.map { $0.group })).sorted()
@@ -448,7 +460,44 @@ class VehiclesListViewModel: ObservableObject {
     }
 
     init() {
-        loadDummyData()
+        subscribeToWebSocket()
+    }
+
+    private func subscribeToWebSocket() {
+        wsManager.$vehicleList
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] list in
+                guard let self = self else { return }
+                if !list.isEmpty {
+                    self.vehicles = list
+                }
+            }
+            .store(in: &cancellables)
+
+        // Also listen for individual events
+        wsManager.eventSubject
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                guard let self = self else { return }
+                switch event {
+                case .snapshot(let vehicles, _, _):
+                    self.vehicles = vehicles
+                case .update(let vehicle, _):
+                    if let idx = self.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
+                        self.vehicles[idx] = vehicle
+                    } else {
+                        self.vehicles.append(vehicle)
+                    }
+                default: break
+                }
+            }
+            .store(in: &cancellables)
+
+        // Fallback: load dummy data after 3 seconds if no WS data
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self = self, self.vehicles.isEmpty else { return }
+            self.loadDummyData()
+        }
     }
 
     func loadDummyData() {

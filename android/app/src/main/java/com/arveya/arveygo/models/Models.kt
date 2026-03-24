@@ -85,6 +85,8 @@ data class Vehicle(
     var output: Boolean = false,
     var batteryVoltage: Double? = null,
     var externalVoltage: Double? = null,
+    var temperatureC: Double? = null,
+    var humidityPct: Double? = null,
     var odometer: Double = 0.0,
     var speedLimit: Int = 0,
     var driverId: String? = null,
@@ -187,11 +189,19 @@ data class Vehicle(
             val ts = json.optInt("ts", 0)
             val batteryVoltage = if (json.has("battery_voltage")) json.optDouble("battery_voltage") else null
             val externalVoltage = if (json.has("external_voltage")) json.optDouble("external_voltage") else null
+            val temperatureC = when {
+                json.has("temperatureC") -> json.optDouble("temperatureC")
+                json.has("tempCurrent") -> json.optDouble("tempCurrent")
+                else -> null
+            }
+            val humidityPct = if (json.has("humidityPct")) json.optDouble("humidityPct") else null
 
+            // Match web backend's 4-condition status logic
             val status = when {
                 !isOnline -> VehicleStatus.OFFLINE
-                ignition && speed > 0 -> VehicleStatus.ONLINE
-                else -> VehicleStatus.IDLE
+                ignition && speed > 5 -> VehicleStatus.ONLINE
+                ignition -> VehicleStatus.IDLE
+                else -> VehicleStatus.OFFLINE
             }
 
             return Vehicle(
@@ -203,6 +213,7 @@ data class Vehicle(
                 isOnline = isOnline, fix = fix, hdop = hdop,
                 input1 = input1, input2 = input2, output = output,
                 batteryVoltage = batteryVoltage, externalVoltage = externalVoltage,
+                temperatureC = temperatureC, humidityPct = humidityPct,
                 odometer = odometer, speedLimit = speedLimit,
                 driverId = driverId, alarmCode = alarmCode,
                 deviceTime = deviceTime, ts = ts
@@ -228,6 +239,8 @@ data class Vehicle(
             input1 = patch.input1, input2 = patch.input2, output = patch.output,
             batteryVoltage = patch.batteryVoltage ?: batteryVoltage,
             externalVoltage = patch.externalVoltage ?: externalVoltage,
+            temperatureC = patch.temperatureC ?: temperatureC,
+            humidityPct = patch.humidityPct ?: humidityPct,
             driverId = patch.driverId ?: driverId,
             alarmCode = patch.alarmCode ?: alarmCode
         )

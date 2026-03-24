@@ -526,6 +526,27 @@ private fun VehiclePopupCard(
                 PopupInfoCell(Icons.Default.Speed, "Toplam Km", vehicle.formattedTotalKm + " km", AppColors.Navy, Modifier.weight(1f))
                 PopupInfoCell(Icons.Default.CellTower, "Sinyal", if (vehicle.status == VehicleStatus.ONLINE) "G\u00fc\u00e7l\u00fc" else "Yok", if (vehicle.status == VehicleStatus.ONLINE) AppColors.Online else AppColors.TextFaint, Modifier.weight(1f))
             }
+            // Temperature row (if available)
+            vehicle.temperatureC?.let { temp ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PopupInfoCell(
+                        Icons.Default.LocalFireDepartment, "S\u0131cakl\u0131k",
+                        "${"%.1f".format(temp)}\u00b0C",
+                        if (temp < 0) Color.Blue else if (temp < 30) AppColors.Online else Color.Red,
+                        Modifier.weight(1f)
+                    )
+                    if (vehicle.humidityPct != null) {
+                        PopupInfoCell(
+                            Icons.Default.Opacity, "Nem",
+                            "%${vehicle.humidityPct!!.toInt()}",
+                            Color(0xFF0EA5E9),
+                            Modifier.weight(1f)
+                        )
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
         }
 
         Spacer(Modifier.height(14.dp))

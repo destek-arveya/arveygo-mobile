@@ -52,6 +52,8 @@ struct Vehicle: Identifiable, Hashable {
     var externalVoltage: Double? = nil
     var odometer: Double = 0
     var speedLimit: Int = 0
+    var temperatureC: Double? = nil
+    var humidityPct: Double? = nil
     var driverId: String? = nil
     var alarmCode: String? = nil
     var deviceTime: String? = nil
@@ -98,15 +100,19 @@ struct Vehicle: Identifiable, Hashable {
         let ts = (json["ts"] as? Int) ?? 0
         let batteryVoltage = json["battery_voltage"] as? Double
         let externalVoltage = json["external_voltage"] as? Double
+        let temperatureC = json["temperatureC"] as? Double ?? json["tempCurrent"] as? Double
+        let humidityPct = json["humidityPct"] as? Double
 
-        // Determine status
+        // Determine status — matches web backend logic
         let status: VehicleStatus
         if !isOnline {
             status = .offline
-        } else if ignition && speed > 0 {
+        } else if ignition && speed > 5 {
             status = .online
-        } else {
+        } else if ignition {
             status = .idle
+        } else {
+            status = .offline
         }
 
         return Vehicle(
@@ -137,6 +143,8 @@ struct Vehicle: Identifiable, Hashable {
             externalVoltage: externalVoltage,
             odometer: odometer,
             speedLimit: speedLimit,
+            temperatureC: temperatureC,
+            humidityPct: humidityPct,
             driverId: driverId,
             alarmCode: alarmCode,
             deviceTime: deviceTime,
@@ -167,6 +175,8 @@ struct Vehicle: Identifiable, Hashable {
         output = patch.output
         if let bv = patch.batteryVoltage { batteryVoltage = bv }
         if let ev = patch.externalVoltage { externalVoltage = ev }
+        if let tc = patch.temperatureC { temperatureC = tc }
+        if let hp = patch.humidityPct { humidityPct = hp }
         if let di = patch.driverId { driverId = di }
         if let ac = patch.alarmCode { alarmCode = ac }
     }
