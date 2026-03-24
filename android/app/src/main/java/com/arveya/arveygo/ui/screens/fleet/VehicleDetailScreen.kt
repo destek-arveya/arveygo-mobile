@@ -345,6 +345,28 @@ private fun OverviewTab(vehicle: Vehicle) {
         }
     }
 
+    // Temperature & Sensor section
+    if (vehicle.temperatureC != null || vehicle.humidityPct != null) {
+        SectionCard(title = "SICAKLIK & SENSÖR", icon = Icons.Default.Thermostat) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    InfoCell(
+                        Icons.Default.Thermostat,
+                        "SICAKLIK",
+                        vehicle.temperatureC?.let { String.format("%.1f°C", it) } ?: "—",
+                        Modifier.weight(1f)
+                    )
+                    InfoCell(
+                        Icons.Default.WaterDrop,
+                        "NEM",
+                        vehicle.humidityPct?.let { "%${it.toInt()}" } ?: "—",
+                        Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+
     SectionCard(title = "SÜRÜCÜ BİLGİLERİ", icon = Icons.Default.Person) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

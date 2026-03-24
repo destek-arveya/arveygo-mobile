@@ -46,6 +46,11 @@ struct DashboardView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 6)
                     }
+                    .refreshable {
+                        dashVM.refreshData()
+                        // Kısa bir bekleme süresi (animasyon için)
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    }
                 }
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {

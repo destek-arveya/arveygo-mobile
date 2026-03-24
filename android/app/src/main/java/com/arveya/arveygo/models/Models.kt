@@ -191,12 +191,15 @@ data class Vehicle(
             val externalVoltage = if (json.has("external_voltage")) json.optDouble("external_voltage") else null
 
             // Temperature: check top-level first, then fall back to sensors array
+            // Note: optDouble returns NaN for null/missing values, so we must filter NaN
+            fun safeDouble(v: Double): Double? = if (v.isNaN()) null else v
+
             var temperatureC: Double? = when {
-                json.has("temperatureC") -> json.optDouble("temperatureC")
-                json.has("tempCurrent") -> json.optDouble("tempCurrent")
+                json.has("temperatureC") -> safeDouble(json.optDouble("temperatureC"))
+                json.has("tempCurrent") -> safeDouble(json.optDouble("tempCurrent"))
                 else -> null
             }
-            var humidityPct: Double? = if (json.has("humidityPct")) json.optDouble("humidityPct") else null
+            var humidityPct: Double? = if (json.has("humidityPct")) safeDouble(json.optDouble("humidityPct")) else null
 
             // If not at top level, look inside sensors array (backend sends sensor data here)
             if (temperatureC == null && json.has("sensors")) {
@@ -205,15 +208,20 @@ data class Vehicle(
                     for (i in 0 until sensors.length()) {
                         val sensor = sensors.optJSONObject(i) ?: continue
                         if (sensor.has("temperatureC")) {
-                            temperatureC = sensor.optDouble("temperatureC")
-                            if (humidityPct == null && sensor.has("humidityPct")) {
-                                humidityPct = sensor.optDouble("humidityPct")
+                            val t = safeDouble(sensor.optDouble("temperatureC"))
+                            if (t != null) {
+                                temperatureC = t
+                                if (humidityPct == null && sensor.has("humidityPct")) {
+                                    humidityPct = safeDouble(sensor.optDouble("humidityPct"))
+                                }
+                                break
                             }
-                            break
                         }
                     }
                 }
             }
+
+            android.util.Log.d("Vehicle", "TEMP PARSE [$plate]: temperatureC=$temperatureC, humidityPct=$humidityPct")
 
             // Match web backend's 4-condition status logic
             val status = when {

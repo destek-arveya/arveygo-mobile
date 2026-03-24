@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +37,7 @@ fun DashboardScreen(onMenuClick: () -> Unit) {
     val drivers by vm.drivers.collectAsState()
     val alerts by vm.alerts.collectAsState()
     val selectedPeriod by vm.selectedPeriod.collectAsState()
+    val isRefreshing by vm.isRefreshing.collectAsState()
 
     // Connect WebSocket when dashboard appears
     LaunchedEffect(Unit) {
@@ -64,10 +66,16 @@ fun DashboardScreen(onMenuClick: () -> Unit) {
             )
         }
     ) { padding ->
-        Column(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { vm.refreshData() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+        ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .background(AppColors.Bg)
         ) {
@@ -90,9 +98,9 @@ fun DashboardScreen(onMenuClick: () -> Unit) {
                     }
                     Spacer(Modifier.height(16.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        WelcomeChip("${vm.onlineCount} Aktif", AppColors.Online)
-                        WelcomeChip("${vm.offlineCount} Çevrimdışı", AppColors.Offline)
-                        WelcomeChip("${vm.idleCount} Rölanti", AppColors.Idle)
+                        WelcomeChip("${vm.kontakOnCount} Kontak Açık", AppColors.Online)
+                        WelcomeChip("${vm.kontakOffCount} Kontak Kapalı", AppColors.Idle)
+                        WelcomeChip("${vm.bilgiYokCount} Bilgi Yok", AppColors.Offline)
                     }
                 }
             }
@@ -200,6 +208,7 @@ fun DashboardScreen(onMenuClick: () -> Unit) {
 
             Spacer(Modifier.height(30.dp))
         }
+        } // PullToRefreshBox
     }
 }
 

@@ -279,6 +279,20 @@ struct VehicleDetailView: View {
                 }
             }
 
+            // Sıcaklık & Sensör Bilgileri
+            if vehicle.temperatureC != nil || vehicle.humidityPct != nil {
+                sectionCard(title: "SICAKLIK & SENSÖR", icon: "thermometer.medium") {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                        if let temp = vehicle.temperatureC {
+                            infoCell(icon: "thermometer.medium", label: "SICAKLIK", value: String(format: "%.1f°C", temp))
+                        }
+                        if let hum = vehicle.humidityPct {
+                            infoCell(icon: "humidity.fill", label: "NEM", value: "%\(Int(hum))")
+                        }
+                    }
+                }
+            }
+
             sectionCard(title: "SÜRÜCÜ BİLGİLERİ", icon: "person.fill") {
                 HStack(spacing: 14) {
                     ZStack {

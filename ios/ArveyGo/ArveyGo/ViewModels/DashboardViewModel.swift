@@ -9,11 +9,18 @@ class DashboardViewModel: ObservableObject {
     @Published var alerts: [FleetAlert] = []
     @Published var selectedPeriod: String = "today"
     @Published var isLoading = false
+    @Published var isRefreshing = false
 
     private var cancellables = Set<AnyCancellable>()
     private let wsManager = WebSocketManager.shared
 
     var totalVehicles: Int { vehicles.count }
+    /// Kontak açık: ignition == true (online + idle)
+    var kontakOnCount: Int { vehicles.filter { $0.ignition }.count }
+    /// Kontak kapalı: isOnline ama ignition == false
+    var kontakOffCount: Int { vehicles.filter { $0.isOnline && !$0.ignition }.count }
+    /// Bilgi yok: isOnline == false (cihazdan veri gelmiyor)
+    var bilgiYokCount: Int { vehicles.filter { !$0.isOnline }.count }
     var onlineCount: Int { vehicles.filter { $0.status == .online }.count }
     var offlineCount: Int { vehicles.filter { $0.status == .offline }.count }
     var idleCount: Int { vehicles.filter { $0.status == .idle }.count }
@@ -36,30 +43,30 @@ class DashboardViewModel: ObservableObject {
                 changeType: .flat
             ),
             DashboardMetric(
-                title: "Aktif",
-                value: "\(onlineCount)",
-                icon: "checkmark.circle.fill",
+                title: "Kontak Açık",
+                value: "\(kontakOnCount)",
+                icon: "key.fill",
                 iconBg: AppTheme.online.opacity(0.08),
                 iconColor: AppTheme.online,
-                change: "+1 dün",
-                changeType: .up
+                change: "",
+                changeType: .flat
             ),
             DashboardMetric(
-                title: "Çevrimdışı",
-                value: "\(offlineCount)",
-                icon: "xmark.circle.fill",
-                iconBg: AppTheme.offline.opacity(0.08),
-                iconColor: AppTheme.offline,
-                change: "−1 dün",
-                changeType: .down
-            ),
-            DashboardMetric(
-                title: "Rölanti",
-                value: "\(idleCount)",
-                icon: "pause.circle.fill",
+                title: "Kontak Kapalı",
+                value: "\(kontakOffCount)",
+                icon: "key",
                 iconBg: AppTheme.idle.opacity(0.08),
                 iconColor: AppTheme.idle,
-                change: "Değişim yok",
+                change: "",
+                changeType: .flat
+            ),
+            DashboardMetric(
+                title: "Bilgi Yok",
+                value: "\(bilgiYokCount)",
+                icon: "questionmark.circle.fill",
+                iconBg: AppTheme.offline.opacity(0.08),
+                iconColor: AppTheme.offline,
+                change: "",
                 changeType: .flat
             ),
             DashboardMetric(
@@ -68,8 +75,8 @@ class DashboardViewModel: ObservableObject {
                 icon: "road.lanes",
                 iconBg: AppTheme.indigo.opacity(0.08),
                 iconColor: AppTheme.indigo,
-                change: "+12% haftalık",
-                changeType: .up
+                change: "",
+                changeType: .flat
             ),
         ]
     }
@@ -165,5 +172,15 @@ class DashboardViewModel: ObservableObject {
     func setPeriod(_ period: String) {
         selectedPeriod = period
         // In real app, this would fetch data for the period
+    }
+
+    /// Pull-to-refresh: WS'yi yeniden bağla ve verileri yenile
+    func refreshData() {
+        isRefreshing = true
+        wsManager.reconnect()
+        // 2 saniye sonra refreshing durumunu kapat
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            self?.isRefreshing = false
+        }
     }
 }

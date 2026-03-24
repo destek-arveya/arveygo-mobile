@@ -102,21 +102,34 @@ struct Vehicle: Identifiable, Hashable {
         let externalVoltage = json["external_voltage"] as? Double
 
         // Temperature: check top-level first, then fall back to sensors array
-        var temperatureC = json["temperatureC"] as? Double ?? json["tempCurrent"] as? Double
-        var humidityPct = json["humidityPct"] as? Double
+        var temperatureC: Double? = nil
+        if let t = json["temperatureC"] {
+            temperatureC = (t as? Double) ?? (t as? NSNumber)?.doubleValue
+        }
+        if temperatureC == nil, let t = json["tempCurrent"] {
+            temperatureC = (t as? Double) ?? (t as? NSNumber)?.doubleValue
+        }
+        var humidityPct: Double? = nil
+        if let h = json["humidityPct"] {
+            humidityPct = (h as? Double) ?? (h as? NSNumber)?.doubleValue
+        }
 
         // If not at top level, look inside sensors array (backend sends sensor data here)
         if temperatureC == nil, let sensors = json["sensors"] as? [[String: Any]] {
             for sensor in sensors {
-                if let temp = sensor["temperatureC"] as? Double {
-                    temperatureC = temp
-                    if humidityPct == nil {
-                        humidityPct = sensor["humidityPct"] as? Double
+                if let t = sensor["temperatureC"] {
+                    if let tv = (t as? Double) ?? (t as? NSNumber)?.doubleValue {
+                        temperatureC = tv
+                        if humidityPct == nil, let h = sensor["humidityPct"] {
+                            humidityPct = (h as? Double) ?? (h as? NSNumber)?.doubleValue
+                        }
+                        break
                     }
-                    break
                 }
             }
         }
+
+        print("🌡️ TEMP PARSE [\(plate)]: temperatureC=\(String(describing: temperatureC)), humidityPct=\(String(describing: humidityPct))")
 
         // Determine status — matches web backend logic
         let status: VehicleStatus

@@ -31,6 +31,9 @@ class DashboardViewModel : ViewModel() {
     val onlineCount: Int get() = _vehicles.value.count { it.status == VehicleStatus.ONLINE }
     val offlineCount: Int get() = _vehicles.value.count { it.status == VehicleStatus.OFFLINE }
     val idleCount: Int get() = _vehicles.value.count { it.status == VehicleStatus.IDLE }
+    val kontakOnCount: Int get() = _vehicles.value.count { it.ignition }
+    val kontakOffCount: Int get() = _vehicles.value.count { it.isOnline && !it.ignition }
+    val bilgiYokCount: Int get() = _vehicles.value.count { !it.isOnline }
     val totalKm: Int get() = _vehicles.value.sumOf { it.totalKm }
     val todayKm: Int get() = _vehicles.value.sumOf { it.todayKm }
     val avgScore: Int get() {
@@ -38,12 +41,24 @@ class DashboardViewModel : ViewModel() {
         return if (d.isEmpty()) 0 else d.sumOf { it.score } / d.size
     }
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing
+
+    fun refreshData() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            WebSocketManager.reconnect()
+            delay(2000)
+            _isRefreshing.value = false
+        }
+    }
+
     fun getMetrics(): List<DashboardMetric> = listOf(
-        DashboardMetric("Toplam Araç", "$totalVehicles", "car", AppColors.Navy.copy(alpha = 0.06f), AppColors.Navy, "Değişim yok", ChangeType.FLAT),
-        DashboardMetric("Aktif", "$onlineCount", "check_circle", AppColors.Online.copy(alpha = 0.08f), AppColors.Online, "+1 dün", ChangeType.UP),
-        DashboardMetric("Çevrimdışı", "$offlineCount", "cancel", AppColors.Offline.copy(alpha = 0.08f), AppColors.Offline, "−1 dün", ChangeType.DOWN),
-        DashboardMetric("Rölanti", "$idleCount", "pause_circle", AppColors.Idle.copy(alpha = 0.08f), AppColors.Idle, "Değişim yok", ChangeType.FLAT),
-        DashboardMetric("Bugün Km", formatKm(todayKm), "road", AppColors.Indigo.copy(alpha = 0.08f), AppColors.Indigo, "+12% haftalık", ChangeType.UP),
+        DashboardMetric("Toplam Araç", "$totalVehicles", "car", AppColors.Navy.copy(alpha = 0.06f), AppColors.Navy, "", ChangeType.FLAT),
+        DashboardMetric("Kontak Açık", "$kontakOnCount", "check_circle", AppColors.Online.copy(alpha = 0.08f), AppColors.Online, "", ChangeType.FLAT),
+        DashboardMetric("Kontak Kapalı", "$kontakOffCount", "cancel", AppColors.Idle.copy(alpha = 0.08f), AppColors.Idle, "", ChangeType.FLAT),
+        DashboardMetric("Bilgi Yok", "$bilgiYokCount", "pause_circle", AppColors.Offline.copy(alpha = 0.08f), AppColors.Offline, "", ChangeType.FLAT),
+        DashboardMetric("Bugün Km", formatKm(todayKm), "road", AppColors.Indigo.copy(alpha = 0.08f), AppColors.Indigo, "", ChangeType.FLAT),
     )
 
     fun formatKm(km: Int): String = NumberFormat.getNumberInstance(Locale("tr", "TR")).format(km)
