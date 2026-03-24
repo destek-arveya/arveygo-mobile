@@ -1,5 +1,6 @@
 package com.arveya.arveygo.viewmodels
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arveya.arveygo.models.AppUser
@@ -134,10 +135,15 @@ class AuthViewModel : ViewModel() {
     private fun generateLocalWSConfig(user: AppUser) {
         val jwt = JWTHelper.issueLiveMapToken(sub = user.id, companyId = user.companyId)
         wsConfig = WSConfig(url = AppConfig.WS_URL, token = jwt, pingInterval = AppConfig.WS_PING_INTERVAL.toInt())
+        Log.d("WS", "generateLocalWSConfig: url=${AppConfig.WS_URL}, token=${jwt.take(30)}..., userId=${user.id}, companyId=${user.companyId}")
     }
 
     fun connectWebSocket() {
-        wsConfig?.let { WebSocketManager.connect(it.url, it.token) }
+        Log.d("WS", "connectWebSocket called, wsConfig=${if (wsConfig != null) "SET" else "NULL"}")
+        wsConfig?.let {
+            Log.d("WS", "connectWebSocket: calling WebSocketManager.connect(url=${it.url}, token=${it.token.take(30)}...)")
+            WebSocketManager.connect(it.url, it.token)
+        } ?: Log.w("WS", "connectWebSocket: wsConfig is NULL — skipping!")
     }
 
     fun disconnectWebSocket() {

@@ -96,6 +96,9 @@ object WebSocketManager {
     private var orderList = mutableListOf<String>()
     // Socket generation counter — prevents stale socket callbacks from triggering reconnect
     private var socketGeneration = 0
+    // DNS fallback tracking
+    private var useFallbackURL = false
+    private var dnsFailCount = 0
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -117,6 +120,8 @@ object WebSocketManager {
         this.token = trimmedToken
         manualClose = false
         authFailed = false
+        useFallbackURL = false
+        dnsFailCount = 0
 
         openSocket(isReconnect = false)
     }
@@ -156,9 +161,17 @@ object WebSocketManager {
         socketGeneration++
         val myGeneration = socketGeneration
 
+        // Use fallback IP-based URL if DNS has failed before
+        val effectiveURL = if (useFallbackURL && AppConfig.WS_URL_FALLBACK.isNotEmpty()) {
+            Log.d(TAG, "Using fallback URL due to DNS issues")
+            AppConfig.WS_URL_FALLBACK
+        } else {
+            wsURL
+        }
+
         // Build URL as raw string (never use Uri.parse which can mangle wss://)
-        val separator = if (wsURL.contains("?")) "&" else "?"
-        val fullURLString = "$wsURL${separator}token=$token"
+        val separator = if (effectiveURL.contains("?")) "&" else "?"
+        val fullURLString = "$effectiveURL${separator}token=$token"
 
         awaitingSnapshot = true
         _status.value = if (isReconnect) WSConnectionStatus.Reconnecting(reconnectAttempt) else WSConnectionStatus.Connecting
@@ -166,7 +179,25 @@ object WebSocketManager {
 
         Log.d(TAG, "Connecting to: $fullURLString")
 
+        // Use custom DNS resolver with fallback
+        val dnsResolver = object : okhttp3.Dns {
+            override fun lookup(hostname: String): List<java.net.InetAddress> {
+                return try {
+                    okhttp3.Dns.SYSTEM.lookup(hostname)
+                } catch (e: java.net.UnknownHostException) {
+                    Log.w(TAG, "System DNS failed for $hostname, trying InetAddress fallback")
+                    try {
+                        java.net.InetAddress.getAllByName(hostname).toList()
+                    } catch (e2: Exception) {
+                        Log.e(TAG, "All DNS resolution failed for $hostname")
+                        throw e
+                    }
+                }
+            }
+        }
+
         client = OkHttpClient.Builder()
+            .dns(dnsResolver)
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.MINUTES) // Keep alive
             .writeTimeout(30, TimeUnit.SECONDS)
@@ -182,6 +213,7 @@ object WebSocketManager {
                 Log.d(TAG, "Socket opened (gen=$myGeneration)")
                 if (myGeneration != socketGeneration) return
                 scope.launch {
+                    dnsFailCount = 0 // Reset on success
                     startPingLoop()
                     armSnapshotTimeout()
                 }
@@ -196,6 +228,16 @@ object WebSocketManager {
                 Log.e(TAG, "Socket error: ${t.localizedMessage}")
                 if (myGeneration != socketGeneration) return
                 scope.launch {
+                    // If DNS resolution failed, switch to fallback URL
+                    if (t is java.net.UnknownHostException) {
+                        dnsFailCount++
+                        if (!useFallbackURL && AppConfig.WS_URL_FALLBACK.isNotEmpty()) {
+                            Log.w(TAG, "DNS resolution failed — switching to fallback URL: ${AppConfig.WS_URL_FALLBACK}")
+                            useFallbackURL = true
+                            openSocket(isReconnect = true)
+                            return@launch
+                        }
+                    }
                     if (!manualClose) handleDisconnect()
                 }
             }

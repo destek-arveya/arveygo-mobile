@@ -101,31 +101,42 @@ struct Vehicle: Identifiable, Hashable {
         let batteryVoltage = json["battery_voltage"] as? Double
         let externalVoltage = json["external_voltage"] as? Double
 
-        // Temperature: check top-level first, then fall back to sensors array
+        // Temperature: check top-level first (backend sends snake_case: temperature_c)
         var temperatureC: Double? = nil
-        if let t = json["temperatureC"] {
-            temperatureC = (t as? Double) ?? (t as? NSNumber)?.doubleValue
-        }
-        if temperatureC == nil, let t = json["tempCurrent"] {
-            temperatureC = (t as? Double) ?? (t as? NSNumber)?.doubleValue
+        for key in ["temperature_c", "temperatureC", "tempCurrent"] {
+            if let t = json[key] {
+                temperatureC = (t as? Double) ?? (t as? NSNumber)?.doubleValue
+                if temperatureC != nil { break }
+            }
         }
         var humidityPct: Double? = nil
-        if let h = json["humidityPct"] {
-            humidityPct = (h as? Double) ?? (h as? NSNumber)?.doubleValue
+        for key in ["humidity_pct", "humidityPct"] {
+            if let h = json[key] {
+                humidityPct = (h as? Double) ?? (h as? NSNumber)?.doubleValue
+                if humidityPct != nil { break }
+            }
         }
 
         // If not at top level, look inside sensors array (backend sends sensor data here)
         if temperatureC == nil, let sensors = json["sensors"] as? [[String: Any]] {
             for sensor in sensors {
-                if let t = sensor["temperatureC"] {
-                    if let tv = (t as? Double) ?? (t as? NSNumber)?.doubleValue {
-                        temperatureC = tv
-                        if humidityPct == nil, let h = sensor["humidityPct"] {
-                            humidityPct = (h as? Double) ?? (h as? NSNumber)?.doubleValue
+                for key in ["temperature_c", "temperatureC"] {
+                    if let t = sensor[key] {
+                        if let tv = (t as? Double) ?? (t as? NSNumber)?.doubleValue {
+                            temperatureC = tv
+                            if humidityPct == nil {
+                                for hKey in ["humidity_pct", "humidityPct"] {
+                                    if let h = sensor[hKey] {
+                                        humidityPct = (h as? Double) ?? (h as? NSNumber)?.doubleValue
+                                        if humidityPct != nil { break }
+                                    }
+                                }
+                            }
+                            break
                         }
-                        break
                     }
                 }
+                if temperatureC != nil { break }
             }
         }
 

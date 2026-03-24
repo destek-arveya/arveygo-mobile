@@ -190,16 +190,24 @@ data class Vehicle(
             val batteryVoltage = if (json.has("battery_voltage")) json.optDouble("battery_voltage") else null
             val externalVoltage = if (json.has("external_voltage")) json.optDouble("external_voltage") else null
 
-            // Temperature: check top-level first, then fall back to sensors array
+            // Temperature: check top-level first (backend sends snake_case: temperature_c)
             // Note: optDouble returns NaN for null/missing values, so we must filter NaN
             fun safeDouble(v: Double): Double? = if (v.isNaN()) null else v
 
-            var temperatureC: Double? = when {
-                json.has("temperatureC") -> safeDouble(json.optDouble("temperatureC"))
-                json.has("tempCurrent") -> safeDouble(json.optDouble("tempCurrent"))
-                else -> null
+            var temperatureC: Double? = null
+            for (key in listOf("temperature_c", "temperatureC", "tempCurrent")) {
+                if (json.has(key)) {
+                    temperatureC = safeDouble(json.optDouble(key))
+                    if (temperatureC != null) break
+                }
             }
-            var humidityPct: Double? = if (json.has("humidityPct")) safeDouble(json.optDouble("humidityPct")) else null
+            var humidityPct: Double? = null
+            for (key in listOf("humidity_pct", "humidityPct")) {
+                if (json.has(key)) {
+                    humidityPct = safeDouble(json.optDouble(key))
+                    if (humidityPct != null) break
+                }
+            }
 
             // If not at top level, look inside sensors array (backend sends sensor data here)
             if (temperatureC == null && json.has("sensors")) {
@@ -207,16 +215,24 @@ data class Vehicle(
                 if (sensors != null) {
                     for (i in 0 until sensors.length()) {
                         val sensor = sensors.optJSONObject(i) ?: continue
-                        if (sensor.has("temperatureC")) {
-                            val t = safeDouble(sensor.optDouble("temperatureC"))
-                            if (t != null) {
-                                temperatureC = t
-                                if (humidityPct == null && sensor.has("humidityPct")) {
-                                    humidityPct = safeDouble(sensor.optDouble("humidityPct"))
+                        for (key in listOf("temperature_c", "temperatureC")) {
+                            if (sensor.has(key)) {
+                                val t = safeDouble(sensor.optDouble(key))
+                                if (t != null) {
+                                    temperatureC = t
+                                    if (humidityPct == null) {
+                                        for (hKey in listOf("humidity_pct", "humidityPct")) {
+                                            if (sensor.has(hKey)) {
+                                                humidityPct = safeDouble(sensor.optDouble(hKey))
+                                                if (humidityPct != null) break
+                                            }
+                                        }
+                                    }
+                                    break
                                 }
-                                break
                             }
                         }
+                        if (temperatureC != null) break
                     }
                 }
             }
