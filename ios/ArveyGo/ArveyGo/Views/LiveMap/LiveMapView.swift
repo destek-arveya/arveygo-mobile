@@ -29,14 +29,7 @@ struct LiveMapView: View {
                         Spacer()
                     }
 
-                    // Bottom status filter bar
-                    VStack {
-                        Spacer()
-                        if selectedVehicle == nil {
-                            statusFilterBar
-                                .padding(.bottom, 8)
-                        }
-                    }
+                    // (filter bar moved to top overlay)
                 }
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -103,7 +96,9 @@ struct LiveMapView: View {
     var mapContent: some View {
         Map(position: $mapCameraPosition) {
             ForEach(vm.filteredVehicles) { vehicle in
-                Annotation(vehicle.plate, coordinate: CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng)) {
+                // Use animated coordinates for smooth movement
+                let coord = vm.animatedCoordinate(for: vehicle)
+                Annotation(vehicle.plate, coordinate: coord) {
                     Button(action: {
                         selectedVehicle = vehicle
                         withAnimation {
@@ -113,7 +108,7 @@ struct LiveMapView: View {
                             ))
                         }
                     }) {
-                        VehicleMapPin(vehicle: vehicle, isSelected: selectedVehicle?.id == vehicle.id)
+                        VehicleMapPin(vehicle: vehicle, isSelected: selectedVehicle?.id == vehicle.id, animatedDirection: vm.animatedDirection(for: vehicle))
                     }
                 }
             }
@@ -122,47 +117,69 @@ struct LiveMapView: View {
         .ignoresSafeArea(edges: .bottom)
     }
 
-    // MARK: - Top Overlay
+    // MARK: - Top Overlay (filter chips + WS status)
     var topOverlay: some View {
-        HStack(spacing: 6) {
-            Spacer()
-            // WebSocket status chip (real-time)
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(wsStatusColor)
-                    .frame(width: 6, height: 6)
-                Text(vm.wsStatus.label)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(AppTheme.navy)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
-            .cornerRadius(20)
-            .onTapGesture {
-                // Tap to reconnect if disconnected/error
-                if case .error = vm.wsStatus {
-                    authVM.connectWebSocket()
-                } else if vm.wsStatus == .disconnected || vm.wsStatus == .idle {
-                    authVM.connectWebSocket()
+        VStack(spacing: 6) {
+            // Filter chips row (like Android)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    statusChip(label: "Tümü", count: vm.vehicles.count, filter: nil, color: AppTheme.navy)
+                    statusChip(label: "Aktif", count: vm.onlineCount, filter: .online, color: AppTheme.online)
+                    statusChip(label: "Çevrimdışı", count: vm.offlineCount, filter: .offline, color: AppTheme.offline)
+                    statusChip(label: "Rölanti", count: vm.idleCount, filter: .idle, color: AppTheme.idle)
+                    
+                    Spacer()
+                    
+                    // WebSocket status chip
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(wsStatusColor)
+                            .frame(width: 6, height: 6)
+                        Text(vm.wsStatus.label)
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(wsStatusColor)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(wsStatusColor.opacity(0.1))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(wsStatusColor.opacity(0.3), lineWidth: 1)
+                    )
+                    .onTapGesture {
+                        if case .error = vm.wsStatus {
+                            authVM.connectWebSocket()
+                        } else if vm.wsStatus == .disconnected || vm.wsStatus == .idle {
+                            authVM.connectWebSocket()
+                        }
+                    }
                 }
+                .padding(.horizontal, 12)
             }
-
-            // Vehicle count chip
-            HStack(spacing: 5) {
-                Image(systemName: "car.fill")
-                    .font(.system(size: 9))
-                Text("\(vm.filteredVehicles.count) Araç")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(AppTheme.navy)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
-            .cornerRadius(20)
         }
-        .padding(.horizontal, 16)
         .padding(.top, 4)
+    }
+    
+    func statusChip(label: String, count: Int, filter: VehicleStatus?, color: Color) -> some View {
+        let isActive = vm.statusFilter == filter
+        return Button(action: { vm.statusFilter = filter }) {
+            Text("\(label) (\(count))")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(isActive ? color : AppTheme.textSecondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(isActive ? color.opacity(0.15) : Color.white.opacity(0.9))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(isActive ? color : AppTheme.borderSoft, lineWidth: 1)
+        )
     }
 
     private var wsStatusColor: Color {
@@ -171,48 +188,6 @@ struct LiveMapView: View {
         case .connecting, .reconnecting: return .orange
         case .error:        return .red
         default:            return .gray
-        }
-    }
-
-    // MARK: - Status Filter Bar (more visible)
-    var statusFilterBar: some View {
-        HStack(spacing: 6) {
-            statusFilterPill(label: "Tümü", count: vm.vehicles.count, filter: nil, color: AppTheme.navy)
-            statusFilterPill(label: "Aktif", count: vm.onlineCount, filter: .online, color: AppTheme.online)
-            statusFilterPill(label: "Rölanti", count: vm.idleCount, filter: .idle, color: AppTheme.idle)
-            statusFilterPill(label: "Çevrimdışı", count: vm.offlineCount, filter: .offline, color: AppTheme.offline)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(.white.opacity(0.95))
-                .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
-        )
-        .padding(.horizontal, 12)
-    }
-
-    func statusFilterPill(label: String, count: Int, filter: VehicleStatus?, color: Color) -> some View {
-        let isActive = vm.statusFilter == filter
-        return Button(action: { vm.statusFilter = filter }) {
-            VStack(spacing: 3) {
-                Text("\(count)")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(isActive ? .white : color)
-                Text(label)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(isActive ? .white.opacity(0.9) : AppTheme.textSecondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isActive ? color : color.opacity(0.08))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isActive ? color : color.opacity(0.2), lineWidth: 1.5)
-            )
         }
     }
 
@@ -233,32 +208,6 @@ struct LiveMapView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
-            .padding(.bottom, 10)
-
-            // Search
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 13))
-                    .foregroundColor(AppTheme.textMuted)
-                TextField("Plaka veya araç ara...", text: $vm.searchText)
-                    .font(.system(size: 13))
-                if !vm.searchText.isEmpty {
-                    Button(action: { vm.searchText = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(AppTheme.textFaint)
-                    }
-                }
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 38)
-            .background(AppTheme.bg)
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(AppTheme.borderSoft, lineWidth: 1)
-            )
-            .padding(.horizontal, 20)
             .padding(.bottom, 10)
 
             Divider()
@@ -468,57 +417,68 @@ struct LiveMapView: View {
     }
 }
 
-// MARK: - Vehicle Map Pin
+// MARK: - Vehicle Map Pin (circle + direction arrow, like Android)
 struct VehicleMapPin: View {
     let vehicle: Vehicle
     let isSelected: Bool
+    var animatedDirection: Double = 0
+
+    private var pinSize: CGFloat { isSelected ? 44 : 36 }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 2) {
+            // Circle with direction arrow inside
             ZStack {
-                // Pin body
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(vehicle.status.color.opacity(isSelected ? 1.0 : 0.85))
-                    .frame(width: isSelected ? 42 : 34, height: isSelected ? 42 : 34)
+                Circle()
+                    .fill(vehicle.status.color)
+                    .frame(width: pinSize, height: pinSize)
                     .shadow(color: vehicle.status.color.opacity(0.4), radius: isSelected ? 8 : 4, y: 2)
 
-                Image(systemName: "car.fill")
-                    .font(.system(size: isSelected ? 18 : 14, weight: .medium))
-                    .foregroundColor(.white)
-                    .rotationEffect(.degrees(vehicle.direction > 0 ? vehicle.direction - 90 : 0))
+                Circle()
+                    .strokeBorder(Color.white, lineWidth: 2.5)
+                    .frame(width: pinSize, height: pinSize)
+
+                // Direction arrow (matching Android)
+                DirectionArrow()
+                    .fill(Color.white)
+                    .frame(width: pinSize * 0.5, height: pinSize * 0.6)
+                    .rotationEffect(.degrees(animatedDirection))
             }
 
-            // Plate label
-            if isSelected {
-                Text(vehicle.plate)
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(AppTheme.navy)
-                    .cornerRadius(4)
-                    .offset(y: 2)
-            }
-
-            // Arrow
-            Triangle()
-                .fill(vehicle.status.color.opacity(isSelected ? 1.0 : 0.85))
-                .frame(width: 10, height: 6)
+            // Plate label (always visible)
+            Text(vehicle.plate)
+                .font(.system(size: isSelected ? 9 : 8, weight: .bold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(AppTheme.navy.opacity(0.9))
+                )
         }
         .animation(.spring(response: 0.25), value: isSelected)
     }
 }
 
-struct Triangle: Shape {
+/// Arrow shape matching Android's direction arrow
+struct DirectionArrow: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        let cx = rect.midX
+        let cy = rect.midY
+        let w = rect.width
+        let h = rect.height
+        // Upward-pointing arrow
+        path.move(to: CGPoint(x: cx, y: cy - h * 0.5))        // top
+        path.addLine(to: CGPoint(x: cx - w * 0.5, y: cy + h * 0.3)) // bottom-left
+        path.addLine(to: CGPoint(x: cx, y: cy + h * 0.1))     // notch
+        path.addLine(to: CGPoint(x: cx + w * 0.5, y: cy + h * 0.3)) // bottom-right
         path.closeSubpath()
         return path
     }
 }
+
+// (Triangle shape removed — not needed)
 
 // MARK: - Live Map ViewModel
 @MainActor
@@ -528,8 +488,14 @@ class LiveMapViewModel: ObservableObject {
     @Published var searchText = ""
     @Published var wsStatus: WSConnectionStatus = .idle
 
+    /// Animated positions: maps vehicle ID → animated CLLocationCoordinate2D
+    @Published var animatedPositions: [String: CLLocationCoordinate2D] = [:]
+    /// Animated directions: maps vehicle ID → animated heading
+    @Published var animatedDirections: [String: Double] = [:]
+
     private var cancellables = Set<AnyCancellable>()
     private let wsManager = WebSocketManager.shared
+    private var animationTimers: [String: Timer] = [:]
 
     var onlineCount: Int { vehicles.filter { $0.status == .online }.count }
     var offlineCount: Int { vehicles.filter { $0.status == .offline }.count }
@@ -552,8 +518,79 @@ class LiveMapViewModel: ObservableObject {
         return result
     }
 
+    /// Get the animated coordinate for a vehicle (falls back to raw lat/lng)
+    func animatedCoordinate(for vehicle: Vehicle) -> CLLocationCoordinate2D {
+        return animatedPositions[vehicle.id] ?? CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng)
+    }
+
+    /// Get the animated direction for a vehicle
+    func animatedDirection(for vehicle: Vehicle) -> Double {
+        return animatedDirections[vehicle.id] ?? vehicle.direction
+    }
+
     init() {
         subscribeToWebSocket()
+    }
+
+    // MARK: - Smooth Animation
+    /// Smoothly interpolate a vehicle marker from its current animated position to the new target over ~1 second.
+    private func animateVehicle(_ vehicle: Vehicle) {
+        let vehicleId = vehicle.id
+        let targetLat = vehicle.lat
+        let targetLng = vehicle.lng
+        let targetDir = vehicle.direction
+
+        let startPos = animatedPositions[vehicleId] ?? CLLocationCoordinate2D(latitude: targetLat, longitude: targetLng)
+        let startDir = animatedDirections[vehicleId] ?? targetDir
+
+        // If first time or same position, snap instantly
+        if animatedPositions[vehicleId] == nil ||
+           (abs(startPos.latitude - targetLat) < 0.000001 && abs(startPos.longitude - targetLng) < 0.000001) {
+            animatedPositions[vehicleId] = CLLocationCoordinate2D(latitude: targetLat, longitude: targetLng)
+            animatedDirections[vehicleId] = targetDir
+            return
+        }
+
+        // Cancel previous animation for this vehicle
+        animationTimers[vehicleId]?.invalidate()
+
+        let duration: Double = 1.0
+        let steps = 30 // 30 frames over 1 second
+        let interval = duration / Double(steps)
+        var currentStep = 0
+
+        let timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
+            guard let self = self else { timer.invalidate(); return }
+            currentStep += 1
+            let t = min(Double(currentStep) / Double(steps), 1.0)
+            // Ease-in-out curve
+            let ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+
+            let lat = startPos.latitude + (targetLat - startPos.latitude) * ease
+            let lng = startPos.longitude + (targetLng - startPos.longitude) * ease
+            let dir = startDir + (targetDir - startDir) * ease
+
+            Task { @MainActor in
+                self.animatedPositions[vehicleId] = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                self.animatedDirections[vehicleId] = dir
+            }
+
+            if currentStep >= steps {
+                timer.invalidate()
+                Task { @MainActor in
+                    self.animationTimers.removeValue(forKey: vehicleId)
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        animationTimers[vehicleId] = timer
+    }
+
+    /// Animate all vehicles to their current positions
+    private func animateAllVehicles(_ vehicleList: [Vehicle]) {
+        for vehicle in vehicleList {
+            animateVehicle(vehicle)
+        }
     }
 
     // MARK: - WebSocket Subscription
@@ -565,6 +602,7 @@ class LiveMapViewModel: ObservableObject {
                 guard let self = self else { return }
                 if !vehicleList.isEmpty {
                     self.vehicles = vehicleList
+                    self.animateAllVehicles(vehicleList)
                 }
             }
             .store(in: &cancellables)
@@ -582,6 +620,7 @@ class LiveMapViewModel: ObservableObject {
                 switch event {
                 case .snapshot(let vehicles, _, _):
                     self.vehicles = vehicles
+                    self.animateAllVehicles(vehicles)
                 case .update(let vehicle, _):
                     // Update single vehicle in list
                     if let index = self.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
@@ -589,6 +628,7 @@ class LiveMapViewModel: ObservableObject {
                     } else {
                         self.vehicles.append(vehicle)
                     }
+                    self.animateVehicle(vehicle)
                 case .statusChanged(let status):
                     self.wsStatus = status
                 case .pong:
@@ -613,7 +653,7 @@ class LiveMapViewModel: ObservableObject {
     }
 
     func loadDummyData() {
-        vehicles = [
+        let dummyVehicles = [
             Vehicle(id: "1", plate: "34 ABC 123", model: "Ford Transit", status: .online, kontakOn: true, totalKm: 48320, todayKm: 87, driver: "Ahmet Yılmaz", city: "İstanbul", lat: 41.0082, lng: 28.9784),
             Vehicle(id: "2", plate: "06 XYZ 789", model: "Mercedes Sprinter", status: .offline, kontakOn: false, totalKm: 92100, todayKm: 0, driver: "Mehmet Demir", city: "Ankara", lat: 39.9334, lng: 32.8597),
             Vehicle(id: "3", plate: "35 DEF 456", model: "Renault Master", status: .online, kontakOn: true, totalKm: 31540, todayKm: 62, driver: "Ayşe Kaya", city: "İzmir", lat: 38.4192, lng: 27.1287),
@@ -623,6 +663,17 @@ class LiveMapViewModel: ObservableObject {
             Vehicle(id: "7", plate: "34 PRS 111", model: "Iveco Daily", status: .online, kontakOn: true, totalKm: 14220, todayKm: 112, driver: "Fatma Arslan", city: "İstanbul", lat: 41.0422, lng: 29.0083),
             Vehicle(id: "8", plate: "06 TUV 222", model: "Ford Transit Custom", status: .idle, kontakOn: false, totalKm: 38900, todayKm: 0, driver: "Hasan Koç", city: "Ankara", lat: 39.9208, lng: 32.8541),
         ]
+        vehicles = dummyVehicles
+        // Initialize animated positions instantly for dummy data
+        for v in dummyVehicles {
+            animatedPositions[v.id] = CLLocationCoordinate2D(latitude: v.lat, longitude: v.lng)
+            animatedDirections[v.id] = v.direction
+        }
+    }
+
+    deinit {
+        animationTimers.values.forEach { $0.invalidate() }
+        animationTimers.removeAll()
     }
 }
 

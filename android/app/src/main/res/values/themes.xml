@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ArveyGo" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#090F41</item>
+        <item name="android:navigationBarColor">#F5F6FA</item>
+    </style>
+</resources>

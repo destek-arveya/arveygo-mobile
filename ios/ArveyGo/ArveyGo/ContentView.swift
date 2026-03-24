@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - App Pages
 enum AppPage: String, CaseIterable {
@@ -61,6 +62,10 @@ struct ContentView: View {
             SideMenuView(isShowing: $showSideMenu, selectedPage: $selectedPage)
         }
         .animation(.spring(response: 0.3), value: showSideMenu)
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            // Reconnect WebSocket when app returns to foreground (global, not just live map)
+            WebSocketManager.shared.reconnect()
+        }
     }
 }
 

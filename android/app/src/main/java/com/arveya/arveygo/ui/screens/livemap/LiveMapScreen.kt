@@ -1,0 +1,714 @@
+package com.arveya.arveygo.ui.screens.livemap
+
+import android.animation.ValueAnimator
+import android.content.Context
+import android.graphics.*
+import android.graphics.drawable.BitmapDrawable
+import android.view.animation.AccelerateDecelerateInterpolator
+import androidx.compose.animation.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.arveya.arveygo.LocalAuthViewModel
+import com.arveya.arveygo.models.Vehicle
+import com.arveya.arveygo.models.VehicleStatus
+import com.arveya.arveygo.services.WSConnectionStatus
+import com.arveya.arveygo.ui.components.AvatarCircle
+import com.arveya.arveygo.ui.components.StatusBadge
+import com.arveya.arveygo.ui.theme.AppColors
+import com.arveya.arveygo.viewmodels.LiveMapViewModel
+import androidx.compose.ui.graphics.vector.ImageVector
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+
+// Animated Marker Wrapper - smoothly animates marker position
+private class AnimatedMarker(
+    private val mapView: MapView,
+    val marker: Marker
+) {
+    private var animator: ValueAnimator? = null
+
+    fun animateTo(target: GeoPoint) {
+        val start = marker.position ?: target
+        if (start.latitude == 0.0 && start.longitude == 0.0) {
+            marker.position = target
+            mapView.invalidate()
+            return
+        }
+        if (start.latitude == target.latitude && start.longitude == target.longitude) return
+
+        animator?.cancel()
+        animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 1000
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener { anim ->
+                val t = anim.animatedFraction.toDouble()
+                val lat = start.latitude + (target.latitude - start.latitude) * t
+                val lng = start.longitude + (target.longitude - start.longitude) * t
+                marker.position = GeoPoint(lat, lng)
+                mapView.invalidate()
+            }
+            start()
+        }
+    }
+
+    fun destroy() {
+        animator?.cancel()
+    }
+}
+
+// Vehicle Pin Bitmap Creator
+private fun createVehiclePinBitmap(
+    context: Context,
+    statusColor: Int,
+    direction: Float,
+    plate: String,
+    isSelected: Boolean
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val baseSize = if (isSelected) 52 else 42
+    val pinPx = (baseSize * density).toInt()
+    val plateH = if (plate.isNotEmpty()) (18 * density).toInt() else 0
+    val totalH = pinPx + plateH + (4 * density).toInt()
+    val totalW = maxOf(pinPx, (plate.length * 7 * density).toInt() + (16 * density).toInt())
+    val bitmap = Bitmap.createBitmap(maxOf(totalW, pinPx), totalH, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val cx = bitmap.width / 2f
+    val cy = pinPx / 2f
+    val radius = pinPx / 2f - 2 * density
+
+    // Shadow
+    val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(50, 0, 0, 0)
+        maskFilter = BlurMaskFilter(4 * density, BlurMaskFilter.Blur.NORMAL)
+    }
+    canvas.drawCircle(cx, cy + 2 * density, radius, shadowPaint)
+
+    // Background circle
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = statusColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(cx, cy, radius, bgPaint)
+
+    // White border
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 2.5f * density
+    }
+    canvas.drawCircle(cx, cy, radius, borderPaint)
+
+    // Direction arrow
+    val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        style = Paint.Style.FILL
+    }
+    canvas.save()
+    canvas.rotate(direction, cx, cy)
+    val arrowPath = Path().apply {
+        moveTo(cx, cy - radius * 0.5f)
+        lineTo(cx - radius * 0.3f, cy + radius * 0.3f)
+        lineTo(cx, cy + radius * 0.1f)
+        lineTo(cx + radius * 0.3f, cy + radius * 0.3f)
+        close()
+    }
+    canvas.drawPath(arrowPath, iconPaint)
+    canvas.restore()
+
+    // Plate label (always shown)
+    if (plate.isNotEmpty()) {
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            textSize = 9f * density
+            typeface = Typeface.DEFAULT_BOLD
+            textAlign = Paint.Align.CENTER
+        }
+        val bgRect = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(230, 26, 35, 80) // Navy
+        }
+        val textWidth = textPaint.measureText(plate)
+        val padH = 5 * density
+        val padV = 2.5f * density
+        val textY = pinPx + 12f * density
+        val rectF = RectF(
+            cx - textWidth / 2 - padH,
+            textY - textPaint.textSize - padV,
+            cx + textWidth / 2 + padH,
+            textY + padV
+        )
+        canvas.drawRoundRect(rectF, 3f * density, 3f * density, bgRect)
+        canvas.drawText(plate, cx, textY, textPaint)
+    }
+
+    return bitmap
+}
+
+// Main Screen
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LiveMapScreen(onMenuClick: () -> Unit) {
+    val context = LocalContext.current
+    val authVM = LocalAuthViewModel.current
+    val user by authVM.currentUser.collectAsState()
+    val vm: LiveMapViewModel = viewModel()
+    val vehicles by vm.vehicles.collectAsState()
+    val vehicleVersion by vm.vehicleVersion.collectAsState()
+    val statusFilter by vm.statusFilter.collectAsState()
+    val wsStatus by vm.wsStatus.collectAsState()
+    var selectedVehicle by remember { mutableStateOf<Vehicle?>(null) }
+    var detailVehicle by remember { mutableStateOf<Vehicle?>(null) }
+    var showVehicleList by remember { mutableStateOf(true) }
+
+    // If detail vehicle is set, show VehicleDetailScreen
+    detailVehicle?.let { vehicle ->
+        com.arveya.arveygo.ui.screens.fleet.VehicleDetailScreen(
+            vehicle = vehicle,
+            onBack = { detailVehicle = null }
+        )
+        return
+    }
+
+    LaunchedEffect(Unit) {
+        vm.loadDummyDataIfNeeded()
+        authVM.connectWebSocket()
+    }
+
+    val filteredVehicles = vm.filteredVehicles()
+
+    // osmdroid configuration
+    LaunchedEffect(Unit) {
+        Configuration.getInstance().apply {
+            userAgentValue = context.packageName
+        }
+    }
+
+    // MapView reference & animated markers map
+    val mapViewRef = remember { mutableStateOf<MapView?>(null) }
+    val animatedMarkers = remember { mutableMapOf<String, AnimatedMarker>() }
+
+    // Update markers when vehicle data changes (SMOOTH animation)
+    LaunchedEffect(vehicleVersion, selectedVehicle, statusFilter) {
+        val mapView = mapViewRef.value ?: return@LaunchedEffect
+        val currentIds = filteredVehicles.map { it.id }.toSet()
+
+        // Remove markers for vehicles no longer visible
+        val toRemove = animatedMarkers.keys.filter { it !in currentIds }
+        toRemove.forEach { id ->
+            animatedMarkers[id]?.let { am ->
+                am.destroy()
+                mapView.overlays.remove(am.marker)
+            }
+            animatedMarkers.remove(id)
+        }
+
+        // Add or update markers
+        filteredVehicles.forEach { vehicle ->
+            val target = GeoPoint(vehicle.lat, vehicle.lng)
+            val isSel = selectedVehicle?.id == vehicle.id
+            val statusColor = when (vehicle.status) {
+                VehicleStatus.ONLINE -> AppColors.Online.toArgb()
+                VehicleStatus.OFFLINE -> AppColors.Offline.toArgb()
+                VehicleStatus.IDLE -> AppColors.Idle.toArgb()
+            }
+
+            val existing = animatedMarkers[vehicle.id]
+            if (existing != null) {
+                val bmp = createVehiclePinBitmap(context, statusColor, vehicle.direction.toFloat(), vehicle.plate, isSel)
+                existing.marker.icon = BitmapDrawable(context.resources, bmp)
+                existing.marker.title = vehicle.plate
+                existing.marker.snippet = "${vehicle.formattedSpeed} \u00b7 ${vehicle.status.label}"
+                // SMOOTH ANIMATE to new position
+                existing.animateTo(target)
+            } else {
+                val marker = Marker(mapView).apply {
+                    position = target
+                    title = vehicle.plate
+                    snippet = "${vehicle.formattedSpeed} \u00b7 ${vehicle.status.label}"
+                    val bmp = createVehiclePinBitmap(context, statusColor, vehicle.direction.toFloat(), vehicle.plate, isSel)
+                    icon = BitmapDrawable(context.resources, bmp)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    setOnMarkerClickListener { _, _ ->
+                        selectedVehicle = vehicle
+                        true
+                    }
+                }
+                mapView.overlays.add(marker)
+                animatedMarkers[vehicle.id] = AnimatedMarker(mapView, marker)
+            }
+        }
+        mapView.invalidate()
+    }
+
+    // Fit bounds on first load
+    var hasFittedBounds by remember { mutableStateOf(false) }
+    LaunchedEffect(filteredVehicles.size) {
+        if (filteredVehicles.size > 1 && !hasFittedBounds) {
+            val mapView = mapViewRef.value ?: return@LaunchedEffect
+            try {
+                val north = filteredVehicles.maxOf { it.lat }
+                val south = filteredVehicles.minOf { it.lat }
+                val east = filteredVehicles.maxOf { it.lng }
+                val west = filteredVehicles.minOf { it.lng }
+                val box = BoundingBox(north + 0.5, east + 0.5, south - 0.5, west - 0.5)
+                mapView.zoomToBoundingBox(box, true, 80)
+                hasFittedBounds = true
+            } catch (_: Exception) {}
+        }
+    }
+
+    // Cleanup
+    DisposableEffect(Unit) {
+        onDispose {
+            animatedMarkers.values.forEach { it.destroy() }
+            animatedMarkers.clear()
+            mapViewRef.value?.onDetach()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = onMenuClick) {
+                        Icon(Icons.Default.Menu, null, tint = AppColors.Navy)
+                    }
+                },
+                title = {
+                    Column {
+                        Text("Canl\u0131 Harita", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+                        Text("Ara\u00e7 Takip / Canl\u0131 Harita", fontSize = 10.sp, color = AppColors.TextMuted)
+                    }
+                },
+                actions = {
+                    WSStatusChip(wsStatus)
+                    Spacer(Modifier.width(8.dp))
+                    AvatarCircle(initials = user?.avatar ?: "A", size = 30.dp)
+                    Spacer(Modifier.width(12.dp))
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.Surface)
+            )
+        }
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+
+            // osmdroid MapView (OpenStreetMap - FREE)
+            AndroidView(
+                factory = { ctx ->
+                    MapView(ctx).apply {
+                        setTileSource(TileSourceFactory.MAPNIK)
+                        setMultiTouchControls(true)
+                        controller.setZoom(6.0)
+                        controller.setCenter(GeoPoint(39.0, 35.0))
+                        zoomController.setVisibility(
+                            org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER
+                        )
+                        mapViewRef.value = this
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Status filter chips
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                StatusFilterChip("T\u00fcm\u00fc (${vehicles.size})", null, statusFilter) { vm.setFilter(null) }
+                StatusFilterChip("Aktif (${vm.onlineCount})", VehicleStatus.ONLINE, statusFilter) { vm.setFilter(VehicleStatus.ONLINE) }
+                StatusFilterChip("\u00c7evrimd\u0131\u015f\u0131 (${vm.offlineCount})", VehicleStatus.OFFLINE, statusFilter) { vm.setFilter(VehicleStatus.OFFLINE) }
+                StatusFilterChip("R\u00f6lanti (${vm.idleCount})", VehicleStatus.IDLE, statusFilter) { vm.setFilter(VehicleStatus.IDLE) }
+            }
+
+            // Zoom controls
+            Column(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 12.dp)
+            ) {
+                FloatingActionButton(
+                    onClick = { mapViewRef.value?.controller?.zoomIn() },
+                    containerColor = AppColors.Surface,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(Icons.Default.Add, null, tint = AppColors.Navy, modifier = Modifier.size(16.dp))
+                }
+                Spacer(Modifier.height(4.dp))
+                FloatingActionButton(
+                    onClick = { mapViewRef.value?.controller?.zoomOut() },
+                    containerColor = AppColors.Surface,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(Icons.Default.Remove, null, tint = AppColors.Navy, modifier = Modifier.size(16.dp))
+                }
+            }
+
+            // Bottom controls
+            Column(modifier = Modifier.align(Alignment.BottomCenter)) {
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    FloatingActionButton(
+                        onClick = { showVehicleList = !showVehicleList },
+                        containerColor = AppColors.Surface,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            if (showVehicleList) Icons.Default.KeyboardArrowDown else Icons.Default.FormatListBulleted,
+                            null, tint = AppColors.Navy, modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                // Vehicle list bottom sheet
+                AnimatedVisibility(
+                    visible = showVehicleList && selectedVehicle == null,
+                    enter = slideInVertically(initialOffsetY = { it }),
+                    exit = slideOutVertically(targetOffsetY = { it })
+                ) {
+                    VehicleListSheet(
+                        vehicles = filteredVehicles,
+                        onSelect = { v ->
+                            selectedVehicle = v
+                            mapViewRef.value?.controller?.animateTo(GeoPoint(v.lat, v.lng), 15.0, 800L)
+                        },
+                        onClose = { showVehicleList = false }
+                    )
+                }
+
+                // Selected vehicle popup
+                selectedVehicle?.let { v ->
+                    VehiclePopupCard(
+                        vehicle = v,
+                        onClose = { selectedVehicle = null },
+                        onZoomTo = {
+                            selectedVehicle = null
+                            mapViewRef.value?.controller?.animateTo(GeoPoint(v.lat, v.lng), 16.0, 600L)
+                        },
+                        onDetail = {
+                            val vehicleToOpen = v
+                            selectedVehicle = null
+                            detailVehicle = vehicleToOpen
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+// WS Status Chip
+@Composable
+private fun WSStatusChip(status: WSConnectionStatus) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .background(status.color.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
+            .border(1.dp, status.color.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+    ) {
+        Box(Modifier.size(6.dp).clip(CircleShape).background(status.color))
+        Spacer(Modifier.width(6.dp))
+        Text(status.label, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = status.color)
+    }
+}
+
+// Status filter chip
+@Composable
+private fun StatusFilterChip(
+    label: String,
+    status: VehicleStatus?,
+    activeFilter: VehicleStatus?,
+    onClick: () -> Unit
+) {
+    val isActive = activeFilter == status
+    val color = status?.color ?: AppColors.Navy
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (isActive) color.copy(alpha = 0.15f) else AppColors.Surface.copy(alpha = 0.9f))
+            .border(1.dp, if (isActive) color else AppColors.BorderSoft, RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+    ) {
+        Text(label, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = if (isActive) color else AppColors.TextSecondary)
+    }
+}
+
+// Vehicle Popup Sheet (matches iOS vehiclePopupSheet)
+@Composable
+private fun VehiclePopupCard(
+    vehicle: Vehicle,
+    onClose: () -> Unit,
+    onZoomTo: () -> Unit,
+    onDetail: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .background(AppColors.Surface, RoundedCornerShape(18.dp))
+            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(18.dp))
+            .padding(top = 16.dp)
+    ) {
+        // Header: icon + plate + model + driver + status
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(52.dp)
+                    .background(vehicle.status.color.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
+            ) {
+                Icon(Icons.Default.DirectionsCar, null, tint = vehicle.status.color, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(vehicle.plate, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                Row {
+                    Text(vehicle.model, fontSize = 13.sp, color = AppColors.TextMuted)
+                    Text(" \u00b7 ", color = AppColors.TextFaint)
+                    Text(vehicle.driver, fontSize = 13.sp, color = AppColors.TextMuted)
+                }
+            }
+            StatusBadge(vehicle.status)
+        }
+
+        Spacer(Modifier.height(14.dp))
+        HorizontalDivider(color = AppColors.BorderSoft)
+        Spacer(Modifier.height(14.dp))
+
+        // Info grid (2 columns, 3 rows)
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 16.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PopupInfoCell(Icons.Default.LocationOn, "Konum", vehicle.city, Color.Blue, Modifier.weight(1f))
+                PopupInfoCell(Icons.Default.Speed, "H\u0131z", vehicle.formattedSpeed, Color(0xFFFF9800), Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PopupInfoCell(Icons.Default.Route, "Bug\u00fcn", vehicle.formattedTodayKm, AppColors.Indigo, Modifier.weight(1f))
+                PopupInfoCell(Icons.Default.VpnKey, "Kontak", if (vehicle.kontakOn) "A\u00e7\u0131k" else "Kapal\u0131", if (vehicle.kontakOn) AppColors.Online else AppColors.Offline, Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PopupInfoCell(Icons.Default.Speed, "Toplam Km", vehicle.formattedTotalKm + " km", AppColors.Navy, Modifier.weight(1f))
+                PopupInfoCell(Icons.Default.CellTower, "Sinyal", if (vehicle.status == VehicleStatus.ONLINE) "G\u00fc\u00e7l\u00fc" else "Yok", if (vehicle.status == VehicleStatus.ONLINE) AppColors.Online else AppColors.TextFaint, Modifier.weight(1f))
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        // Quick actions row
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 16.dp)
+        ) {
+            PopupQuickAction(Icons.Default.LocationOn, "Konuma Git", Color.Blue, Modifier.weight(1f), onZoomTo)
+            PopupQuickAction(Icons.Default.History, "Rota Ge\u00e7mi\u015fi", AppColors.Indigo, Modifier.weight(1f)) {}
+            PopupQuickAction(Icons.Default.Notifications, "Alarm Kur", Color(0xFFFF9800), Modifier.weight(1f)) {}
+            PopupQuickAction(Icons.Default.Lock, "Blokaj", Color.Red, Modifier.weight(1f)) {}
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        // DETAY GÖR Button
+        Button(
+            onClick = onDetail,
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Navy),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .height(50.dp)
+        ) {
+            Icon(Icons.Default.OpenInFull, null, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Detay G\u00f6r", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun PopupInfoCell(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .background(AppColors.Bg, RoundedCornerShape(10.dp))
+            .padding(12.dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(32.dp)
+                .background(color.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+        ) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(14.dp))
+        }
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = AppColors.TextFaint, letterSpacing = 0.3.sp)
+            Text(value, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun PopupQuickAction(
+    icon: ImageVector,
+    label: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.clickable(onClick = onClick)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(42.dp)
+                .background(color.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+        ) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted, textAlign = TextAlign.Center, maxLines = 2, lineHeight = 11.sp)
+    }
+}
+
+// Vehicle list sheet
+@Composable
+private fun VehicleListSheet(
+    vehicles: List<Vehicle>,
+    onSelect: (Vehicle) -> Unit,
+    onClose: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(0.35f)
+            .background(AppColors.Surface, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            .padding(top = 8.dp)
+    ) {
+        Box(
+            Modifier
+                .width(36.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(AppColors.BorderSoft)
+                .align(Alignment.CenterHorizontally)
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+        ) {
+            Text("Ara\u00e7lar", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "${vehicles.size}",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AppColors.TextMuted,
+                modifier = Modifier
+                    .background(AppColors.Bg, RoundedCornerShape(20.dp))
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            )
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = onClose, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Default.Close, null, tint = AppColors.TextMuted, modifier = Modifier.size(16.dp))
+            }
+        }
+        HorizontalDivider(color = AppColors.BorderSoft)
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            items(vehicles) { v ->
+                VehicleListRow(v) { onSelect(v) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VehicleListRow(vehicle: Vehicle, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    ) {
+        Box(
+            Modifier
+                .width(3.dp)
+                .height(34.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(vehicle.status.color)
+        )
+        Spacer(Modifier.width(10.dp))
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(32.dp)
+                .background(vehicle.status.color.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+        ) {
+            Icon(Icons.Default.DirectionsCar, null, tint = vehicle.status.color, modifier = Modifier.size(14.dp))
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(vehicle.plate, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+            Text(vehicle.model, fontSize = 10.sp, color = AppColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(vehicle.formattedSpeed, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+            StatusBadge(vehicle.status)
+        }
+    }
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 60.dp),
+        color = AppColors.BorderSoft.copy(alpha = 0.5f)
+    )
+}
+
+// (VehiclePopupCard and related components are defined above VehicleListSheet)

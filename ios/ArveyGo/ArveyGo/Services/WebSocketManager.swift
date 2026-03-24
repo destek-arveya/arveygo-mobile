@@ -123,6 +123,10 @@ final class WebSocketManager: ObservableObject {
 
     /// Force reconnect (e.g., after app returns to foreground).
     func reconnect() {
+        guard !wsURL.isEmpty, !token.isEmpty else {
+            print("[WS] Reconnect skipped — no URL/token configured yet")
+            return
+        }
         manualClose = false
         authFailed = false
         clearAllTimers()
