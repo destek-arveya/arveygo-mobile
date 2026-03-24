@@ -96,9 +96,10 @@ object WebSocketManager {
     private var orderList = mutableListOf<String>()
     // Socket generation counter — prevents stale socket callbacks from triggering reconnect
     private var socketGeneration = 0
-    // DNS fallback tracking
+    // DNS fallback tracking — persists across connect() calls
     private var useFallbackURL = false
     private var dnsFailCount = 0
+    private var dnsEverFailed = false
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -120,8 +121,11 @@ object WebSocketManager {
         this.token = trimmedToken
         manualClose = false
         authFailed = false
-        useFallbackURL = false
-        dnsFailCount = 0
+        // If DNS has ever failed, keep using fallback URL
+        if (!dnsEverFailed) {
+            useFallbackURL = false
+            dnsFailCount = 0
+        }
 
         openSocket(isReconnect = false)
     }
@@ -148,6 +152,7 @@ object WebSocketManager {
         authFailed = false
         clearAllTimers()
         closeSocket()
+        // Keep useFallbackURL/dnsEverFailed state on reconnect
         openSocket(isReconnect = true)
     }
 
@@ -162,8 +167,8 @@ object WebSocketManager {
         val myGeneration = socketGeneration
 
         // Use fallback IP-based URL if DNS has failed before
-        val effectiveURL = if (useFallbackURL && AppConfig.WS_URL_FALLBACK.isNotEmpty()) {
-            Log.d(TAG, "Using fallback URL due to DNS issues")
+        val effectiveURL = if ((useFallbackURL || dnsEverFailed) && AppConfig.WS_URL_FALLBACK.isNotEmpty()) {
+            Log.d(TAG, "Using fallback URL (dnsEverFailed=$dnsEverFailed)")
             AppConfig.WS_URL_FALLBACK
         } else {
             wsURL
@@ -210,10 +215,11 @@ object WebSocketManager {
 
         webSocket = client?.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                Log.d(TAG, "Socket opened (gen=$myGeneration)")
+                Log.d(TAG, "Socket opened (gen=$myGeneration, fallback=$useFallbackURL)")
                 if (myGeneration != socketGeneration) return
                 scope.launch {
-                    dnsFailCount = 0 // Reset on success
+                    dnsFailCount = 0 // Reset fail count on success (but keep dnsEverFailed)
+                    reconnectAttempt = 0
                     startPingLoop()
                     armSnapshotTimeout()
                 }
@@ -225,15 +231,28 @@ object WebSocketManager {
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.e(TAG, "Socket error: ${t.localizedMessage}")
+                Log.e(TAG, "Socket error: ${t.localizedMessage} (${t.javaClass.simpleName})")
                 if (myGeneration != socketGeneration) return
                 scope.launch {
-                    // If DNS resolution failed, switch to fallback URL
-                    if (t is java.net.UnknownHostException) {
+                    // If DNS resolution failed or connection refused, switch to fallback URL
+                    if (t is java.net.UnknownHostException || t is java.net.SocketException) {
                         dnsFailCount++
+                        dnsEverFailed = true
                         if (!useFallbackURL && AppConfig.WS_URL_FALLBACK.isNotEmpty()) {
-                            Log.w(TAG, "DNS resolution failed — switching to fallback URL: ${AppConfig.WS_URL_FALLBACK}")
+                            Log.w(TAG, "DNS/connection failed — switching to fallback URL: ${AppConfig.WS_URL_FALLBACK}")
                             useFallbackURL = true
+                            reconnectAttempt = 0
+                            openSocket(isReconnect = true)
+                            return@launch
+                        }
+                    }
+                    // For SSL/TLS errors on wss://, also try fallback (ws:// IP)
+                    if (t is javax.net.ssl.SSLException || t is javax.net.ssl.SSLHandshakeException) {
+                        if (!useFallbackURL && AppConfig.WS_URL_FALLBACK.isNotEmpty()) {
+                            Log.w(TAG, "SSL error — switching to fallback URL: ${AppConfig.WS_URL_FALLBACK}")
+                            useFallbackURL = true
+                            dnsEverFailed = true
+                            reconnectAttempt = 0
                             openSocket(isReconnect = true)
                             return@launch
                         }

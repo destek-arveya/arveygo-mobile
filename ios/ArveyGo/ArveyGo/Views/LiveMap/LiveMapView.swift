@@ -263,6 +263,15 @@ struct LiveMapView: View {
                     }
                     .padding(.horizontal, 20)
 
+                    // Son Veri Zamanı
+                    if vehicle.deviceTime != nil {
+                        HStack(spacing: 10) {
+                            infoCell(icon: "clock.fill", label: "Son Veri", value: vehicle.formattedDeviceTime, color: AppTheme.indigo)
+                            Spacer().frame(maxWidth: .infinity)
+                        }
+                        .padding(.horizontal, 20)
+                    }
+
                     // Temperature row (if available)
                     if let temp = vehicle.temperatureC {
                         HStack(spacing: 10) {

@@ -4,7 +4,9 @@ import androidx.compose.ui.graphics.Color
 import com.arveya.arveygo.ui.theme.AppColors
 import org.json.JSONObject
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.TimeZone
 
 // MARK: - User Model
 data class AppUser(
@@ -103,6 +105,29 @@ data class Vehicle(
     val formattedTodayKm: String get() = "$todayKm km"
 
     val formattedSpeed: String get() = "${speed.toInt()} km/h"
+
+    val formattedDeviceTime: String
+        get() {
+            val raw = deviceTime ?: return "—"
+            return try {
+                val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
+                val outputFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
+                outputFormat.timeZone = TimeZone.getTimeZone("Europe/Istanbul")
+                val date = inputFormat.parse(raw) ?: return raw
+                outputFormat.format(date)
+            } catch (_: Exception) {
+                try {
+                    val inputFormat2 = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+                    inputFormat2.timeZone = TimeZone.getTimeZone("UTC")
+                    val outputFormat2 = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
+                    outputFormat2.timeZone = TimeZone.getTimeZone("Europe/Istanbul")
+                    val date2 = inputFormat2.parse(raw) ?: return raw
+                    outputFormat2.format(date2)
+                } catch (_: Exception) {
+                    raw
+                }
+            }
+        }
 
     // Fleet extensions
     val fleetStatus: FleetVehicleStatus

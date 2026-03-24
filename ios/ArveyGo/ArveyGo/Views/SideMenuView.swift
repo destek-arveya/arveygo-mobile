@@ -101,7 +101,7 @@ struct SideMenuView: View {
                             }
                             .foregroundColor(.red)
                             .padding(.horizontal, 16)
-                            .padding(.vertical, 11)
+                            .padding(.vertical, 14)
                         }
                     }
                     .padding(.vertical, 8)
@@ -117,7 +117,6 @@ struct SideMenuView: View {
             }
             .frame(width: menuWidth)
             .background(AppTheme.surface)
-            .shadow(color: .black.opacity(0.15), radius: 20, x: 5)
 
             Spacer()
         }
@@ -174,7 +173,7 @@ struct SideMenuView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.vertical, 14)
             .background(isActive ? AppTheme.indigo.opacity(0.06) : Color.clear)
             .cornerRadius(8)
             .padding(.horizontal, 8)

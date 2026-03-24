@@ -328,6 +328,7 @@ private fun OverviewTab(vehicle: Vehicle) {
         Triple(Icons.Default.Route, "BUGÜN KM", vehicle.formattedTodayKm),
         Triple(Icons.Default.LocationOn, "KONUM", vehicle.city),
         Triple(Icons.Default.DirectionsCar, "ARAÇ TİPİ", vehicle.vehicleType),
+        Triple(Icons.Default.Schedule, "SON VERİ", vehicle.formattedDeviceTime),
     )
 
     SectionCard(title = "ARAÇ BİLGİLERİ", icon = Icons.Default.DirectionsCar) {

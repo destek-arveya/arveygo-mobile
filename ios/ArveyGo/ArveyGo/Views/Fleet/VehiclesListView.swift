@@ -282,6 +282,16 @@ struct VehiclesListView: View {
                                     .foregroundColor(temp < 0 ? .blue : temp < 30 ? AppTheme.online : .red)
                             }
                         }
+                        if vehicle.deviceTime != nil {
+                            HStack(spacing: 3) {
+                                Text("⏱")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(AppTheme.textFaint)
+                                Text(vehicle.formattedDeviceTime)
+                                    .font(.system(size: 9))
+                                    .foregroundColor(AppTheme.textFaint)
+                            }
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

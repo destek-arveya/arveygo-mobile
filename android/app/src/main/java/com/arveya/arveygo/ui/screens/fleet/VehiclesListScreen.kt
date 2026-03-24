@@ -442,12 +442,15 @@ private fun AlertSummaryCard(
 
 @Composable
 private fun VehicleTableRow(vehicle: Vehicle, onClick: () -> Unit) {
-    Column {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
                 .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
             // Status dot + plate/model
@@ -494,6 +497,21 @@ private fun VehicleTableRow(vehicle: Vehicle, onClick: () -> Unit) {
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (temp < 0) Color.Blue else if (temp < 30) AppColors.Online else Color.Red
+                            )
+                        }
+                    }
+                    // Son Veri Zamanı
+                    if (vehicle.deviceTime != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "⏱ ",
+                                fontSize = 9.sp,
+                                color = AppColors.TextFaint
+                            )
+                            Text(
+                                vehicle.formattedDeviceTime,
+                                fontSize = 9.sp,
+                                color = AppColors.TextFaint
                             )
                         }
                     }

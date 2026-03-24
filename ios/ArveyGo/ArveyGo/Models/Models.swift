@@ -74,6 +74,31 @@ struct Vehicle: Identifiable, Hashable {
         return "\(Int(speed)) km/h"
     }
 
+    var formattedDeviceTime: String {
+        guard let raw = deviceTime, !raw.isEmpty else { return "—" }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        if let date = formatter.date(from: raw) {
+            let outFormatter = DateFormatter()
+            outFormatter.dateFormat = "dd.MM.yyyy HH:mm"
+            outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
+            outFormatter.locale = Locale(identifier: "tr_TR")
+            return outFormatter.string(from: date)
+        }
+        // Fallback: try without timezone
+        let formatter2 = DateFormatter()
+        formatter2.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        formatter2.timeZone = TimeZone(abbreviation: "UTC")
+        if let date2 = formatter2.date(from: raw) {
+            let outFormatter = DateFormatter()
+            outFormatter.dateFormat = "dd.MM.yyyy HH:mm"
+            outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
+            outFormatter.locale = Locale(identifier: "tr_TR")
+            return outFormatter.string(from: date2)
+        }
+        return raw
+    }
+
     /// Create a Vehicle from a WebSocket JSON payload
     static func fromWSPayload(_ json: [String: Any]) -> Vehicle? {
         guard let imei = json["imei"] as? String, !imei.isEmpty else { return nil }

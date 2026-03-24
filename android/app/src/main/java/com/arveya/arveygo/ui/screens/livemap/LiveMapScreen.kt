@@ -553,6 +553,13 @@ private fun VehiclePopupCard(
                 PopupInfoCell(Icons.Default.Speed, "Toplam Km", vehicle.formattedTotalKm + " km", AppColors.Navy, Modifier.weight(1f))
                 PopupInfoCell(Icons.Default.CellTower, "Sinyal", if (vehicle.status == VehicleStatus.ONLINE) "G\u00fc\u00e7l\u00fc" else "Yok", if (vehicle.status == VehicleStatus.ONLINE) AppColors.Online else AppColors.TextFaint, Modifier.weight(1f))
             }
+            // Son Veri Zamanı
+            if (vehicle.deviceTime != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PopupInfoCell(Icons.Default.Schedule, "Son Veri", vehicle.formattedDeviceTime, AppColors.Indigo, Modifier.weight(1f))
+                    Spacer(Modifier.weight(1f))
+                }
+            }
             // Temperature row (if available)
             vehicle.temperatureC?.let { temp ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

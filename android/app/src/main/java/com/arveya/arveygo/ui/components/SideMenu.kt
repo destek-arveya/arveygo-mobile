@@ -13,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -41,14 +40,14 @@ fun SideMenu(
         exit = slideOutHorizontally(targetOffsetX = { -it })
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
+            // Menu panel — clean border, no shadow artifacts
             Column(
                 modifier = Modifier
                     .width(menuWidth)
                     .fillMaxHeight()
                     .background(AppColors.Surface)
-                    .shadow(20.dp)
             ) {
-                // Header
+                // Header with gradient
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -60,19 +59,37 @@ fun SideMenu(
                         AvatarCircle(initials = user?.avatar ?: "A", size = 44.dp)
                         Spacer(Modifier.width(12.dp))
                         Column {
-                            Text(user?.name ?: "Admin", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                            Text(user?.role ?: "Süper Yönetici", fontSize = 11.sp, color = Color.White.copy(alpha = 0.6f))
+                            Text(
+                                user?.name ?: "Admin",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
+                            Text(
+                                user?.role ?: "Süper Yönetici",
+                                fontSize = 11.sp,
+                                color = Color.White.copy(alpha = 0.6f)
+                            )
                         }
                     }
                     Spacer(Modifier.height(12.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Business, null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(12.dp))
+                        Icon(
+                            Icons.Default.Business, null,
+                            tint = Color.White.copy(alpha = 0.5f),
+                            modifier = Modifier.size(12.dp)
+                        )
                         Spacer(Modifier.width(6.dp))
-                        Text("Arveya Teknoloji", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.5f))
+                        Text(
+                            "Arveya Teknoloji",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
                     }
                 }
 
-                // Menu items
+                // Scrollable menu items
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -100,19 +117,33 @@ fun SideMenu(
                         MenuItem(Icons.Default.Settings, "Ayarlar", null, selectedPage) { onClose() }
                     }
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        color = AppColors.BorderSoft
+                    )
 
-                    // Logout
+                    // Logout — minimum 48dp touch target
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onLogout() }
-                            .padding(horizontal = 16.dp, vertical = 11.dp)
+                            .padding(horizontal = 16.dp)
+                            .heightIn(min = 48.dp),
+                        horizontalArrangement = Arrangement.Start
                     ) {
-                        Icon(Icons.Default.Logout, null, tint = Color.Red, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(10.dp))
-                        Text("Çıkış Yap", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.Red)
+                        Icon(
+                            Icons.Default.Logout, null,
+                            tint = Color.Red,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            "Çıkış Yap",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.Red
+                        )
                     }
                 }
 
@@ -124,7 +155,8 @@ fun SideMenu(
                     modifier = Modifier.padding(16.dp)
                 )
             }
-            // Clickable area to close menu
+
+            // Tap area outside menu to close
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -147,7 +179,7 @@ private fun MenuSection(title: String, content: @Composable () -> Unit) {
             fontWeight = FontWeight.SemiBold,
             color = AppColors.TextFaint,
             letterSpacing = 1.sp,
-            modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 4.dp)
+            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 6.dp)
         )
         content()
     }
@@ -167,16 +199,21 @@ private fun MenuItem(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(if (isActive) AppColors.Indigo.copy(alpha = 0.06f) else Color.Transparent)
             .clickable { page?.let { onSelect(it) } }
-            .padding(horizontal = 8.dp, vertical = 10.dp)
+            .heightIn(min = 48.dp)
+            .padding(horizontal = 12.dp)
     ) {
-        Icon(icon, null, tint = if (isActive) AppColors.Indigo else AppColors.TextMuted, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(10.dp))
+        Icon(
+            icon, null,
+            tint = if (isActive) AppColors.Indigo else AppColors.TextMuted,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(12.dp))
         Text(
             label,
-            fontSize = 13.sp,
+            fontSize = 14.sp,
             fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
             color = if (isActive) AppColors.Navy else AppColors.TextSecondary,
             modifier = Modifier.weight(1f)
