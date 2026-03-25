@@ -29,7 +29,7 @@ import com.arveya.arveygo.viewmodels.DashboardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(onMenuClick: () -> Unit) {
+fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}) {
     val authVM = LocalAuthViewModel.current
     val vm: DashboardViewModel = viewModel()
     val user by authVM.currentUser.collectAsState()
@@ -38,6 +38,7 @@ fun DashboardScreen(onMenuClick: () -> Unit) {
     val alerts by vm.alerts.collectAsState()
     val selectedPeriod by vm.selectedPeriod.collectAsState()
     val isRefreshing by vm.isRefreshing.collectAsState()
+    var selectedVehicle by remember { mutableStateOf<Vehicle?>(null) }
 
     // Connect WebSocket when dashboard appears
     LaunchedEffect(Unit) {
@@ -137,7 +138,7 @@ fun DashboardScreen(onMenuClick: () -> Unit) {
             ) {
                 Column {
                     vehicles.filter { it.status == VehicleStatus.ONLINE }.take(4).forEach { v ->
-                        DashboardVehicleRow(v)
+                        DashboardVehicleRow(v, onClick = { selectedVehicle = v })
                     }
                 }
             }
@@ -210,6 +211,14 @@ fun DashboardScreen(onMenuClick: () -> Unit) {
         }
         } // PullToRefreshBox
     }
+
+    // Vehicle Detail fullscreen overlay
+    selectedVehicle?.let { vehicle ->
+        com.arveya.arveygo.ui.screens.fleet.VehicleDetailScreen(
+            vehicle = vehicle,
+            onBack = { selectedVehicle = null }
+        )
+    }
 }
 
 @Composable
@@ -251,10 +260,10 @@ private fun PeriodFilter(selected: String, onSelect: (String) -> Unit) {
 }
 
 @Composable
-private fun DashboardVehicleRow(vehicle: Vehicle) {
+private fun DashboardVehicleRow(vehicle: Vehicle, onClick: () -> Unit = {}) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 14.dp, vertical = 8.dp)
     ) {
         Box(Modifier.width(3.dp).height(36.dp).clip(RoundedCornerShape(2.dp)).background(vehicle.status.color))
         Spacer(Modifier.width(10.dp))

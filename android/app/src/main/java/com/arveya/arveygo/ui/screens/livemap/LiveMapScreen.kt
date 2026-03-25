@@ -44,6 +44,7 @@ import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polyline
 
 // Animated Marker Wrapper - smoothly animates marker position
 private class AnimatedMarker(
@@ -213,6 +214,10 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
     var showVehicleList by remember { mutableStateOf(true) }
     var trackingVehicleId by remember { mutableStateOf<String?>(null) }
 
+    // Trail history: keep last 40 positions per vehicle
+    val trailHistory = remember { mutableMapOf<String, MutableList<GeoPoint>>() }
+    val trailPolylines = remember { mutableMapOf<String, Polyline>() }
+
     // If detail vehicle is set, show VehicleDetailScreen
     detailVehicle?.let { vehicle ->
         com.arveya.arveygo.ui.screens.fleet.VehicleDetailScreen(
@@ -295,6 +300,52 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
         }
         mapView.invalidate()
 
+        // Update trail polylines for moving vehicles
+        filteredVehicles.forEach { vehicle ->
+            val pos = GeoPoint(vehicle.lat, vehicle.lng)
+            if (vehicle.lat == 0.0 && vehicle.lng == 0.0) return@forEach
+            val history = trailHistory.getOrPut(vehicle.id) { mutableListOf() }
+            // Only add if position changed
+            if (history.isEmpty() || history.last().latitude != pos.latitude || history.last().longitude != pos.longitude) {
+                history.add(pos)
+                if (history.size > 40) history.removeAt(0)
+            }
+            // Draw polyline if vehicle is online and has 2+ points
+            if (vehicle.status == VehicleStatus.ONLINE && history.size >= 2) {
+                val existing = trailPolylines[vehicle.id]
+                if (existing != null) {
+                    existing.setPoints(history.toList())
+                } else {
+                    val polyline = Polyline().apply {
+                        setPoints(history.toList())
+                        outlinePaint.color = vehicle.status.color.copy(alpha = 0.6f).toArgb()
+                        outlinePaint.strokeWidth = 4f * context.resources.displayMetrics.density
+                        outlinePaint.strokeCap = Paint.Cap.ROUND
+                        outlinePaint.strokeJoin = Paint.Join.ROUND
+                        outlinePaint.isAntiAlias = true
+                    }
+                    // Insert polylines below markers
+                    val markerIndex = mapView.overlays.indexOfFirst { it is Marker }
+                    if (markerIndex >= 0) {
+                        mapView.overlays.add(markerIndex, polyline)
+                    } else {
+                        mapView.overlays.add(polyline)
+                    }
+                    trailPolylines[vehicle.id] = polyline
+                }
+            }
+        }
+        // Remove trails for vehicles no longer visible
+        val currentTrailIds = filteredVehicles.map { it.id }.toSet()
+        trailPolylines.keys.toList().forEach { id ->
+            if (id !in currentTrailIds) {
+                trailPolylines[id]?.let { mapView.overlays.remove(it) }
+                trailPolylines.remove(id)
+                trailHistory.remove(id)
+            }
+        }
+        mapView.invalidate()
+
         // If tracking a vehicle, keep centering on it
         trackingVehicleId?.let { trackId ->
             filteredVehicles.find { it.id == trackId }?.let { trackedVehicle ->
@@ -325,6 +376,8 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
         onDispose {
             animatedMarkers.values.forEach { it.destroy() }
             animatedMarkers.clear()
+            trailPolylines.clear()
+            trailHistory.clear()
             mapViewRef.value?.onDetach()
         }
     }
@@ -333,7 +386,10 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
         topBar = {
             TopAppBar(
                 navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
+                    IconButton(onClick = {
+                        selectedVehicle = null
+                        onMenuClick()
+                    }) {
                         Icon(Icons.Default.Menu, null, tint = AppColors.Navy)
                     }
                 },

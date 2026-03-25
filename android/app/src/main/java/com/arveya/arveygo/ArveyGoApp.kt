@@ -52,7 +52,8 @@ fun MainContent(authVM: AuthViewModel) {
         // Active page
         when (selectedPage) {
             AppPage.DASHBOARD -> DashboardScreen(
-                onMenuClick = { showSideMenu = true }
+                onMenuClick = { showSideMenu = true },
+                onNavigateToMap = { selectedPage = AppPage.LIVE_MAP }
             )
             AppPage.LIVE_MAP -> LiveMapScreen(
                 onMenuClick = { showSideMenu = true }

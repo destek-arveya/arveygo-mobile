@@ -35,7 +35,10 @@ struct LiveMapView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
-                        Button(action: { withAnimation(.spring(response: 0.3)) { showSideMenu.toggle() } }) {
+                        Button(action: {
+                            selectedVehicle = nil
+                            withAnimation(.spring(response: 0.3)) { showSideMenu.toggle() }
+                        }) {
                             Image(systemName: "line.3.horizontal")
                                 .font(.system(size: 18, weight: .medium))
                                 .foregroundColor(AppTheme.navy)
@@ -73,6 +76,9 @@ struct LiveMapView: View {
                     authVM.connectWebSocket()
                     // If WS fails to deliver data, fall back to dummy
                     vm.loadDummyDataIfNeeded()
+                }
+                .onChange(of: showSideMenu) { _, isShowing in
+                    if isShowing { selectedVehicle = nil }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                     // Reconnect when app returns to foreground
@@ -125,6 +131,14 @@ struct LiveMapView: View {
     // MARK: - Map Content
     var mapContent: some View {
         Map(position: $mapCameraPosition) {
+            // Trail polylines for online vehicles
+            ForEach(vm.filteredVehicles.filter { $0.status == .online }) { vehicle in
+                if let trail = vm.trailHistory[vehicle.id], trail.count >= 2 {
+                    MapPolyline(coordinates: trail)
+                        .stroke(vehicle.status.color.opacity(0.6), lineWidth: 3)
+                }
+            }
+
             ForEach(vm.filteredVehicles) { vehicle in
                 // Use animated coordinates for smooth movement
                 let coord = vm.animatedCoordinate(for: vehicle)
@@ -508,6 +522,8 @@ class LiveMapViewModel: ObservableObject {
     @Published var animatedPositions: [String: CLLocationCoordinate2D] = [:]
     /// Animated directions: maps vehicle ID → animated heading
     @Published var animatedDirections: [String: Double] = [:]
+    /// Trail history: last 40 positions per vehicle for iz düşümü
+    @Published var trailHistory: [String: [CLLocationCoordinate2D]] = [:]
 
     private var cancellables = Set<AnyCancellable>()
     private let wsManager = WebSocketManager.shared
@@ -555,6 +571,21 @@ class LiveMapViewModel: ObservableObject {
         let targetLat = vehicle.lat
         let targetLng = vehicle.lng
         let targetDir = vehicle.direction
+
+        // Update trail history for online/moving vehicles
+        let newPos = CLLocationCoordinate2D(latitude: targetLat, longitude: targetLng)
+        if vehicle.status == .online && targetLat != 0 && targetLng != 0 {
+            var trail = trailHistory[vehicleId] ?? []
+            if let last = trail.last {
+                if abs(last.latitude - targetLat) > 0.000001 || abs(last.longitude - targetLng) > 0.000001 {
+                    trail.append(newPos)
+                    if trail.count > 40 { trail.removeFirst() }
+                    trailHistory[vehicleId] = trail
+                }
+            } else {
+                trailHistory[vehicleId] = [newPos]
+            }
+        }
 
         let startPos = animatedPositions[vehicleId] ?? CLLocationCoordinate2D(latitude: targetLat, longitude: targetLng)
         let startDir = animatedDirections[vehicleId] ?? targetDir

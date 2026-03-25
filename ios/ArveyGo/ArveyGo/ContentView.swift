@@ -35,7 +35,7 @@ struct ContentView: View {
             Group {
                 switch selectedPage {
                 case .dashboard:
-                    DashboardView(showSideMenu: $showSideMenu)
+                    DashboardView(showSideMenu: $showSideMenu, selectedPage: $selectedPage)
                 case .liveMap:
                     LiveMapView(showSideMenu: $showSideMenu)
                 case .vehicles:

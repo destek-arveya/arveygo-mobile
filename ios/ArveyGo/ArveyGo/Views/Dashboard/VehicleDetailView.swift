@@ -1,11 +1,19 @@
 import SwiftUI
 import MapKit
+import Combine
 
 struct VehicleDetailView: View {
-    let vehicle: Vehicle
+    let initialVehicle: Vehicle
     @Environment(\.dismiss) private var dismiss
     @State private var selectedTab: DetailTab = .overview
     @State private var mapCameraPosition: MapCameraPosition = .automatic
+    @State private var vehicle: Vehicle
+    @State private var cancellables = Set<AnyCancellable>()
+
+    init(vehicle: Vehicle) {
+        self.initialVehicle = vehicle
+        _vehicle = State(initialValue: vehicle)
+    }
 
     enum DetailTab: String, CaseIterable {
         case overview = "Genel"
@@ -103,6 +111,24 @@ struct VehicleDetailView: View {
                     center: CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng),
                     span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
                 ))
+                // Subscribe to real-time WebSocket updates
+                WebSocketManager.shared.$vehicleList
+                    .receive(on: DispatchQueue.main)
+                    .sink { vehicles in
+                        if let updated = vehicles.first(where: { $0.id == initialVehicle.id || $0.imei == initialVehicle.imei }) {
+                            vehicle = updated
+                        }
+                    }
+                    .store(in: &cancellables)
+                WebSocketManager.shared.eventSubject
+                    .receive(on: DispatchQueue.main)
+                    .sink { event in
+                        if case .update(let updatedVehicle, _) = event,
+                           updatedVehicle.id == initialVehicle.id || updatedVehicle.imei == initialVehicle.imei {
+                            vehicle = updatedVehicle
+                        }
+                    }
+                    .store(in: &cancellables)
             }
         }
     }

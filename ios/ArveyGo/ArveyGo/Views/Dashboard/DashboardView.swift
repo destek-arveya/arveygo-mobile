@@ -5,6 +5,7 @@ struct DashboardView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @StateObject private var dashVM = DashboardViewModel()
     @Binding var showSideMenu: Bool
+    @Binding var selectedPage: AppPage
     @State private var selectedVehicle: Vehicle?
 
     var body: some View {
@@ -254,6 +255,7 @@ struct DashboardView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
                         .background(Color.clear)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
 
@@ -328,8 +330,9 @@ struct DashboardView: View {
 
     // MARK: - Map Card
     var mapCard: some View {
-        CardView(title: "Filo Haritası", actionLabel: "Canlı Harita") {
-        } content: {
+        CardView(title: "Filo Haritası", actionLabel: "Canlı Harita", action: {
+            selectedPage = .liveMap
+        }) {
             ZStack(alignment: .bottomLeading) {
                 Map {
                     ForEach(dashVM.vehicles) { vehicle in
@@ -474,6 +477,6 @@ struct DashboardView: View {
 }
 
 #Preview {
-    DashboardView(showSideMenu: .constant(false))
+    DashboardView(showSideMenu: .constant(false), selectedPage: .constant(.dashboard))
         .environmentObject(AuthViewModel())
 }

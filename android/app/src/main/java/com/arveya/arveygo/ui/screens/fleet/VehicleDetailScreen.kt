@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.arveya.arveygo.models.*
+import com.arveya.arveygo.services.WSEvent
+import com.arveya.arveygo.services.WebSocketManager
 import com.arveya.arveygo.ui.components.StatusBadge
 import com.arveya.arveygo.ui.theme.AppColors
 import org.osmdroid.config.Configuration
@@ -45,9 +47,28 @@ fun VehicleDetailScreen(
 ) {
     var selectedTab by remember { mutableStateOf(DetailTab.OVERVIEW) }
     val context = LocalContext.current
+    var currentVehicle by remember { mutableStateOf(vehicle) }
 
     LaunchedEffect(Unit) {
         Configuration.getInstance().userAgentValue = context.packageName
+    }
+
+    // Subscribe to real-time WebSocket updates
+    LaunchedEffect(vehicle.id, vehicle.imei) {
+        WebSocketManager.vehicleList.collect { vehicles ->
+            val updated = vehicles.firstOrNull { it.id == vehicle.id || (it.imei.isNotEmpty() && it.imei == vehicle.imei) }
+            if (updated != null) { currentVehicle = updated }
+        }
+    }
+    LaunchedEffect(vehicle.id, vehicle.imei) {
+        WebSocketManager.events.collect { event ->
+            if (event is WSEvent.Update) {
+                val u = event.vehicle
+                if (u.id == vehicle.id || (u.imei.isNotEmpty() && u.imei == vehicle.imei)) {
+                    currentVehicle = u
+                }
+            }
+        }
     }
 
     Scaffold(
@@ -63,7 +84,7 @@ fun VehicleDetailScreen(
                 },
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        Text(vehicle.plate, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+                        Text(currentVehicle.plate, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
                         Text("Araç Detayı", fontSize = 10.sp, color = AppColors.TextMuted)
                     }
                 },
@@ -110,10 +131,10 @@ fun VehicleDetailScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             // Map Header
-            MapHeader(vehicle, context)
+            MapHeader(currentVehicle, context)
 
             // Vehicle Identity Card (overlapping map)
-            VehicleIdentityCard(vehicle)
+            VehicleIdentityCard(currentVehicle)
 
             // Tab Selector
             TabSelector(selectedTab) { selectedTab = it }
@@ -126,10 +147,10 @@ fun VehicleDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 when (selectedTab) {
-                    DetailTab.OVERVIEW -> OverviewTab(vehicle)
-                    DetailTab.MAINTENANCE -> MaintenanceTab(vehicle)
-                    DetailTab.COSTS -> CostsTab(vehicle)
-                    DetailTab.EVENTS -> EventsTab(vehicle)
+                    DetailTab.OVERVIEW -> OverviewTab(currentVehicle)
+                    DetailTab.MAINTENANCE -> MaintenanceTab(currentVehicle)
+                    DetailTab.COSTS -> CostsTab(currentVehicle)
+                    DetailTab.EVENTS -> EventsTab(currentVehicle)
                 }
             }
         }
