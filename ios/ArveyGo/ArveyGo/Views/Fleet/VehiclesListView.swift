@@ -204,15 +204,15 @@ struct VehiclesListView: View {
                 Text("PLAKA / ARAÇ")
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text("DURUM")
-                    .frame(width: 70, alignment: .center)
+                    .frame(width: 72, alignment: .center)
                 Text("KM")
-                    .frame(width: 60, alignment: .trailing)
+                    .frame(width: 64, alignment: .trailing)
             }
-            .font(.system(size: 9, weight: .bold))
+            .font(.system(size: 10, weight: .bold))
             .foregroundColor(AppTheme.textMuted)
             .tracking(0.5)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
             .background(AppTheme.bg)
 
             // Table rows
@@ -246,44 +246,50 @@ struct VehiclesListView: View {
 
     func vehicleTableRow(_ vehicle: Vehicle) -> some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 // Status dot + plate/model
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Circle()
                         .fill(vehicle.status.color)
-                        .frame(width: 8, height: 8)
+                        .frame(width: 10, height: 10)
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        // Row 1: Plate
                         Text(vehicle.plate)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: 15, weight: .bold))
                             .foregroundColor(AppTheme.navy)
-                        HStack(spacing: 4) {
+
+                        // Row 2: Model + Driver
+                        HStack(spacing: 5) {
                             Text(vehicle.model)
-                                .font(.system(size: 10))
+                                .font(.system(size: 12))
                                 .foregroundColor(AppTheme.textMuted)
                             if !vehicle.driver.isEmpty {
                                 Text("•")
-                                    .font(.system(size: 8))
+                                    .font(.system(size: 9))
                                     .foregroundColor(AppTheme.textFaint)
                                 Text(vehicle.driver)
-                                    .font(.system(size: 10))
+                                    .font(.system(size: 12))
                                     .foregroundColor(AppTheme.textMuted)
                                     .lineLimit(1)
                             }
+                        }
+
+                        // Row 3: Temp + Time (if available)
+                        HStack(spacing: 5) {
                             if let temp = vehicle.temperatureC {
-                                Text("•")
-                                    .font(.system(size: 8))
-                                    .foregroundColor(AppTheme.textFaint)
                                 Text(String(format: "🌡️%.1f°C", temp))
-                                    .font(.system(size: 10, weight: .semibold))
+                                    .font(.system(size: 11, weight: .semibold))
                                     .foregroundColor(temp < 0 ? .blue : temp < 30 ? AppTheme.online : .red)
                             }
                             if vehicle.deviceTime != nil {
-                                Text("•")
-                                    .font(.system(size: 8))
-                                    .foregroundColor(AppTheme.textFaint)
-                                Text("⏱\(vehicle.formattedDeviceTime)")
-                                    .font(.system(size: 7))
+                                if vehicle.temperatureC != nil {
+                                    Text("•")
+                                        .font(.system(size: 9))
+                                        .foregroundColor(AppTheme.textFaint)
+                                }
+                                Text("⏱ \(vehicle.formattedDeviceTime)")
+                                    .font(.system(size: 10))
                                     .foregroundColor(AppTheme.textFaint)
                                     .lineLimit(1)
                             }
@@ -294,33 +300,33 @@ struct VehiclesListView: View {
 
                 // Status badge
                 fleetStatusBadge(vehicle.fleetStatus)
-                    .frame(width: 70)
+                    .frame(width: 72)
 
                 // Km
                 Text(vehicle.formattedTotalKm)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppTheme.navy)
-                    .frame(width: 60, alignment: .trailing)
+                    .frame(width: 64, alignment: .trailing)
 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(AppTheme.textFaint)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 16)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
             .background(AppTheme.surface)
             .contentShape(Rectangle())
 
-            Divider().padding(.leading, 40)
+            Divider().padding(.leading, 44)
         }
     }
 
     func fleetStatusBadge(_ status: FleetVehicleStatus) -> some View {
         Text(status.label)
-            .font(.system(size: 10, weight: .semibold))
+            .font(.system(size: 11, weight: .semibold))
             .foregroundColor(status.color)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
             .background(status.color.opacity(0.1))
             .cornerRadius(20)
     }

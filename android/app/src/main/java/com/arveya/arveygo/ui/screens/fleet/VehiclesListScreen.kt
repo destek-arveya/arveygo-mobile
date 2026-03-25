@@ -2,6 +2,7 @@ package com.arveya.arveygo.ui.screens.fleet
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -311,7 +312,7 @@ fun VehiclesListScreen(onMenuClick: () -> Unit) {
                 ) {
                     Text(
                         "PLAKA / ARAÇ",
-                        fontSize = 9.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.TextMuted,
                         letterSpacing = 0.5.sp,
@@ -319,24 +320,24 @@ fun VehiclesListScreen(onMenuClick: () -> Unit) {
                     )
                     Text(
                         "DURUM",
-                        fontSize = 9.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.TextMuted,
                         letterSpacing = 0.5.sp,
-                        modifier = Modifier.width(70.dp),
+                        modifier = Modifier.width(72.dp),
                         textAlign = TextAlign.Center
                     )
                     Text(
                         "KM",
-                        fontSize = 9.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.TextMuted,
                         letterSpacing = 0.5.sp,
-                        modifier = Modifier.width(60.dp),
+                        modifier = Modifier.width(64.dp),
                         textAlign = TextAlign.End
                     )
                     // Space for chevron
-                    Spacer(Modifier.width(20.dp))
+                    Spacer(Modifier.width(22.dp))
                 }
 
                 // Table rows
@@ -405,78 +406,89 @@ private fun VehicleTableRow(vehicle: Vehicle, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 16.dp)
+                .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
             // Status dot + plate/model
             Row(
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top,
                 modifier = Modifier.weight(1f)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(8.dp)
+                        .padding(top = 5.dp)
+                        .size(10.dp)
                         .clip(CircleShape)
                         .background(vehicle.status.color)
                 )
-                Spacer(Modifier.width(8.dp))
-                Column {
+                Spacer(Modifier.width(10.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    // Row 1: Plate
                     Text(
                         vehicle.plate,
-                        fontSize = 13.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.Navy
                     )
+                    // Row 2: Model + Driver
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             vehicle.model,
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             color = AppColors.TextMuted,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         if (vehicle.driver.isNotEmpty()) {
-                            Text(" • ", fontSize = 8.sp, color = AppColors.TextFaint)
+                            Text(" • ", fontSize = 9.sp, color = AppColors.TextFaint)
                             Text(
                                 vehicle.driver,
-                                fontSize = 10.sp,
+                                fontSize = 12.sp,
                                 color = AppColors.TextMuted,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-                        vehicle.temperatureC?.let { temp ->
-                            Text(" • ", fontSize = 8.sp, color = AppColors.TextFaint)
-                            Text(
-                                "\uD83C\uDF21\uFE0F${"%.1f".format(temp)}°C",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (temp < 0) Color.Blue else if (temp < 30) AppColors.Online else Color.Red
-                            )
-                        }
-                        if (vehicle.deviceTime != null) {
-                            Text(" • ", fontSize = 8.sp, color = AppColors.TextFaint)
-                            Text(
-                                "⏱${vehicle.formattedDeviceTime}",
-                                fontSize = 8.sp,
-                                color = AppColors.TextFaint,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                    }
+                    // Row 3: Temp + Time (if available)
+                    val hasTemp = vehicle.temperatureC != null
+                    val hasTime = vehicle.deviceTime != null
+                    if (hasTemp || hasTime) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            vehicle.temperatureC?.let { temp ->
+                                Text(
+                                    "\uD83C\uDF21\uFE0F${"%.1f".format(temp)}°C",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (temp < 0) Color.Blue else if (temp < 30) AppColors.Online else Color.Red
+                                )
+                            }
+                            if (hasTemp && hasTime) {
+                                Text(" • ", fontSize = 9.sp, color = AppColors.TextFaint)
+                            }
+                            if (hasTime) {
+                                Text(
+                                    "⏱ ${vehicle.formattedDeviceTime}",
+                                    fontSize = 10.sp,
+                                    color = AppColors.TextFaint,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                 }
             }
 
             // Fleet status badge
-            FleetStatusBadge(vehicle.fleetStatus, modifier = Modifier.width(70.dp))
+            FleetStatusBadge(vehicle.fleetStatus, modifier = Modifier.width(72.dp))
 
             // Km
             Text(
                 vehicle.formattedTotalKm,
-                fontSize = 12.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = AppColors.Navy,
-                modifier = Modifier.width(60.dp),
+                modifier = Modifier.width(64.dp),
                 textAlign = TextAlign.End
             )
 
@@ -485,10 +497,10 @@ private fun VehicleTableRow(vehicle: Vehicle, onClick: () -> Unit) {
             Icon(
                 Icons.Default.ChevronRight, null,
                 tint = AppColors.TextFaint,
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(16.dp)
             )
         }
-        HorizontalDivider(modifier = Modifier.padding(start = 40.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+        HorizontalDivider(modifier = Modifier.padding(start = 44.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
     }
 }
 
@@ -500,12 +512,12 @@ private fun FleetStatusBadge(status: FleetVehicleStatus, modifier: Modifier = Mo
     ) {
         Text(
             status.label,
-            fontSize = 10.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             color = status.color,
             modifier = Modifier
                 .background(status.color.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
-                .padding(horizontal = 8.dp, vertical = 3.dp)
+                .padding(horizontal = 10.dp, vertical = 4.dp)
         )
     }
 }
