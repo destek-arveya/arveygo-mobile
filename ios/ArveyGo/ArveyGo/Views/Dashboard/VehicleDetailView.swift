@@ -292,6 +292,38 @@ struct VehicleDetailView: View {
     // MARK: - Overview Tab
     var overviewTab: some View {
         VStack(spacing: 16) {
+            // Device Time (matching vehicles list style)
+            if vehicle.deviceTime != nil {
+                HStack(spacing: 8) {
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.indigo)
+                    Text("Son Bilgi Tarihi")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(AppTheme.navy)
+                    Spacer()
+                    Text("⏱ \(vehicle.formattedDeviceTime)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(AppTheme.textMuted)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(AppTheme.bg)
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(AppTheme.borderSoft, lineWidth: 1)
+                        )
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(AppTheme.surface)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(AppTheme.borderSoft, lineWidth: 1)
+                )
+            }
+
             sectionCard(title: "ARAÇ BİLGİLERİ", icon: "car.fill") {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     infoCell(icon: "car.fill", label: "MARKA / MODEL", value: vehicle.model)

@@ -14,9 +14,6 @@ struct VehiclesListView: View {
 
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 14) {
-                            // Alert Summary Cards
-                            alertSummaryCards
-
                             // Search & Filter
                             searchAndFilter
 
@@ -310,7 +307,9 @@ struct VehiclesListView: View {
                     .foregroundColor(AppTheme.textFaint)
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.vertical, 16)
+            .background(AppTheme.surface)
+            .contentShape(Rectangle())
 
             Divider().padding(.leading, 40)
         }

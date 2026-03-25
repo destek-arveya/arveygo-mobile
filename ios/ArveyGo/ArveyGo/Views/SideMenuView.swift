@@ -75,7 +75,7 @@ struct SideMenuView: View {
                         }
 
                         menuSection(title: "AYARLAR") {
-                            menuItem(icon: "gearshape.fill", label: "Ayarlar")
+                            menuItem(icon: "gearshape.fill", label: "Ayarlar", page: .settings)
                         }
 
                         Divider()

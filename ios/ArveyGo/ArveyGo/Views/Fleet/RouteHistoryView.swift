@@ -655,116 +655,118 @@ class RouteHistoryViewModel: ObservableObject {
     }
 
     func loadRoutes(from startDate: Date, to endDate: Date) {
-        // Generate dummy multi-day route data
-        let cal = Calendar.current
-        let dayCount = max(1, (cal.dateComponents([.day], from: cal.startOfDay(for: startDate), to: cal.startOfDay(for: endDate)).day ?? 0) + 1)
+        // Dummy data matching route_history.json structure (Çanakkale area)
         let formatter = DateFormatter()
         formatter.dateFormat = "dd.MM"
+        let dateStr = formatter.string(from: startDate)
 
-        var allRoutes: [RouteTrip] = []
-        var routeId = 1
-
-        for dayOffset in 0..<dayCount {
-            guard let date = cal.date(byAdding: .day, value: dayOffset, to: startDate) else { continue }
-            let dateStr = formatter.string(from: date)
-
-            // Day 1 routes
-            allRoutes.append(RouteTrip(
-                id: "r\(routeId)",
+        routes = [
+            RouteTrip(
+                id: "trip1",
                 dateLabel: dateStr,
-                startTime: "08:15",
-                endTime: "09:42",
-                startAddress: "Kadıköy, İstanbul",
-                endAddress: "Maslak, İstanbul",
-                distance: "32.4 km",
-                duration: "1s 27dk",
-                maxSpeed: "94 km/h",
-                avgSpeed: "38 km/h",
-                fuelUsed: "4.2 Lt",
+                startTime: "10:15",
+                endTime: "10:19",
+                startAddress: "Çanakkale Merkez",
+                endAddress: "Çanakkale Sahil",
+                distance: "0.14 km",
+                duration: "4dk 43sn",
+                maxSpeed: "12 km/h",
+                avgSpeed: "2 km/h",
+                fuelUsed: "0.1 Lt",
                 points: [
-                    RoutePoint(lat: 40.9905, lng: 29.0230, speed: 0, time: "08:15"),
-                    RoutePoint(lat: 40.9950, lng: 29.0180, speed: 45, time: "08:20"),
-                    RoutePoint(lat: 41.0050, lng: 29.0100, speed: 62, time: "08:28"),
-                    RoutePoint(lat: 41.0150, lng: 28.9950, speed: 78, time: "08:35"),
-                    RoutePoint(lat: 41.0280, lng: 28.9800, speed: 94, time: "08:45"),
-                    RoutePoint(lat: 41.0400, lng: 28.9700, speed: 85, time: "08:55"),
-                    RoutePoint(lat: 41.0550, lng: 28.9600, speed: 50, time: "09:10"),
-                    RoutePoint(lat: 41.0650, lng: 28.9550, speed: 30, time: "09:25"),
-                    RoutePoint(lat: 41.0710, lng: 28.9520, speed: 0, time: "09:42"),
+                    RoutePoint(lat: 40.13416, lng: 26.41174, speed: 0, time: "10:15"),
+                    RoutePoint(lat: 40.13418, lng: 26.41169, speed: 2, time: "10:15"),
+                    RoutePoint(lat: 40.13422, lng: 26.41163, speed: 3, time: "10:15"),
+                    RoutePoint(lat: 40.13425, lng: 26.41158, speed: 5, time: "10:16"),
+                    RoutePoint(lat: 40.13430, lng: 26.41152, speed: 7, time: "10:16"),
+                    RoutePoint(lat: 40.13437, lng: 26.41144, speed: 8, time: "10:16"),
+                    RoutePoint(lat: 40.13444, lng: 26.41136, speed: 10, time: "10:17"),
+                    RoutePoint(lat: 40.13449, lng: 26.41129, speed: 12, time: "10:17"),
+                    RoutePoint(lat: 40.13455, lng: 26.41120, speed: 8, time: "10:17"),
+                    RoutePoint(lat: 40.13459, lng: 26.41113, speed: 5, time: "10:18"),
+                    RoutePoint(lat: 40.13462, lng: 26.41108, speed: 3, time: "10:18"),
+                    RoutePoint(lat: 40.13464, lng: 26.41104, speed: 0, time: "10:19"),
                 ]
-            ))
-            routeId += 1
-
-            allRoutes.append(RouteTrip(
-                id: "r\(routeId)",
+            ),
+            RouteTrip(
+                id: "trip2",
                 dateLabel: dateStr,
-                startTime: "10:30",
-                endTime: "11:15",
-                startAddress: "Maslak, İstanbul",
-                endAddress: "Şişli, İstanbul",
-                distance: "12.8 km",
-                duration: "45dk",
-                maxSpeed: "72 km/h",
-                avgSpeed: "28 km/h",
-                fuelUsed: "1.8 Lt",
+                startTime: "10:25",
+                endTime: "10:31",
+                startAddress: "Çanakkale Sahil",
+                endAddress: "Çanakkale Liman",
+                distance: "1.04 km",
+                duration: "5dk 58sn",
+                maxSpeed: "36 km/h",
+                avgSpeed: "11 km/h",
+                fuelUsed: "0.2 Lt",
                 points: [
-                    RoutePoint(lat: 41.0710, lng: 28.9520, speed: 0, time: "10:30"),
-                    RoutePoint(lat: 41.0650, lng: 28.9550, speed: 40, time: "10:38"),
-                    RoutePoint(lat: 41.0580, lng: 28.9700, speed: 72, time: "10:48"),
-                    RoutePoint(lat: 41.0500, lng: 28.9820, speed: 55, time: "10:58"),
-                    RoutePoint(lat: 41.0440, lng: 28.9870, speed: 0, time: "11:15"),
+                    RoutePoint(lat: 40.13464, lng: 26.41104, speed: 0, time: "10:25"),
+                    RoutePoint(lat: 40.13480, lng: 26.41070, speed: 12, time: "10:25"),
+                    RoutePoint(lat: 40.13510, lng: 26.41020, speed: 22, time: "10:26"),
+                    RoutePoint(lat: 40.13560, lng: 26.40960, speed: 30, time: "10:26"),
+                    RoutePoint(lat: 40.13610, lng: 26.40900, speed: 36, time: "10:27"),
+                    RoutePoint(lat: 40.13660, lng: 26.40850, speed: 28, time: "10:27"),
+                    RoutePoint(lat: 40.13720, lng: 26.40800, speed: 20, time: "10:28"),
+                    RoutePoint(lat: 40.13770, lng: 26.40760, speed: 15, time: "10:28"),
+                    RoutePoint(lat: 40.13810, lng: 26.40730, speed: 10, time: "10:29"),
+                    RoutePoint(lat: 40.13840, lng: 26.40710, speed: 5, time: "10:30"),
+                    RoutePoint(lat: 40.13855, lng: 26.40700, speed: 0, time: "10:31"),
                 ]
-            ))
-            routeId += 1
-
-            allRoutes.append(RouteTrip(
-                id: "r\(routeId)",
+            ),
+            RouteTrip(
+                id: "trip3",
                 dateLabel: dateStr,
-                startTime: "13:00",
-                endTime: "14:20",
-                startAddress: "Şişli, İstanbul",
-                endAddress: "Ataşehir, İstanbul",
-                distance: "22.1 km",
-                duration: "1s 20dk",
-                maxSpeed: "88 km/h",
-                avgSpeed: "32 km/h",
-                fuelUsed: "3.1 Lt",
+                startTime: "11:00",
+                endTime: "11:05",
+                startAddress: "Çanakkale Liman",
+                endAddress: "Çanakkale İskele Cd.",
+                distance: "1.43 km",
+                duration: "4dk 55sn",
+                maxSpeed: "42 km/h",
+                avgSpeed: "17 km/h",
+                fuelUsed: "0.3 Lt",
                 points: [
-                    RoutePoint(lat: 41.0440, lng: 28.9870, speed: 0, time: "13:00"),
-                    RoutePoint(lat: 41.0350, lng: 28.9950, speed: 55, time: "13:10"),
-                    RoutePoint(lat: 41.0250, lng: 29.0100, speed: 88, time: "13:25"),
-                    RoutePoint(lat: 41.0150, lng: 29.0300, speed: 70, time: "13:40"),
-                    RoutePoint(lat: 41.0050, lng: 29.0500, speed: 45, time: "13:55"),
-                    RoutePoint(lat: 40.9950, lng: 29.0600, speed: 30, time: "14:10"),
-                    RoutePoint(lat: 40.9870, lng: 29.0640, speed: 0, time: "14:20"),
+                    RoutePoint(lat: 40.13855, lng: 26.40700, speed: 0, time: "11:00"),
+                    RoutePoint(lat: 40.13880, lng: 26.40640, speed: 15, time: "11:00"),
+                    RoutePoint(lat: 40.13920, lng: 26.40560, speed: 28, time: "11:01"),
+                    RoutePoint(lat: 40.13970, lng: 26.40480, speed: 38, time: "11:01"),
+                    RoutePoint(lat: 40.14030, lng: 26.40400, speed: 42, time: "11:02"),
+                    RoutePoint(lat: 40.14090, lng: 26.40330, speed: 35, time: "11:02"),
+                    RoutePoint(lat: 40.14140, lng: 26.40270, speed: 25, time: "11:03"),
+                    RoutePoint(lat: 40.14180, lng: 26.40220, speed: 18, time: "11:03"),
+                    RoutePoint(lat: 40.14210, lng: 26.40180, speed: 10, time: "11:04"),
+                    RoutePoint(lat: 40.14230, lng: 26.40150, speed: 5, time: "11:04"),
+                    RoutePoint(lat: 40.14240, lng: 26.40140, speed: 0, time: "11:05"),
                 ]
-            ))
-            routeId += 1
-
-            allRoutes.append(RouteTrip(
-                id: "r\(routeId)",
+            ),
+            RouteTrip(
+                id: "trip4",
                 dateLabel: dateStr,
-                startTime: "16:00",
-                endTime: "17:35",
-                startAddress: "Ataşehir, İstanbul",
-                endAddress: "Kadıköy, İstanbul",
-                distance: "15.6 km",
-                duration: "1s 35dk",
-                maxSpeed: "65 km/h",
-                avgSpeed: "22 km/h",
-                fuelUsed: "2.4 Lt",
+                startTime: "11:30",
+                endTime: "11:38",
+                startAddress: "Çanakkale İskele Cd.",
+                endAddress: "Çanakkale Kordon",
+                distance: "1.32 km",
+                duration: "7dk 33sn",
+                maxSpeed: "38 km/h",
+                avgSpeed: "11 km/h",
+                fuelUsed: "0.2 Lt",
                 points: [
-                    RoutePoint(lat: 40.9870, lng: 29.0640, speed: 0, time: "16:00"),
-                    RoutePoint(lat: 40.9900, lng: 29.0550, speed: 40, time: "16:15"),
-                    RoutePoint(lat: 40.9920, lng: 29.0400, speed: 65, time: "16:35"),
-                    RoutePoint(lat: 40.9910, lng: 29.0300, speed: 50, time: "16:55"),
-                    RoutePoint(lat: 40.9905, lng: 29.0230, speed: 0, time: "17:35"),
+                    RoutePoint(lat: 40.14240, lng: 26.40140, speed: 0, time: "11:30"),
+                    RoutePoint(lat: 40.14260, lng: 26.40100, speed: 10, time: "11:30"),
+                    RoutePoint(lat: 40.14290, lng: 26.40050, speed: 18, time: "11:31"),
+                    RoutePoint(lat: 40.14330, lng: 26.39990, speed: 28, time: "11:32"),
+                    RoutePoint(lat: 40.14380, lng: 26.39930, speed: 38, time: "11:33"),
+                    RoutePoint(lat: 40.14420, lng: 26.39880, speed: 30, time: "11:34"),
+                    RoutePoint(lat: 40.14460, lng: 26.39840, speed: 22, time: "11:35"),
+                    RoutePoint(lat: 40.14490, lng: 26.39810, speed: 15, time: "11:36"),
+                    RoutePoint(lat: 40.14510, lng: 26.39790, speed: 8, time: "11:37"),
+                    RoutePoint(lat: 40.14520, lng: 26.39780, speed: 0, time: "11:38"),
                 ]
-            ))
-            routeId += 1
-        }
+            )
+        ]
 
-        routes = allRoutes
         if let first = routes.first {
             selectedRoute = first
         }

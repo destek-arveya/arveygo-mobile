@@ -189,52 +189,6 @@ fun VehiclesListScreen(onMenuClick: () -> Unit) {
                 .background(AppColors.Bg)
                 .verticalScroll(rememberScrollState())
         ) {
-            // Alert Summary Cards (horizontal scroll)
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(top = 6.dp)
-            ) {
-                item {
-                    AlertSummaryCard(
-                        icon = Icons.Default.Error,
-                        value = "${vm.expiredDocs}",
-                        label = "Süresi Dolmuş Belge",
-                        iconBg = Color.Red.copy(alpha = 0.1f),
-                        iconColor = Color.Red
-                    )
-                }
-                item {
-                    AlertSummaryCard(
-                        icon = Icons.Default.Warning,
-                        value = "${vm.criticalDocs}",
-                        label = "Yaklaşan Belge Süresi",
-                        iconBg = Color(0xFFFFA000).copy(alpha = 0.1f),
-                        iconColor = Color(0xFFFFA000)
-                    )
-                }
-                item {
-                    AlertSummaryCard(
-                        icon = Icons.Default.Circle,
-                        value = "${vm.wornTires}",
-                        label = "Lastik Değişimi",
-                        iconBg = Color.Red.copy(alpha = 0.1f),
-                        iconColor = Color.Red
-                    )
-                }
-                item {
-                    AlertSummaryCard(
-                        icon = Icons.Default.Build,
-                        value = "${vm.upcomingMaint}",
-                        label = "30 Gün Bakım",
-                        iconBg = Color.Blue.copy(alpha = 0.1f),
-                        iconColor = Color.Blue
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(14.dp))
-
             // Search bar
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -451,7 +405,7 @@ private fun VehicleTableRow(vehicle: Vehicle, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .padding(horizontal = 14.dp, vertical = 16.dp)
         ) {
             // Status dot + plate/model
             Row(

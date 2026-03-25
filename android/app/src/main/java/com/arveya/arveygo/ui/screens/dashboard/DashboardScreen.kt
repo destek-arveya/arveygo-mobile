@@ -30,7 +30,7 @@ import com.arveya.arveygo.viewmodels.DashboardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}) {
+fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}, onNavigateToVehicles: () -> Unit = {}) {
     val authVM = LocalAuthViewModel.current
     val vm: DashboardViewModel = viewModel()
     val user by authVM.currentUser.collectAsState()
@@ -137,6 +137,7 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}) {
                 title = DL.activeVehicles,
                 count = "${vm.onlineCount}",
                 actionLabel = DL.allLabel,
+                onAction = onNavigateToVehicles,
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {
                 Column {
@@ -358,6 +359,7 @@ private fun CardView(
     title: String,
     count: String? = null,
     actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
@@ -378,7 +380,8 @@ private fun CardView(
             }
             Spacer(Modifier.weight(1f))
             if (actionLabel != null) {
-                Text(actionLabel, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AppColors.Indigo)
+                Text(actionLabel, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AppColors.Indigo,
+                    modifier = Modifier.clickable { onAction?.invoke() })
             }
         }
         content()

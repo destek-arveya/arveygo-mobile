@@ -114,7 +114,7 @@ fun SideMenu(
                         MenuItem(Icons.Default.BarChart, "Raporlar", null, selectedPage) { onClose() }
                     }
                     MenuSection("AYARLAR") {
-                        MenuItem(Icons.Default.Settings, "Ayarlar", null, selectedPage) { onClose() }
+                        MenuItem(Icons.Default.Settings, "Ayarlar", AppPage.SETTINGS, selectedPage, onPageSelected)
                     }
 
                     HorizontalDivider(

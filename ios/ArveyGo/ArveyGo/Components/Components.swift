@@ -148,33 +148,55 @@ struct LoadingSpinner: View {
     }
 }
 
-// MARK: - Language Switcher
+// MARK: - Language Switcher (Picker/Dropdown)
 struct LanguageSwitcher: View {
     @ObservedObject private var strings = LoginStrings.shared
-    let languages = ["TR", "EN"]
+
+    private let languages: [(code: String, flag: String, name: String)] = [
+        ("TR", "🇹🇷", "Türkçe"),
+        ("EN", "🇬🇧", "English"),
+        ("ES", "🇪🇸", "Español"),
+        ("FR", "🇫🇷", "Français")
+    ]
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(languages, id: \.self) { lang in
+        Menu {
+            ForEach(languages, id: \.code) { lang in
                 Button(action: {
-                    strings.currentLang = lang
-                    DashboardStrings.shared.currentLang = lang
+                    strings.currentLang = lang.code
+                    DashboardStrings.shared.currentLang = lang.code
                 }) {
-                    Text(lang)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(strings.currentLang == lang ? .white : AppTheme.textMuted)
-                        .frame(width: 36, height: 28)
-                        .background(strings.currentLang == lang ? AppTheme.navy : Color.clear)
-                        .cornerRadius(6)
+                    HStack {
+                        Text("\(lang.flag) \(lang.name)")
+                        if strings.currentLang == lang.code {
+                            Image(systemName: "checkmark")
+                        }
+                    }
                 }
             }
+        } label: {
+            HStack(spacing: 5) {
+                Text(currentFlag)
+                    .font(.system(size: 14))
+                Text(strings.currentLang)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppTheme.navy)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundColor(AppTheme.textMuted)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(AppTheme.bg)
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(AppTheme.borderSoft, lineWidth: 1)
+            )
         }
-        .padding(3)
-        .background(AppTheme.bg)
-        .cornerRadius(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
-        )
+    }
+
+    private var currentFlag: String {
+        languages.first(where: { $0.code == strings.currentLang })?.flag ?? "🇹🇷"
     }
 }

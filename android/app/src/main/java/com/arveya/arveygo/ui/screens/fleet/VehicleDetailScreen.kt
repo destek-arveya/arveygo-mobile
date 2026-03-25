@@ -352,6 +352,33 @@ private fun OverviewTab(vehicle: Vehicle) {
         Triple(Icons.Default.Schedule, "SON VERİ", vehicle.formattedDeviceTime),
     )
 
+    // Device Time card (matching vehicles list style)
+    if (vehicle.deviceTime != null) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(AppColors.Surface, RoundedCornerShape(12.dp))
+                .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Icon(Icons.Default.Schedule, null, tint = AppColors.Indigo, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Son Bilgi Tarihi", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+            Spacer(Modifier.weight(1f))
+            Text(
+                "⏱ ${vehicle.formattedDeviceTime}",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = AppColors.TextMuted,
+                modifier = Modifier
+                    .background(AppColors.Bg, RoundedCornerShape(8.dp))
+                    .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            )
+        }
+    }
+
     SectionCard(title = "ARAÇ BİLGİLERİ", icon = Icons.Default.DirectionsCar) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             for (i in infoItems.indices step 2) {

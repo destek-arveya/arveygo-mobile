@@ -14,6 +14,7 @@ import com.arveya.arveygo.ui.screens.dashboard.DashboardScreen
 import com.arveya.arveygo.ui.screens.fleet.RouteHistoryScreen
 import com.arveya.arveygo.ui.screens.fleet.VehiclesListScreen
 import com.arveya.arveygo.ui.screens.livemap.LiveMapScreen
+import com.arveya.arveygo.ui.screens.settings.SettingsScreen
 import com.arveya.arveygo.ui.components.SideMenu
 import com.arveya.arveygo.ui.theme.AppColors
 import com.arveya.arveygo.viewmodels.AuthViewModel
@@ -53,7 +54,8 @@ fun MainContent(authVM: AuthViewModel) {
         when (selectedPage) {
             AppPage.DASHBOARD -> DashboardScreen(
                 onMenuClick = { showSideMenu = true },
-                onNavigateToMap = { selectedPage = AppPage.LIVE_MAP }
+                onNavigateToMap = { selectedPage = AppPage.LIVE_MAP },
+                onNavigateToVehicles = { selectedPage = AppPage.VEHICLES }
             )
             AppPage.LIVE_MAP -> LiveMapScreen(
                 onMenuClick = { showSideMenu = true }
@@ -62,6 +64,9 @@ fun MainContent(authVM: AuthViewModel) {
                 onMenuClick = { showSideMenu = true }
             )
             AppPage.ROUTE_HISTORY -> RouteHistoryScreen(
+                onMenuClick = { showSideMenu = true }
+            )
+            AppPage.SETTINGS -> SettingsScreen(
                 onMenuClick = { showSideMenu = true }
             )
         }

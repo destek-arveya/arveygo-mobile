@@ -265,35 +265,60 @@ fun GradientButton(
     }
 }
 
-// MARK: - Language Switcher
+// MARK: - Language Switcher (Dropdown Picker)
 @Composable
 fun LanguageSwitcher() {
     val selectedLang by com.arveya.arveygo.utils.LoginStrings.currentLang.collectAsState()
-    val languages = listOf("TR", "EN")
+    var expanded by remember { mutableStateOf(false) }
+    val languages = listOf(
+        Triple("TR", "🇹🇷", "Türkçe"),
+        Triple("EN", "🇬🇧", "English"),
+        Triple("ES", "🇪🇸", "Español"),
+        Triple("FR", "🇫🇷", "Français")
+    )
 
-    Row(
-        modifier = Modifier
-            .background(AppColors.Bg, RoundedCornerShape(8.dp))
-            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(8.dp))
-            .padding(3.dp)
-    ) {
-        languages.forEach { lang ->
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(36.dp, 28.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(if (selectedLang == lang) AppColors.Navy else Color.Transparent)
-                    .clickable {
-                        com.arveya.arveygo.utils.LoginStrings.setLanguage(lang)
-                        com.arveya.arveygo.utils.DashboardStrings.setLanguage(lang)
+    Box {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .background(AppColors.Bg, RoundedCornerShape(8.dp))
+                .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(8.dp))
+                .clickable { expanded = true }
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+        ) {
+            val flag = languages.firstOrNull { it.first == selectedLang }?.second ?: "🇹🇷"
+            Text(flag, fontSize = 14.sp)
+            Spacer(Modifier.width(5.dp))
+            Text(
+                text = selectedLang,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AppColors.Navy
+            )
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                Icons.Default.ArrowDropDown, null,
+                tint = AppColors.TextMuted,
+                modifier = Modifier.size(14.dp)
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            languages.forEach { (code, flag, name) ->
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("$flag  $name", fontSize = 13.sp)
+                            if (selectedLang == code) {
+                                Spacer(Modifier.width(8.dp))
+                                Icon(Icons.Default.Check, null, tint = AppColors.Indigo, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    },
+                    onClick = {
+                        com.arveya.arveygo.utils.LoginStrings.setLanguage(code)
+                        com.arveya.arveygo.utils.DashboardStrings.setLanguage(code)
+                        expanded = false
                     }
-            ) {
-                Text(
-                    text = lang,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (selectedLang == lang) Color.White else AppColors.TextMuted
                 )
             }
         }

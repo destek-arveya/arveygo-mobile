@@ -51,44 +51,66 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
     val trips = remember {
         listOf(
             RouteTrip(
-                "1", "Bug\u00fcn", "08:15", "10:42",
-                "Kad\u0131k\u00f6y, \u0130stanbul", "Tuzla, \u0130stanbul",
-                "47.3 km", "2s 27dk", "118 km/h", "62 km/h", "6.8 L",
+                "trip1", "Bugün", "10:15", "10:19",
+                "Çanakkale Merkez", "Çanakkale Sahil",
+                "0.14 km", "4dk 43sn", "12 km/h", "2 km/h", "0.1 L",
                 listOf(
-                    RoutePoint(40.9903, 29.0231, 0, "08:15"),
-                    RoutePoint(40.9720, 29.0580, 65, "08:30"),
-                    RoutePoint(40.9450, 29.1200, 95, "09:00"),
-                    RoutePoint(40.9200, 29.2100, 110, "09:30"),
-                    RoutePoint(40.8900, 29.2800, 80, "10:00"),
-                    RoutePoint(40.8350, 29.3000, 40, "10:30"),
-                    RoutePoint(40.8150, 29.3200, 0, "10:42"),
+                    RoutePoint(40.13416, 26.41174, 0, "10:15"),
+                    RoutePoint(40.13422, 26.41163, 3, "10:15"),
+                    RoutePoint(40.13430, 26.41152, 7, "10:16"),
+                    RoutePoint(40.13437, 26.41144, 8, "10:16"),
+                    RoutePoint(40.13444, 26.41136, 10, "10:17"),
+                    RoutePoint(40.13455, 26.41120, 8, "10:17"),
+                    RoutePoint(40.13462, 26.41108, 3, "10:18"),
+                    RoutePoint(40.13464, 26.41104, 0, "10:19"),
                 )
             ),
             RouteTrip(
-                "2", "Bug\u00fcn", "13:00", "14:35",
-                "Tuzla, \u0130stanbul", "Pendik, \u0130stanbul",
-                "18.5 km", "1s 35dk", "85 km/h", "48 km/h", "3.2 L",
+                "trip2", "Bugün", "10:25", "10:31",
+                "Çanakkale Sahil", "Çanakkale Liman",
+                "1.04 km", "5dk 58sn", "36 km/h", "11 km/h", "0.2 L",
                 listOf(
-                    RoutePoint(40.8150, 29.3200, 0, "13:00"),
-                    RoutePoint(40.8350, 29.2900, 55, "13:15"),
-                    RoutePoint(40.8600, 29.2500, 70, "13:30"),
-                    RoutePoint(40.8750, 29.2300, 85, "14:00"),
-                    RoutePoint(40.8800, 29.2200, 30, "14:30"),
-                    RoutePoint(40.8850, 29.2100, 0, "14:35"),
+                    RoutePoint(40.13464, 26.41104, 0, "10:25"),
+                    RoutePoint(40.13510, 26.41020, 22, "10:26"),
+                    RoutePoint(40.13560, 26.40960, 30, "10:26"),
+                    RoutePoint(40.13610, 26.40900, 36, "10:27"),
+                    RoutePoint(40.13660, 26.40850, 28, "10:27"),
+                    RoutePoint(40.13720, 26.40800, 20, "10:28"),
+                    RoutePoint(40.13770, 26.40760, 15, "10:28"),
+                    RoutePoint(40.13810, 26.40730, 10, "10:29"),
+                    RoutePoint(40.13840, 26.40710, 5, "10:30"),
+                    RoutePoint(40.13855, 26.40700, 0, "10:31"),
                 )
             ),
             RouteTrip(
-                "3", "D\u00fcn", "09:00", "12:15",
-                "Kad\u0131k\u00f6y, \u0130stanbul", "Gebze, Kocaeli",
-                "65.8 km", "3s 15dk", "125 km/h", "58 km/h", "9.4 L",
+                "trip3", "Bugün", "11:00", "11:05",
+                "Çanakkale Liman", "Çanakkale İskele Cd.",
+                "1.43 km", "4dk 55sn", "42 km/h", "17 km/h", "0.3 L",
                 listOf(
-                    RoutePoint(40.9903, 29.0231, 0, "09:00"),
-                    RoutePoint(40.9500, 29.1000, 80, "09:30"),
-                    RoutePoint(40.9000, 29.2000, 105, "10:00"),
-                    RoutePoint(40.8500, 29.3000, 125, "10:30"),
-                    RoutePoint(40.8200, 29.3500, 90, "11:00"),
-                    RoutePoint(40.8000, 29.4000, 75, "11:30"),
-                    RoutePoint(40.7900, 29.4300, 0, "12:15"),
+                    RoutePoint(40.13855, 26.40700, 0, "11:00"),
+                    RoutePoint(40.13920, 26.40560, 28, "11:01"),
+                    RoutePoint(40.13970, 26.40480, 38, "11:01"),
+                    RoutePoint(40.14030, 26.40400, 42, "11:02"),
+                    RoutePoint(40.14090, 26.40330, 35, "11:02"),
+                    RoutePoint(40.14140, 26.40270, 25, "11:03"),
+                    RoutePoint(40.14180, 26.40220, 18, "11:03"),
+                    RoutePoint(40.14210, 26.40180, 10, "11:04"),
+                    RoutePoint(40.14240, 26.40140, 0, "11:05"),
+                )
+            ),
+            RouteTrip(
+                "trip4", "Bugün", "11:30", "11:38",
+                "Çanakkale İskele Cd.", "Çanakkale Kordon",
+                "1.32 km", "7dk 33sn", "38 km/h", "11 km/h", "0.2 L",
+                listOf(
+                    RoutePoint(40.14240, 26.40140, 0, "11:30"),
+                    RoutePoint(40.14290, 26.40050, 18, "11:31"),
+                    RoutePoint(40.14330, 26.39990, 28, "11:32"),
+                    RoutePoint(40.14380, 26.39930, 38, "11:33"),
+                    RoutePoint(40.14420, 26.39880, 30, "11:34"),
+                    RoutePoint(40.14460, 26.39840, 22, "11:35"),
+                    RoutePoint(40.14490, 26.39810, 15, "11:36"),
+                    RoutePoint(40.14520, 26.39780, 0, "11:38"),
                 )
             )
         )
@@ -284,8 +306,8 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
                         MapView(ctx).apply {
                             setTileSource(TileSourceFactory.MAPNIK)
                             setMultiTouchControls(true)
-                            controller.setZoom(10.0)
-                            controller.setCenter(GeoPoint(40.9, 29.2))
+                            controller.setZoom(15.0)
+                            controller.setCenter(GeoPoint(40.136, 26.408))
                             zoomController.setVisibility(
                                 org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER
                             )

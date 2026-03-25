@@ -33,7 +33,8 @@
 			AA000026 /* CountryCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000026 /* CountryCode.swift */; };
 			AA000027 /* CountryPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000027 /* CountryPickerSheet.swift */; };
 			AA000028 /* DashboardStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000028 /* DashboardStrings.swift */; };
-			AA000029 /* RoundedCorner.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000029 /* RoundedCorner.swift */; };
+				AA000029 /* RoundedCorner.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000029 /* RoundedCorner.swift */; };
+				AA000030 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000030 /* SettingsView.swift */; };
 /* End PBXBuildFile section *//* Begin PBXFileReference section */
 		BB000000 /* ArveyGo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ArveyGo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB000001 /* ArveyGoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArveyGoApp.swift; sourceTree = "<group>"; };
@@ -63,7 +64,8 @@
 			BB000026 /* CountryCode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountryCode.swift; sourceTree = "<group>"; };
 			BB000027 /* CountryPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountryPickerSheet.swift; sourceTree = "<group>"; };
 			BB000028 /* DashboardStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardStrings.swift; sourceTree = "<group>"; };
-			BB000029 /* RoundedCorner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundedCorner.swift; sourceTree = "<group>"; };
+				BB000029 /* RoundedCorner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundedCorner.swift; sourceTree = "<group>"; };
+				BB000030 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section *//* Begin PBXFrameworksBuildPhase section */
 		CC000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -109,9 +111,18 @@
 				DD000012 /* Dashboard */,
 				DD000013 /* LiveMap */,
 				DD000014 /* Fleet */,
+				DD000017 /* Settings */,
 				BB000015 /* SideMenuView.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		DD000017 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				BB000030 /* SettingsView.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 		DD000013 /* LiveMap */ = {
@@ -326,6 +337,7 @@
 					AA000027 /* CountryPickerSheet.swift in Sources */,
 					AA000028 /* DashboardStrings.swift in Sources */,
 					AA000029 /* RoundedCorner.swift in Sources */,
+					AA000030 /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

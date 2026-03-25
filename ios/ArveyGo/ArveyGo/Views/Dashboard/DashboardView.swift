@@ -219,7 +219,7 @@ struct DashboardView: View {
     // MARK: - Vehicle List Card
     var vehicleListCard: some View {
         CardView(title: DL.vehiclesTitle, count: "\(dashVM.totalVehicles)", actionLabel: DL.viewAll) {
-            // Action
+            selectedPage = .vehicles
         } content: {
             VStack(spacing: 0) {
                 ForEach(dashVM.vehicles) { vehicle in
