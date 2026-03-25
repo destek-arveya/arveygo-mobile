@@ -8,6 +8,7 @@ struct ArveyGoApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(authVM)
+                .preferredColorScheme(.light)
         }
     }
 }

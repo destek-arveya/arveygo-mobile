@@ -1,5 +1,7 @@
 package com.arveya.arveygo
 
+import android.app.UiModeManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -21,6 +23,11 @@ val LocalAuthViewModel = staticCompositionLocalOf<AuthViewModel> {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Force light mode — disable dark theme
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val uiModeManager = getSystemService(UiModeManager::class.java)
+            uiModeManager?.setApplicationNightMode(UiModeManager.MODE_NIGHT_NO)
+        }
         enableEdgeToEdge()
 
         // Lifecycle observer for WebSocket reconnection
