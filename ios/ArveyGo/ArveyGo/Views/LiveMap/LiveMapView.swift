@@ -76,8 +76,6 @@ struct LiveMapView: View {
                 .onAppear {
                     // Connect WebSocket when map appears
                     authVM.connectWebSocket()
-                    // If WS fails to deliver data, fall back to dummy
-                    vm.loadDummyDataIfNeeded()
                 }
                 .onChange(of: showSideMenu) { _, isShowing in
                     if isShowing { selectedVehicle = nil }
@@ -133,8 +131,8 @@ struct LiveMapView: View {
     // MARK: - Map Content
     var mapContent: some View {
         Map(position: $mapCameraPosition) {
-            // Trail polylines for online vehicles
-            ForEach(vm.filteredVehicles.filter { $0.status == .online }) { vehicle in
+            // Trail polylines for online + idle vehicles (keep trail visible during rölanti)
+            ForEach(vm.filteredVehicles.filter { $0.status == .online || $0.status == .idle }) { vehicle in
                 if let trail = vm.trailHistory[vehicle.id], trail.count >= 2 {
                     MapPolyline(coordinates: trail)
                         .stroke(vehicle.status.color.opacity(0.6), lineWidth: 3)
@@ -640,14 +638,14 @@ class LiveMapViewModel: ObservableObject {
         let targetLng = vehicle.lng
         let targetDir = vehicle.direction
 
-        // Update trail history for online/moving vehicles
+        // Update trail history for online/idle vehicles (keep trail visible during rölanti)
         let newPos = CLLocationCoordinate2D(latitude: targetLat, longitude: targetLng)
-        if vehicle.status == .online && targetLat != 0 && targetLng != 0 {
+        if (vehicle.status == .online || vehicle.status == .idle) && targetLat != 0 && targetLng != 0 {
             var trail = trailHistory[vehicleId] ?? []
             if let last = trail.last {
                 if abs(last.latitude - targetLat) > 0.000001 || abs(last.longitude - targetLng) > 0.000001 {
                     trail.append(newPos)
-                    if trail.count > 40 { trail.removeFirst() }
+                    if trail.count > 20 { trail.removeFirst() }
                     trailHistory[vehicleId] = trail
                 }
             } else {
@@ -753,38 +751,7 @@ class LiveMapViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    /// If no WS data after some time, load dummy data for preview
-    func loadDummyDataIfNeeded() {
-        guard vehicles.isEmpty else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-            guard let self = self, self.vehicles.isEmpty else { return }
-            // Only load dummy if still no data after 3 seconds
-            if case .error = self.wsStatus {
-                self.loadDummyData()
-            } else if self.wsStatus == .idle || self.wsStatus == .disconnected {
-                self.loadDummyData()
-            }
-        }
-    }
 
-    func loadDummyData() {
-        let dummyVehicles = [
-            Vehicle(id: "1", plate: "34 ABC 123", model: "Ford Transit", status: .online, kontakOn: true, totalKm: 48320, todayKm: 87, driver: "Ahmet Yılmaz", city: "İstanbul", lat: 41.0082, lng: 28.9784),
-            Vehicle(id: "2", plate: "06 XYZ 789", model: "Mercedes Sprinter", status: .offline, kontakOn: false, totalKm: 92100, todayKm: 0, driver: "Mehmet Demir", city: "Ankara", lat: 39.9334, lng: 32.8597),
-            Vehicle(id: "3", plate: "35 DEF 456", model: "Renault Master", status: .online, kontakOn: true, totalKm: 31540, todayKm: 62, driver: "Ayşe Kaya", city: "İzmir", lat: 38.4192, lng: 27.1287),
-            Vehicle(id: "4", plate: "16 GHI 321", model: "Volkswagen Crafter", status: .idle, kontakOn: false, totalKm: 67890, todayKm: 0, driver: "Can Öztürk", city: "Bursa", lat: 40.1885, lng: 29.0610),
-            Vehicle(id: "5", plate: "41 JKL 654", model: "Fiat Ducato", status: .online, kontakOn: true, totalKm: 22430, todayKm: 45, driver: "Zeynep Şahin", city: "Kocaeli", lat: 40.7654, lng: 29.9408),
-            Vehicle(id: "6", plate: "07 MNO 987", model: "Peugeot Boxer", status: .offline, kontakOn: false, totalKm: 55670, todayKm: 0, driver: "Ali Çelik", city: "Antalya", lat: 36.8969, lng: 30.7133),
-            Vehicle(id: "7", plate: "34 PRS 111", model: "Iveco Daily", status: .online, kontakOn: true, totalKm: 14220, todayKm: 112, driver: "Fatma Arslan", city: "İstanbul", lat: 41.0422, lng: 29.0083),
-            Vehicle(id: "8", plate: "06 TUV 222", model: "Ford Transit Custom", status: .idle, kontakOn: false, totalKm: 38900, todayKm: 0, driver: "Hasan Koç", city: "Ankara", lat: 39.9208, lng: 32.8541),
-        ]
-        vehicles = dummyVehicles
-        // Initialize animated positions instantly for dummy data
-        for v in dummyVehicles {
-            animatedPositions[v.id] = CLLocationCoordinate2D(latitude: v.lat, longitude: v.lng)
-            animatedDirections[v.id] = v.direction
-        }
-    }
 
     deinit {
         animationTimers.values.forEach { $0.invalidate() }

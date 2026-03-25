@@ -114,11 +114,12 @@ data class Vehicle(
 
     private fun formatTimestamp(raw: String?): String {
         if (raw.isNullOrEmpty()) return "\u2014"
+        val cleaned = raw.replace(Regex("\\.\\d+"), "")
         return try {
             val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
             val outputFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
             outputFormat.timeZone = TimeZone.getTimeZone("Europe/Istanbul")
-            val date = inputFormat.parse(raw) ?: return raw
+            val date = inputFormat.parse(cleaned) ?: return raw
             outputFormat.format(date)
         } catch (_: Exception) {
             try {
@@ -126,7 +127,7 @@ data class Vehicle(
                 inputFormat2.timeZone = TimeZone.getTimeZone("UTC")
                 val outputFormat2 = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
                 outputFormat2.timeZone = TimeZone.getTimeZone("Europe/Istanbul")
-                val date2 = inputFormat2.parse(raw) ?: return raw
+                val date2 = inputFormat2.parse(cleaned) ?: return raw
                 outputFormat2.format(date2)
             } catch (_: Exception) { raw }
         }
@@ -139,11 +140,13 @@ data class Vehicle(
     val formattedDeviceTime: String
         get() {
             val raw = deviceTime ?: return "—"
+            // Strip fractional seconds that can cause parse failure (e.g. .456+03:00)
+            val cleaned = raw.replace(Regex("\\.\\d+"), "")
             return try {
                 val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
                 val outputFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
                 outputFormat.timeZone = TimeZone.getTimeZone("Europe/Istanbul")
-                val date = inputFormat.parse(raw) ?: return raw
+                val date = inputFormat.parse(cleaned) ?: return raw
                 outputFormat.format(date)
             } catch (_: Exception) {
                 try {
@@ -151,7 +154,7 @@ data class Vehicle(
                     inputFormat2.timeZone = TimeZone.getTimeZone("UTC")
                     val outputFormat2 = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
                     outputFormat2.timeZone = TimeZone.getTimeZone("Europe/Istanbul")
-                    val date2 = inputFormat2.parse(raw) ?: return raw
+                    val date2 = inputFormat2.parse(cleaned) ?: return raw
                     outputFormat2.format(date2)
                 } catch (_: Exception) {
                     raw

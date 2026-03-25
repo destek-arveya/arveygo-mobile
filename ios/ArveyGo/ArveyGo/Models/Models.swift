@@ -85,19 +85,29 @@ struct Vehicle: Identifiable, Hashable {
 
     func formatTimestamp(_ raw: String?) -> String {
         guard let raw = raw, !raw.isEmpty else { return "—" }
+        let cleaned = raw.replacingOccurrences(of: "\\.\\d+", with: "", options: .regularExpression)
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
-        if let date = formatter.date(from: raw) {
+        if let date = formatter.date(from: cleaned) {
             let outFormatter = DateFormatter()
             outFormatter.dateFormat = "dd.MM.yyyy HH:mm"
             outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
             outFormatter.locale = Locale(identifier: "tr_TR")
             return outFormatter.string(from: date)
         }
+        let formatter1b = ISO8601DateFormatter()
+        formatter1b.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date1b = formatter1b.date(from: raw) {
+            let outFormatter = DateFormatter()
+            outFormatter.dateFormat = "dd.MM.yyyy HH:mm"
+            outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
+            outFormatter.locale = Locale(identifier: "tr_TR")
+            return outFormatter.string(from: date1b)
+        }
         let formatter2 = DateFormatter()
         formatter2.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
         formatter2.timeZone = TimeZone(abbreviation: "UTC")
-        if let date2 = formatter2.date(from: raw) {
+        if let date2 = formatter2.date(from: cleaned) {
             let outFormatter = DateFormatter()
             outFormatter.dateFormat = "dd.MM.yyyy HH:mm"
             outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
@@ -113,20 +123,36 @@ struct Vehicle: Identifiable, Hashable {
 
     var formattedDeviceTime: String {
         guard let raw = deviceTime, !raw.isEmpty else { return "—" }
+        // Strip fractional seconds that can cause parse failure (e.g. .456+03:00)
+        let cleaned = raw.replacingOccurrences(
+            of: "\\.\\d+",
+            with: "",
+            options: .regularExpression
+        )
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
-        if let date = formatter.date(from: raw) {
+        if let date = formatter.date(from: cleaned) {
             let outFormatter = DateFormatter()
             outFormatter.dateFormat = "dd.MM.yyyy HH:mm"
             outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
             outFormatter.locale = Locale(identifier: "tr_TR")
             return outFormatter.string(from: date)
         }
+        // Also try the original raw value (may have fractional seconds support on some OS)
+        let formatter1b = ISO8601DateFormatter()
+        formatter1b.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date1b = formatter1b.date(from: raw) {
+            let outFormatter = DateFormatter()
+            outFormatter.dateFormat = "dd.MM.yyyy HH:mm"
+            outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
+            outFormatter.locale = Locale(identifier: "tr_TR")
+            return outFormatter.string(from: date1b)
+        }
         // Fallback: try without timezone
         let formatter2 = DateFormatter()
         formatter2.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
         formatter2.timeZone = TimeZone(abbreviation: "UTC")
-        if let date2 = formatter2.date(from: raw) {
+        if let date2 = formatter2.date(from: cleaned) {
             let outFormatter = DateFormatter()
             outFormatter.dateFormat = "dd.MM.yyyy HH:mm"
             outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")

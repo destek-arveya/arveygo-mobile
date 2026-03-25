@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import Combine
 
 struct RouteHistoryView: View {
     @EnvironmentObject var authVM: AuthViewModel
@@ -69,7 +70,16 @@ struct RouteHistoryView: View {
                     .presentationCornerRadius(20)
             }
             .onAppear {
+                // Auto-select first vehicle and load routes when vehicles arrive from WS
                 if selectedVehicle == nil, let first = vm.vehicles.first {
+                    selectedVehicle = first
+                    vm.selectVehicle(first)
+                    vm.loadRoutes(from: startDate, to: endDate)
+                }
+            }
+            .onChange(of: vm.vehicles) { _, vehicles in
+                // When WS vehicles first arrive, auto-select and load
+                if selectedVehicle == nil, let first = vehicles.first {
                     selectedVehicle = first
                     vm.selectVehicle(first)
                     vm.loadRoutes(from: startDate, to: endDate)
@@ -658,22 +668,28 @@ class RouteHistoryViewModel: ObservableObject {
     @Published var routes: [RouteTrip] = []
     @Published var selectedRoute: RouteTrip?
     @Published var selectedVehicleId: String?
+    @Published var isLoadingVehicles = false
+    @Published var isLoadingRoutes = false
+    @Published var errorMessage: String?
+
+    private var cancellables = Set<AnyCancellable>()
+    private let wsManager = WebSocketManager.shared
 
     init() {
-        loadVehicles()
+        subscribeToWebSocket()
     }
 
-    func loadVehicles() {
-        vehicles = [
-            Vehicle(id: "1", plate: "34 ABC 123", model: "Ford Transit", status: .online, kontakOn: true, totalKm: 48320, todayKm: 87, driver: "Ahmet Yılmaz", city: "İstanbul", lat: 41.0082, lng: 28.9784),
-            Vehicle(id: "2", plate: "06 XYZ 789", model: "Mercedes Sprinter", status: .offline, kontakOn: false, totalKm: 92100, todayKm: 0, driver: "Mehmet Demir", city: "Ankara", lat: 39.9334, lng: 32.8597),
-            Vehicle(id: "3", plate: "35 DEF 456", model: "Renault Master", status: .online, kontakOn: true, totalKm: 31540, todayKm: 62, driver: "Ayşe Kaya", city: "İzmir", lat: 38.4192, lng: 27.1287),
-            Vehicle(id: "4", plate: "16 GHI 321", model: "Volkswagen Crafter", status: .idle, kontakOn: false, totalKm: 67890, todayKm: 0, driver: "Can Öztürk", city: "Bursa", lat: 40.1885, lng: 29.0610),
-            Vehicle(id: "5", plate: "41 JKL 654", model: "Fiat Ducato", status: .online, kontakOn: true, totalKm: 22430, todayKm: 45, driver: "Zeynep Şahin", city: "Kocaeli", lat: 40.7654, lng: 29.9408),
-            Vehicle(id: "6", plate: "07 MNO 987", model: "Peugeot Boxer", status: .offline, kontakOn: false, totalKm: 55670, todayKm: 0, driver: "Ali Çelik", city: "Antalya", lat: 36.8969, lng: 30.7133),
-            Vehicle(id: "7", plate: "34 PRS 111", model: "Iveco Daily", status: .online, kontakOn: true, totalKm: 14220, todayKm: 112, driver: "Fatma Arslan", city: "İstanbul", lat: 41.0422, lng: 29.0083),
-            Vehicle(id: "8", plate: "06 TUV 222", model: "Ford Transit Custom", status: .idle, kontakOn: false, totalKm: 38900, todayKm: 0, driver: "Hasan Koç", city: "Ankara", lat: 39.9208, lng: 32.8541),
-        ]
+    // MARK: - Get vehicles from WebSocket (real data)
+    private func subscribeToWebSocket() {
+        wsManager.$vehicleList
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] list in
+                guard let self = self else { return }
+                if !list.isEmpty {
+                    self.vehicles = list
+                }
+            }
+            .store(in: &cancellables)
     }
 
     func selectVehicle(_ vehicle: Vehicle) {
@@ -684,122 +700,146 @@ class RouteHistoryViewModel: ObservableObject {
         selectedRoute = route
     }
 
+    // MARK: - Load routes from API
     func loadRoutes(from startDate: Date, to endDate: Date) {
-        // Dummy data matching route_history.json structure (Çanakkale area)
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd.MM"
-        let dateStr = formatter.string(from: startDate)
+        guard let vehicleId = selectedVehicleId else { return }
 
-        routes = [
-            RouteTrip(
-                id: "trip1",
-                dateLabel: dateStr,
-                startTime: "10:15",
-                endTime: "10:19",
-                startAddress: "Çanakkale Merkez",
-                endAddress: "Çanakkale Sahil",
-                distance: "0.14 km",
-                duration: "4dk 43sn",
-                maxSpeed: "12 km/h",
-                avgSpeed: "2 km/h",
-                fuelUsed: "0.1 Lt",
-                points: [
-                    RoutePoint(lat: 40.13416, lng: 26.41174, speed: 0, time: "10:15"),
-                    RoutePoint(lat: 40.13418, lng: 26.41169, speed: 2, time: "10:15"),
-                    RoutePoint(lat: 40.13422, lng: 26.41163, speed: 3, time: "10:15"),
-                    RoutePoint(lat: 40.13425, lng: 26.41158, speed: 5, time: "10:16"),
-                    RoutePoint(lat: 40.13430, lng: 26.41152, speed: 7, time: "10:16"),
-                    RoutePoint(lat: 40.13437, lng: 26.41144, speed: 8, time: "10:16"),
-                    RoutePoint(lat: 40.13444, lng: 26.41136, speed: 10, time: "10:17"),
-                    RoutePoint(lat: 40.13449, lng: 26.41129, speed: 12, time: "10:17"),
-                    RoutePoint(lat: 40.13455, lng: 26.41120, speed: 8, time: "10:17"),
-                    RoutePoint(lat: 40.13459, lng: 26.41113, speed: 5, time: "10:18"),
-                    RoutePoint(lat: 40.13462, lng: 26.41108, speed: 3, time: "10:18"),
-                    RoutePoint(lat: 40.13464, lng: 26.41104, speed: 0, time: "10:19"),
-                ]
-            ),
-            RouteTrip(
-                id: "trip2",
-                dateLabel: dateStr,
-                startTime: "10:25",
-                endTime: "10:31",
-                startAddress: "Çanakkale Sahil",
-                endAddress: "Çanakkale Liman",
-                distance: "1.04 km",
-                duration: "5dk 58sn",
-                maxSpeed: "36 km/h",
-                avgSpeed: "11 km/h",
-                fuelUsed: "0.2 Lt",
-                points: [
-                    RoutePoint(lat: 40.13464, lng: 26.41104, speed: 0, time: "10:25"),
-                    RoutePoint(lat: 40.13480, lng: 26.41070, speed: 12, time: "10:25"),
-                    RoutePoint(lat: 40.13510, lng: 26.41020, speed: 22, time: "10:26"),
-                    RoutePoint(lat: 40.13560, lng: 26.40960, speed: 30, time: "10:26"),
-                    RoutePoint(lat: 40.13610, lng: 26.40900, speed: 36, time: "10:27"),
-                    RoutePoint(lat: 40.13660, lng: 26.40850, speed: 28, time: "10:27"),
-                    RoutePoint(lat: 40.13720, lng: 26.40800, speed: 20, time: "10:28"),
-                    RoutePoint(lat: 40.13770, lng: 26.40760, speed: 15, time: "10:28"),
-                    RoutePoint(lat: 40.13810, lng: 26.40730, speed: 10, time: "10:29"),
-                    RoutePoint(lat: 40.13840, lng: 26.40710, speed: 5, time: "10:30"),
-                    RoutePoint(lat: 40.13855, lng: 26.40700, speed: 0, time: "10:31"),
-                ]
-            ),
-            RouteTrip(
-                id: "trip3",
-                dateLabel: dateStr,
-                startTime: "11:00",
-                endTime: "11:05",
-                startAddress: "Çanakkale Liman",
-                endAddress: "Çanakkale İskele Cd.",
-                distance: "1.43 km",
-                duration: "4dk 55sn",
-                maxSpeed: "42 km/h",
-                avgSpeed: "17 km/h",
-                fuelUsed: "0.3 Lt",
-                points: [
-                    RoutePoint(lat: 40.13855, lng: 26.40700, speed: 0, time: "11:00"),
-                    RoutePoint(lat: 40.13880, lng: 26.40640, speed: 15, time: "11:00"),
-                    RoutePoint(lat: 40.13920, lng: 26.40560, speed: 28, time: "11:01"),
-                    RoutePoint(lat: 40.13970, lng: 26.40480, speed: 38, time: "11:01"),
-                    RoutePoint(lat: 40.14030, lng: 26.40400, speed: 42, time: "11:02"),
-                    RoutePoint(lat: 40.14090, lng: 26.40330, speed: 35, time: "11:02"),
-                    RoutePoint(lat: 40.14140, lng: 26.40270, speed: 25, time: "11:03"),
-                    RoutePoint(lat: 40.14180, lng: 26.40220, speed: 18, time: "11:03"),
-                    RoutePoint(lat: 40.14210, lng: 26.40180, speed: 10, time: "11:04"),
-                    RoutePoint(lat: 40.14230, lng: 26.40150, speed: 5, time: "11:04"),
-                    RoutePoint(lat: 40.14240, lng: 26.40140, speed: 0, time: "11:05"),
-                ]
-            ),
-            RouteTrip(
-                id: "trip4",
-                dateLabel: dateStr,
-                startTime: "11:30",
-                endTime: "11:38",
-                startAddress: "Çanakkale İskele Cd.",
-                endAddress: "Çanakkale Kordon",
-                distance: "1.32 km",
-                duration: "7dk 33sn",
-                maxSpeed: "38 km/h",
-                avgSpeed: "11 km/h",
-                fuelUsed: "0.2 Lt",
-                points: [
-                    RoutePoint(lat: 40.14240, lng: 26.40140, speed: 0, time: "11:30"),
-                    RoutePoint(lat: 40.14260, lng: 26.40100, speed: 10, time: "11:30"),
-                    RoutePoint(lat: 40.14290, lng: 26.40050, speed: 18, time: "11:31"),
-                    RoutePoint(lat: 40.14330, lng: 26.39990, speed: 28, time: "11:32"),
-                    RoutePoint(lat: 40.14380, lng: 26.39930, speed: 38, time: "11:33"),
-                    RoutePoint(lat: 40.14420, lng: 26.39880, speed: 30, time: "11:34"),
-                    RoutePoint(lat: 40.14460, lng: 26.39840, speed: 22, time: "11:35"),
-                    RoutePoint(lat: 40.14490, lng: 26.39810, speed: 15, time: "11:36"),
-                    RoutePoint(lat: 40.14510, lng: 26.39790, speed: 8, time: "11:37"),
-                    RoutePoint(lat: 40.14520, lng: 26.39780, speed: 0, time: "11:38"),
-                ]
-            )
-        ]
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
 
-        if let first = routes.first {
-            selectedRoute = first
+        let startStr = dateFormatter.string(from: startDate)
+        let endStr = dateFormatter.string(from: endDate)
+
+        isLoadingRoutes = true
+        errorMessage = nil
+
+        Task {
+            do {
+                let json = try await APIService.shared.get(
+                    "/api/mobile/route-history/\(vehicleId)/trips?started_at=\(startStr)&ended_at=\(endStr)&per_page=4"
+                )
+
+                let tripsArray = json["trips"] as? [[String: Any]] ?? json["data"] as? [[String: Any]] ?? []
+
+                var parsedRoutes: [RouteTrip] = []
+
+                for tripJson in tripsArray {
+                    let tripNo = tripJson["trip_no"] as? Int ?? tripJson["id"] as? Int ?? 0
+                    let startTime = tripJson["started_at"] as? String ?? ""
+                    let endTime = tripJson["ended_at"] as? String ?? ""
+                    let startAddr = tripJson["start_address"] as? String ?? tripJson["from"] as? String ?? ""
+                    let endAddr = tripJson["end_address"] as? String ?? tripJson["to"] as? String ?? ""
+                    let distance = tripJson["distance"] as? String ?? "\(String(format: "%.2f", (tripJson["distance_km"] as? Double) ?? 0)) km"
+                    let duration = tripJson["duration"] as? String ?? ""
+                    let maxSpeed = tripJson["max_speed"] as? String ?? "\((tripJson["max_speed_kmh"] as? Int) ?? 0) km/h"
+                    let avgSpeed = tripJson["avg_speed"] as? String ?? "\((tripJson["avg_speed_kmh"] as? Int) ?? 0) km/h"
+                    let fuelUsed = tripJson["fuel_used"] as? String ?? "\(String(format: "%.1f", (tripJson["fuel_liters"] as? Double) ?? 0)) Lt"
+
+                    // Parse time for display
+                    let displayStart = Self.formatTimeOnly(startTime)
+                    let displayEnd = Self.formatTimeOnly(endTime)
+                    let dateLabel = Self.formatDateLabel(startTime)
+
+                    // Parse points if included
+                    var points: [RoutePoint] = []
+                    if let pointsArray = tripJson["points"] as? [[String: Any]] {
+                        for pt in pointsArray {
+                            let lat = (pt["lat"] as? Double) ?? 0
+                            let lng = (pt["lon"] as? Double) ?? (pt["lng"] as? Double) ?? 0
+                            let speed = (pt["speed"] as? Int) ?? Int((pt["speed"] as? Double) ?? 0)
+                            let time = (pt["device_time"] as? String) ?? (pt["time"] as? String) ?? ""
+                            points.append(RoutePoint(lat: lat, lng: lng, speed: speed, time: Self.formatTimeOnly(time)))
+                        }
+                    }
+
+                    // If points not included inline, fetch them separately
+                    if points.isEmpty {
+                        do {
+                            let pointsJson = try await APIService.shared.get(
+                                "/api/mobile/route-history/\(vehicleId)/trips/\(tripNo)/points?started_at=\(startStr)&ended_at=\(endStr)"
+                            )
+                            let ptsArray = pointsJson["points"] as? [[String: Any]] ?? pointsJson["data"] as? [[String: Any]] ?? []
+                            for pt in ptsArray {
+                                let lat = (pt["lat"] as? Double) ?? 0
+                                let lng = (pt["lon"] as? Double) ?? (pt["lng"] as? Double) ?? 0
+                                let speed = (pt["speed"] as? Int) ?? Int((pt["speed"] as? Double) ?? 0)
+                                let time = (pt["device_time"] as? String) ?? (pt["time"] as? String) ?? ""
+                                points.append(RoutePoint(lat: lat, lng: lng, speed: speed, time: Self.formatTimeOnly(time)))
+                            }
+                        } catch {
+                            print("[RouteHistory] Failed to load points for trip \(tripNo): \(error)")
+                        }
+                    }
+
+                    parsedRoutes.append(RouteTrip(
+                        id: "trip\(tripNo)",
+                        dateLabel: dateLabel,
+                        startTime: displayStart,
+                        endTime: displayEnd,
+                        startAddress: startAddr,
+                        endAddress: endAddr,
+                        distance: distance,
+                        duration: duration,
+                        maxSpeed: maxSpeed,
+                        avgSpeed: avgSpeed,
+                        fuelUsed: fuelUsed,
+                        points: points
+                    ))
+                }
+
+                self.routes = parsedRoutes
+                self.isLoadingRoutes = false
+
+                if let first = parsedRoutes.first {
+                    self.selectedRoute = first
+                } else {
+                    self.selectedRoute = nil
+                }
+            } catch {
+                self.isLoadingRoutes = false
+                self.errorMessage = error.localizedDescription
+                self.routes = []
+                self.selectedRoute = nil
+                print("[RouteHistory] API error: \(error)")
+            }
         }
+    }
+
+    // MARK: - Helpers
+    private static func formatTimeOnly(_ iso: String) -> String {
+        guard !iso.isEmpty else { return "—" }
+        let cleaned = iso.replacingOccurrences(of: "\\.\\d+", with: "", options: .regularExpression)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        if let date = formatter.date(from: cleaned) {
+            let out = DateFormatter()
+            out.dateFormat = "HH:mm"
+            out.timeZone = TimeZone(identifier: "Europe/Istanbul")
+            return out.string(from: date)
+        }
+        // Fallback: extract HH:mm from string
+        if let range = iso.range(of: "\\d{2}:\\d{2}", options: .regularExpression) {
+            return String(iso[range])
+        }
+        return iso
+    }
+
+    private static func formatDateLabel(_ iso: String) -> String {
+        guard !iso.isEmpty else { return "" }
+        let cleaned = iso.replacingOccurrences(of: "\\.\\d+", with: "", options: .regularExpression)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        if let date = formatter.date(from: cleaned) {
+            let cal = Calendar.current
+            let now = Date()
+            if cal.isDateInToday(date) { return "Bugün" }
+            if cal.isDateInYesterday(date) { return "Dün" }
+            let out = DateFormatter()
+            out.dateFormat = "dd.MM"
+            out.timeZone = TimeZone(identifier: "Europe/Istanbul")
+            return out.string(from: date)
+        }
+        return ""
     }
 }
 

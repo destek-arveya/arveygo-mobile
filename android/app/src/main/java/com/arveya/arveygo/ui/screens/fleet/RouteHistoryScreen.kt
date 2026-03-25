@@ -2,6 +2,7 @@ package com.arveya.arveygo.ui.screens.fleet
 
 import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
+import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -24,10 +25,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.arveya.arveygo.models.*
+import com.arveya.arveygo.services.APIService
+import com.arveya.arveygo.services.WebSocketManager
 import com.arveya.arveygo.ui.theme.AppColors
-import com.arveya.arveygo.viewmodels.DashboardViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
@@ -35,91 +41,233 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline as OsmPolyline
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RouteHistoryScreen(onMenuClick: () -> Unit) {
     val context = LocalContext.current
-    val vm: DashboardViewModel = viewModel()
-    val vehicles by vm.vehicles.collectAsState()
+    val scope = rememberCoroutineScope()
+    var vehicles by remember { mutableStateOf<List<Vehicle>>(emptyList()) }
     var selectedVehicle by remember { mutableStateOf<Vehicle?>(null) }
     var selectedTrip by remember { mutableStateOf<RouteTrip?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var dateRange by remember { mutableStateOf("Bug\u00fcn") }
     var isPlaying by remember { mutableStateOf(false) }
+    var trips by remember { mutableStateOf<List<RouteTrip>>(emptyList()) }
+    var isLoadingRoutes by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val trips = remember {
-        listOf(
-            RouteTrip(
-                "trip1", "Bugün", "10:15", "10:19",
-                "Çanakkale Merkez", "Çanakkale Sahil",
-                "0.14 km", "4dk 43sn", "12 km/h", "2 km/h", "0.1 L",
-                listOf(
-                    RoutePoint(40.13416, 26.41174, 0, "10:15"),
-                    RoutePoint(40.13422, 26.41163, 3, "10:15"),
-                    RoutePoint(40.13430, 26.41152, 7, "10:16"),
-                    RoutePoint(40.13437, 26.41144, 8, "10:16"),
-                    RoutePoint(40.13444, 26.41136, 10, "10:17"),
-                    RoutePoint(40.13455, 26.41120, 8, "10:17"),
-                    RoutePoint(40.13462, 26.41108, 3, "10:18"),
-                    RoutePoint(40.13464, 26.41104, 0, "10:19"),
-                )
-            ),
-            RouteTrip(
-                "trip2", "Bugün", "10:25", "10:31",
-                "Çanakkale Sahil", "Çanakkale Liman",
-                "1.04 km", "5dk 58sn", "36 km/h", "11 km/h", "0.2 L",
-                listOf(
-                    RoutePoint(40.13464, 26.41104, 0, "10:25"),
-                    RoutePoint(40.13510, 26.41020, 22, "10:26"),
-                    RoutePoint(40.13560, 26.40960, 30, "10:26"),
-                    RoutePoint(40.13610, 26.40900, 36, "10:27"),
-                    RoutePoint(40.13660, 26.40850, 28, "10:27"),
-                    RoutePoint(40.13720, 26.40800, 20, "10:28"),
-                    RoutePoint(40.13770, 26.40760, 15, "10:28"),
-                    RoutePoint(40.13810, 26.40730, 10, "10:29"),
-                    RoutePoint(40.13840, 26.40710, 5, "10:30"),
-                    RoutePoint(40.13855, 26.40700, 0, "10:31"),
-                )
-            ),
-            RouteTrip(
-                "trip3", "Bugün", "11:00", "11:05",
-                "Çanakkale Liman", "Çanakkale İskele Cd.",
-                "1.43 km", "4dk 55sn", "42 km/h", "17 km/h", "0.3 L",
-                listOf(
-                    RoutePoint(40.13855, 26.40700, 0, "11:00"),
-                    RoutePoint(40.13920, 26.40560, 28, "11:01"),
-                    RoutePoint(40.13970, 26.40480, 38, "11:01"),
-                    RoutePoint(40.14030, 26.40400, 42, "11:02"),
-                    RoutePoint(40.14090, 26.40330, 35, "11:02"),
-                    RoutePoint(40.14140, 26.40270, 25, "11:03"),
-                    RoutePoint(40.14180, 26.40220, 18, "11:03"),
-                    RoutePoint(40.14210, 26.40180, 10, "11:04"),
-                    RoutePoint(40.14240, 26.40140, 0, "11:05"),
-                )
-            ),
-            RouteTrip(
-                "trip4", "Bugün", "11:30", "11:38",
-                "Çanakkale İskele Cd.", "Çanakkale Kordon",
-                "1.32 km", "7dk 33sn", "38 km/h", "11 km/h", "0.2 L",
-                listOf(
-                    RoutePoint(40.14240, 26.40140, 0, "11:30"),
-                    RoutePoint(40.14290, 26.40050, 18, "11:31"),
-                    RoutePoint(40.14330, 26.39990, 28, "11:32"),
-                    RoutePoint(40.14380, 26.39930, 38, "11:33"),
-                    RoutePoint(40.14420, 26.39880, 30, "11:34"),
-                    RoutePoint(40.14460, 26.39840, 22, "11:35"),
-                    RoutePoint(40.14490, 26.39810, 15, "11:36"),
-                    RoutePoint(40.14520, 26.39780, 0, "11:38"),
-                )
-            )
-        )
+    // Date range state
+    var startDate by remember {
+        val cal = Calendar.getInstance()
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        mutableStateOf(cal.time)
+    }
+    var endDate by remember { mutableStateOf(Date()) }
+
+    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US) }
+
+    // Helper to format time from ISO date string
+    fun formatTimeOnly(isoString: String): String {
+        val cleaned = isoString.replace(Regex("\\.\\d+"), "")
+        val formats = listOf("yyyy-MM-dd'T'HH:mm:ssXXX", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd HH:mm:ss")
+        for (fmt in formats) {
+            try {
+                val sdf = SimpleDateFormat(fmt, Locale.US)
+                val date = sdf.parse(cleaned) ?: continue
+                val outFmt = SimpleDateFormat("HH:mm", Locale.US)
+                return outFmt.format(date)
+            } catch (_: Exception) {}
+        }
+        // Fallback: try to extract HH:mm from string
+        val timeMatch = Regex("(\\d{2}:\\d{2})").find(isoString)
+        return timeMatch?.groupValues?.get(1) ?: isoString
     }
 
-    LaunchedEffect(vehicles) {
-        if (vehicles.isNotEmpty() && selectedVehicle == null) {
-            selectedVehicle = vehicles.first()
+    // Helper to format date label
+    fun formatDateLabel(isoString: String): String {
+        val cleaned = isoString.replace(Regex("\\.\\d+"), "")
+        val formats = listOf("yyyy-MM-dd'T'HH:mm:ssXXX", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd HH:mm:ss")
+        for (fmt in formats) {
+            try {
+                val sdf = SimpleDateFormat(fmt, Locale.US)
+                val date = sdf.parse(cleaned) ?: continue
+                val cal = Calendar.getInstance()
+                val todayCal = Calendar.getInstance()
+                cal.time = date
+                if (cal.get(Calendar.YEAR) == todayCal.get(Calendar.YEAR) &&
+                    cal.get(Calendar.DAY_OF_YEAR) == todayCal.get(Calendar.DAY_OF_YEAR)) return "Bugün"
+                todayCal.add(Calendar.DAY_OF_YEAR, -1)
+                if (cal.get(Calendar.YEAR) == todayCal.get(Calendar.YEAR) &&
+                    cal.get(Calendar.DAY_OF_YEAR) == todayCal.get(Calendar.DAY_OF_YEAR)) return "Dün"
+                return SimpleDateFormat("dd MMM yyyy", Locale("tr")).format(date)
+            } catch (_: Exception) {}
         }
+        return isoString
+    }
+
+    // Load routes from API
+    fun loadRoutes(vehicle: Vehicle, from: Date, to: Date) {
+        scope.launch {
+            isLoadingRoutes = true
+            errorMessage = null
+            try {
+                val startStr = dateFormat.format(from)
+                val endStr = dateFormat.format(to)
+                val path = "/api/mobile/route-history/${vehicle.id}/trips?started_at=$startStr&ended_at=$endStr&per_page=4"
+                Log.d("RouteHistory", "Loading: $path")
+                val json = withContext(Dispatchers.IO) { APIService.get(path) }
+
+                val tripsArr = json.optJSONArray("data") ?: json.optJSONArray("trips")
+                val parsed = mutableListOf<RouteTrip>()
+                if (tripsArr != null) {
+                    for (i in 0 until tripsArr.length()) {
+                        val t = tripsArr.getJSONObject(i)
+                        val tripNo = t.optInt("trip_no", i + 1)
+                        val startedAt = t.optString("started_at", "")
+                        val endedAt = t.optString("ended_at", "")
+                        val startAddr = t.optString("start_address", "Bilinmiyor")
+                        val endAddr = t.optString("end_address", "Bilinmiyor")
+                        val dist = t.optDouble("distance", 0.0)
+                        val dur = t.optInt("duration", 0)
+                        val maxSpd = t.optInt("max_speed", 0)
+                        val avgSpd = t.optInt("avg_speed", 0)
+                        val fuel = t.optDouble("fuel_used", 0.0)
+
+                        val distStr = if (dist < 1.0) "%.2f km".format(dist) else "%.1f km".format(dist)
+                        val durMin = dur / 60
+                        val durSec = dur % 60
+                        val durStr = if (durMin > 0) "${durMin}dk ${durSec}sn" else "${durSec}sn"
+
+                        // Parse points if inline
+                        val pointsArr = t.optJSONArray("points")
+                        val points = mutableListOf<RoutePoint>()
+                        if (pointsArr != null && pointsArr.length() > 0) {
+                            for (j in 0 until pointsArr.length()) {
+                                val p = pointsArr.getJSONObject(j)
+                                points.add(RoutePoint(
+                                    lat = p.optDouble("lat", 0.0),
+                                    lng = p.optDouble("lng", p.optDouble("lon", 0.0)),
+                                    speed = p.optInt("speed", 0),
+                                    time = formatTimeOnly(p.optString("device_time", p.optString("time", "")))
+                                ))
+                            }
+                        }
+
+                        parsed.add(RouteTrip(
+                            id = "trip$tripNo",
+                            dateLabel = formatDateLabel(startedAt),
+                            startTime = formatTimeOnly(startedAt),
+                            endTime = formatTimeOnly(endedAt),
+                            startAddress = startAddr,
+                            endAddress = endAddr,
+                            distance = distStr,
+                            duration = durStr,
+                            maxSpeed = "$maxSpd km/h",
+                            avgSpeed = "$avgSpd km/h",
+                            fuelUsed = "%.1f L".format(fuel),
+                            points = points
+                        ))
+
+                        // If no inline points, fetch separately
+                        if (points.isEmpty()) {
+                            try {
+                                val ptsPath = "/api/mobile/route-history/${vehicle.id}/trips/$tripNo/points?started_at=$startStr&ended_at=$endStr"
+                                val ptsJson = withContext(Dispatchers.IO) { APIService.get(ptsPath) }
+                                val ptsArr = ptsJson.optJSONArray("data") ?: ptsJson.optJSONArray("points")
+                                if (ptsArr != null) {
+                                    val fetchedPts = mutableListOf<RoutePoint>()
+                                    for (j in 0 until ptsArr.length()) {
+                                        val p = ptsArr.getJSONObject(j)
+                                        fetchedPts.add(RoutePoint(
+                                            lat = p.optDouble("lat", 0.0),
+                                            lng = p.optDouble("lng", p.optDouble("lon", 0.0)),
+                                            speed = p.optInt("speed", 0),
+                                            time = formatTimeOnly(p.optString("device_time", p.optString("time", "")))
+                                        ))
+                                    }
+                                    // Update trip with fetched points
+                                    val idx = parsed.indexOfFirst { it.id == "trip$tripNo" }
+                                    if (idx >= 0) {
+                                        parsed[idx] = parsed[idx].copy(points = fetchedPts)
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Log.e("RouteHistory", "Failed to load points for trip $tripNo", e)
+                            }
+                        }
+                    }
+                }
+                trips = parsed
+                Log.d("RouteHistory", "Loaded ${parsed.size} trips")
+            } catch (e: Exception) {
+                Log.e("RouteHistory", "Failed to load routes", e)
+                errorMessage = e.message
+            } finally {
+                isLoadingRoutes = false
+            }
+        }
+    }
+
+    // Subscribe to WebSocket vehicles
+    LaunchedEffect(Unit) {
+        WebSocketManager.vehicleList.collectLatest { list ->
+            if (list.isNotEmpty()) {
+                vehicles = list
+                if (selectedVehicle == null) {
+                    selectedVehicle = list.first()
+                }
+            }
+        }
+    }
+
+    // Load routes when vehicle or date changes
+    LaunchedEffect(selectedVehicle, startDate, endDate) {
+        selectedVehicle?.let { v ->
+            loadRoutes(v, startDate, endDate)
+        }
+    }
+
+    // Update date range from quick filter
+    fun applyDateFilter(label: String) {
+        dateRange = label
+        val cal = Calendar.getInstance()
+        when (label) {
+            "Bugün" -> {
+                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0)
+                startDate = cal.time
+                endDate = Date()
+            }
+            "Dün" -> {
+                cal.add(Calendar.DAY_OF_YEAR, -1)
+                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0)
+                startDate = cal.time
+                val endCal = Calendar.getInstance()
+                endCal.add(Calendar.DAY_OF_YEAR, -1)
+                endCal.set(Calendar.HOUR_OF_DAY, 23); endCal.set(Calendar.MINUTE, 59); endCal.set(Calendar.SECOND, 59)
+                endDate = endCal.time
+            }
+            "Bu Hafta" -> {
+                cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
+                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0)
+                startDate = cal.time
+                endDate = Date()
+            }
+            "Bu Ay" -> {
+                cal.set(Calendar.DAY_OF_MONTH, 1)
+                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0)
+                startDate = cal.time
+                endDate = Date()
+            }
+        }
+        showDatePicker = false
     }
 
     LaunchedEffect(Unit) {
@@ -284,7 +432,7 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
                                 .clip(RoundedCornerShape(20.dp))
                                 .background(if (isActive) AppColors.Navy else AppColors.Surface)
                                 .border(1.dp, if (isActive) AppColors.Navy else AppColors.BorderSoft, RoundedCornerShape(20.dp))
-                                .clickable { dateRange = label; showDatePicker = false }
+                                .clickable { applyDateFilter(label) }
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = if (isActive) Color.White else AppColors.TextSecondary)
@@ -372,21 +520,56 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
             }
 
             // Trip list
-            LazyColumn(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                val grouped = trips.groupBy { it.dateLabel }
-                grouped.forEach { (date, dayTrips) ->
-                    item {
-                        Text(date, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextMuted, modifier = Modifier.padding(vertical = 4.dp))
-                    }
-                    items(dayTrips) { trip ->
-                        TripCard(trip, isSelected = selectedTrip?.id == trip.id) { selectedTrip = trip }
+            if (isLoadingRoutes) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = AppColors.Indigo, modifier = Modifier.size(32.dp))
+                        Spacer(Modifier.height(8.dp))
+                        Text("Rotalar yükleniyor...", fontSize = 12.sp, color = AppColors.TextMuted)
                     }
                 }
-                item { Spacer(Modifier.height(20.dp)) }
+            } else if (errorMessage != null) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.ErrorOutline, null, tint = AppColors.Offline, modifier = Modifier.size(32.dp))
+                        Spacer(Modifier.height(8.dp))
+                        Text(errorMessage ?: "Hata oluştu", fontSize = 12.sp, color = AppColors.TextMuted)
+                    }
+                }
+            } else if (trips.isEmpty()) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.Route, null, tint = AppColors.TextMuted, modifier = Modifier.size(32.dp))
+                        Spacer(Modifier.height(8.dp))
+                        Text("Bu tarih aralığında rota bulunamadı", fontSize = 12.sp, color = AppColors.TextMuted)
+                    }
+                }
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    val grouped = trips.groupBy { it.dateLabel }
+                    grouped.forEach { (date, dayTrips) ->
+                        item {
+                            Text(date, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextMuted, modifier = Modifier.padding(vertical = 4.dp))
+                        }
+                        items(dayTrips) { trip ->
+                            TripCard(trip, isSelected = selectedTrip?.id == trip.id) { selectedTrip = trip }
+                        }
+                    }
+                    item { Spacer(Modifier.height(20.dp)) }
+                }
             }
         }
     }

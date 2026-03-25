@@ -214,7 +214,7 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
     var showVehicleList by remember { mutableStateOf(true) }
     var trackingVehicleId by remember { mutableStateOf<String?>(null) }
 
-    // Trail history: keep last 40 positions per vehicle
+    // Trail history: keep last 20 positions per vehicle (persists through idle/rölanti)
     val trailHistory = remember { mutableMapOf<String, MutableList<GeoPoint>>() }
     val trailPolylines = remember { mutableMapOf<String, Polyline>() }
 
@@ -228,7 +228,6 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
     }
 
     LaunchedEffect(Unit) {
-        vm.loadDummyDataIfNeeded()
         authVM.connectWebSocket()
     }
 
@@ -308,10 +307,10 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
             // Only add if position changed
             if (history.isEmpty() || history.last().latitude != pos.latitude || history.last().longitude != pos.longitude) {
                 history.add(pos)
-                if (history.size > 40) history.removeAt(0)
+                if (history.size > 20) history.removeAt(0)
             }
-            // Draw polyline if vehicle is online and has 2+ points
-            if (vehicle.status == VehicleStatus.ONLINE && history.size >= 2) {
+            // Draw polyline if vehicle is online/idle and has 2+ points (keep trail during rölanti)
+            if ((vehicle.status == VehicleStatus.ONLINE || vehicle.status == VehicleStatus.IDLE) && history.size >= 2) {
                 val existing = trailPolylines[vehicle.id]
                 if (existing != null) {
                     existing.setPoints(history.toList())
