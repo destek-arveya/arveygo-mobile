@@ -750,50 +750,79 @@ class RouteHistoryViewModel: ObservableObject {
                 var parsedRoutes: [RouteTrip] = []
 
                 for tripJson in tripsArray {
-                    let tripNo = tripJson["trip_no"] as? Int ?? tripJson["id"] as? Int ?? 0
-                    let startTime = tripJson["started_at"] as? String ?? ""
-                    let endTime = tripJson["ended_at"] as? String ?? ""
-                    let startAddr = tripJson["start_address"] as? String ?? tripJson["from"] as? String ?? ""
-                    let endAddr = tripJson["end_address"] as? String ?? tripJson["to"] as? String ?? ""
-                    let distance = tripJson["distance"] as? String ?? "\(String(format: "%.2f", (tripJson["distance_km"] as? Double) ?? 0)) km"
-                    let duration = tripJson["duration"] as? String ?? ""
-                    let maxSpeed = tripJson["max_speed"] as? String ?? "\((tripJson["max_speed_kmh"] as? Int) ?? 0) km/h"
-                    let avgSpeed = tripJson["avg_speed"] as? String ?? "\((tripJson["avg_speed_kmh"] as? Int) ?? 0) km/h"
-                    let fuelUsed = tripJson["fuel_used"] as? String ?? "\(String(format: "%.1f", (tripJson["fuel_liters"] as? Double) ?? 0)) Lt"
+                    let tripNo = tripJson["tripNo"] as? Int ?? tripJson["trip_no"] as? Int ?? tripJson["id"] as? Int ?? 0
+                    let startTime = tripJson["startTime"] as? String ?? tripJson["started_at"] as? String ?? ""
+                    let endTime = tripJson["endTime"] as? String ?? tripJson["ended_at"] as? String ?? ""
+
+                    // Distance comes in meters from API
+                    let distanceM = (tripJson["distance"] as? Double) ?? Double(tripJson["distance"] as? Int ?? 0)
+                    let distanceKm = distanceM / 1000.0
+                    let distanceStr = distanceKm < 1.0 ? String(format: "%.0f m", distanceM) : String(format: "%.1f km", distanceKm)
+
+                    // Duration comes in seconds
+                    let durationSec = (tripJson["duration"] as? Int) ?? Int((tripJson["duration"] as? Double) ?? 0)
+                    let dMin = durationSec / 60
+                    let dSec = durationSec % 60
+                    let durationStr = dMin > 0 ? "\(dMin)dk \(dSec)sn" : "\(dSec)sn"
+
+                    let maxSpeedVal = (tripJson["maxSpeed"] as? Int) ?? (tripJson["max_speed"] as? Int) ?? 0
+                    let avgSpeedVal = (tripJson["avgSpeed"] as? Int) ?? (tripJson["avg_speed"] as? Int) ?? 0
 
                     // Parse time for display
                     let displayStart = Self.formatTimeOnly(startTime)
                     let displayEnd = Self.formatTimeOnly(endTime)
                     let dateLabel = Self.formatDateLabel(startTime)
 
-                    // Parse points if included
+                    // Parse coords from startCoord/endCoord (used for start/end markers)
                     var points: [RoutePoint] = []
-                    if let pointsArray = tripJson["points"] as? [[String: Any]] {
-                        for pt in pointsArray {
-                            let lat = (pt["lat"] as? Double) ?? 0
-                            let lng = (pt["lon"] as? Double) ?? (pt["lng"] as? Double) ?? 0
-                            let speed = (pt["speed"] as? Int) ?? Int((pt["speed"] as? Double) ?? 0)
-                            let time = (pt["device_time"] as? String) ?? (pt["time"] as? String) ?? ""
-                            points.append(RoutePoint(lat: lat, lng: lng, speed: speed, time: Self.formatTimeOnly(time)))
+
+                    // Try inline coords array [[lat, lng, alt], ...]
+                    if let coordsArray = tripJson["coords"] as? [[Any]], !coordsArray.isEmpty {
+                        for coord in coordsArray {
+                            if coord.count >= 2, let lat = coord[0] as? Double, let lng = coord[1] as? Double {
+                                points.append(RoutePoint(lat: lat, lng: lng, speed: 0, time: ""))
+                            }
                         }
                     }
 
-                    // If points not included inline, fetch them separately
+                    // If no inline coords, fetch playbackPoints from points endpoint
                     if points.isEmpty {
                         do {
                             let pointsJson = try await APIService.shared.get(
                                 "/api/mobile/route-history/\(deviceId)/trips/\(tripNo)/points?started_at=\(startStr)&ended_at=\(endStr)"
                             )
-                            let ptsArray = pointsJson["points"] as? [[String: Any]] ?? pointsJson["data"] as? [[String: Any]] ?? []
-                            for pt in ptsArray {
-                                let lat = (pt["lat"] as? Double) ?? 0
-                                let lng = (pt["lon"] as? Double) ?? (pt["lng"] as? Double) ?? 0
-                                let speed = (pt["speed"] as? Int) ?? Int((pt["speed"] as? Double) ?? 0)
-                                let time = (pt["device_time"] as? String) ?? (pt["time"] as? String) ?? ""
-                                points.append(RoutePoint(lat: lat, lng: lng, speed: speed, time: Self.formatTimeOnly(time)))
+                            // playbackPoints has full data with lat, lng, speed, time
+                            if let pbPoints = pointsJson["playbackPoints"] as? [[String: Any]], !pbPoints.isEmpty {
+                                for pt in pbPoints {
+                                    let lat = (pt["lat"] as? Double) ?? 0
+                                    let lng = (pt["lng"] as? Double) ?? 0
+                                    let spd = (pt["speed"] as? Int) ?? Int((pt["speed"] as? Double) ?? 0)
+                                    let time = (pt["time"] as? String) ?? ""
+                                    points.append(RoutePoint(lat: lat, lng: lng, speed: spd, time: Self.formatTimeOnly(time)))
+                                }
+                            }
+                            // Fallback to routeCoords [[lat, lng, alt], ...]
+                            else if let routeCoords = pointsJson["routeCoords"] as? [[Any]], !routeCoords.isEmpty {
+                                for coord in routeCoords {
+                                    if coord.count >= 2, let lat = coord[0] as? Double, let lng = coord[1] as? Double {
+                                        points.append(RoutePoint(lat: lat, lng: lng, speed: 0, time: ""))
+                                    }
+                                }
                             }
                         } catch {
                             print("[RouteHistory] Failed to load points for trip \(tripNo): \(error)")
+                        }
+                    }
+
+                    // If still no points, use startCoord/endCoord as fallback
+                    if points.isEmpty {
+                        if let sc = tripJson["startCoord"] as? [Any], sc.count >= 2,
+                           let lat = sc[0] as? Double, let lng = sc[1] as? Double {
+                            points.append(RoutePoint(lat: lat, lng: lng, speed: 0, time: displayStart))
+                        }
+                        if let ec = tripJson["endCoord"] as? [Any], ec.count >= 2,
+                           let lat = ec[0] as? Double, let lng = ec[1] as? Double {
+                            points.append(RoutePoint(lat: lat, lng: lng, speed: 0, time: displayEnd))
                         }
                     }
 
@@ -802,13 +831,13 @@ class RouteHistoryViewModel: ObservableObject {
                         dateLabel: dateLabel,
                         startTime: displayStart,
                         endTime: displayEnd,
-                        startAddress: startAddr,
-                        endAddress: endAddr,
-                        distance: distance,
-                        duration: duration,
-                        maxSpeed: maxSpeed,
-                        avgSpeed: avgSpeed,
-                        fuelUsed: fuelUsed,
+                        startAddress: tripJson["startTimeLabel"] as? String ?? displayStart,
+                        endAddress: tripJson["endTimeLabel"] as? String ?? displayEnd,
+                        distance: distanceStr,
+                        duration: durationStr,
+                        maxSpeed: "\(maxSpeedVal) km/h",
+                        avgSpeed: "\(avgSpeedVal) km/h",
+                        fuelUsed: "—",
                         points: points
                     ))
                 }

@@ -148,84 +148,113 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
                 Log.d("RouteHistory", "Loading: $path")
                 val json = withContext(Dispatchers.IO) { APIService.get(path) }
 
-                val tripsArr = json.optJSONArray("data") ?: json.optJSONArray("trips")
+                val tripsArr = json.optJSONArray("trips") ?: json.optJSONArray("data")
                 val parsed = mutableListOf<RouteTrip>()
                 if (tripsArr != null) {
                     for (i in 0 until tripsArr.length()) {
                         val t = tripsArr.getJSONObject(i)
-                        val tripNo = t.optInt("trip_no", i + 1)
-                        val startedAt = t.optString("started_at", "")
-                        val endedAt = t.optString("ended_at", "")
-                        val startAddr = t.optString("start_address", "Bilinmiyor")
-                        val endAddr = t.optString("end_address", "Bilinmiyor")
-                        val dist = t.optDouble("distance", 0.0)
-                        val dur = t.optInt("duration", 0)
-                        val maxSpd = t.optInt("max_speed", 0)
-                        val avgSpd = t.optInt("avg_speed", 0)
-                        val fuel = t.optDouble("fuel_used", 0.0)
+                        val tripNo = t.optInt("tripNo", t.optInt("trip_no", i + 1))
+                        val startedAt = t.optString("startTime", t.optString("started_at", ""))
+                        val endedAt = t.optString("endTime", t.optString("ended_at", ""))
 
-                        val distStr = if (dist < 1.0) "%.2f km".format(dist) else "%.1f km".format(dist)
+                        // Distance comes in meters from API
+                        val distM = t.optDouble("distance", 0.0)
+                        val distKm = distM / 1000.0
+                        val distStr = if (distKm < 1.0) "%.0f m".format(distM) else "%.1f km".format(distKm)
+
+                        // Duration in seconds
+                        val dur = t.optInt("duration", 0)
                         val durMin = dur / 60
                         val durSec = dur % 60
                         val durStr = if (durMin > 0) "${durMin}dk ${durSec}sn" else "${durSec}sn"
 
-                        // Parse points if inline
-                        val pointsArr = t.optJSONArray("points")
+                        val maxSpd = t.optInt("maxSpeed", t.optInt("max_speed", 0))
+                        val avgSpd = t.optInt("avgSpeed", t.optInt("avg_speed", 0))
+
+                        // Parse inline coords array [[lat, lng, alt], ...]
                         val points = mutableListOf<RoutePoint>()
-                        if (pointsArr != null && pointsArr.length() > 0) {
-                            for (j in 0 until pointsArr.length()) {
-                                val p = pointsArr.getJSONObject(j)
-                                points.add(RoutePoint(
-                                    lat = p.optDouble("lat", 0.0),
-                                    lng = p.optDouble("lng", p.optDouble("lon", 0.0)),
-                                    speed = p.optInt("speed", 0),
-                                    time = formatTimeOnly(p.optString("device_time", p.optString("time", "")))
-                                ))
+                        val coordsArr = t.optJSONArray("coords")
+                        if (coordsArr != null && coordsArr.length() > 0) {
+                            for (j in 0 until coordsArr.length()) {
+                                val coord = coordsArr.optJSONArray(j)
+                                if (coord != null && coord.length() >= 2) {
+                                    points.add(RoutePoint(
+                                        lat = coord.optDouble(0, 0.0),
+                                        lng = coord.optDouble(1, 0.0),
+                                        speed = 0, time = ""
+                                    ))
+                                }
                             }
                         }
 
-                        parsed.add(RouteTrip(
-                            id = "trip$tripNo",
-                            dateLabel = formatDateLabel(startedAt),
-                            startTime = formatTimeOnly(startedAt),
-                            endTime = formatTimeOnly(endedAt),
-                            startAddress = startAddr,
-                            endAddress = endAddr,
-                            distance = distStr,
-                            duration = durStr,
-                            maxSpeed = "$maxSpd km/h",
-                            avgSpeed = "$avgSpd km/h",
-                            fuelUsed = "%.1f L".format(fuel),
-                            points = points
-                        ))
-
-                        // If no inline points, fetch separately
+                        // If no inline coords, fetch playbackPoints from points endpoint
                         if (points.isEmpty()) {
                             try {
                                 val ptsPath = "/api/mobile/route-history/$deviceId/trips/$tripNo/points?started_at=$startStr&ended_at=$endStr"
                                 val ptsJson = withContext(Dispatchers.IO) { APIService.get(ptsPath) }
-                                val ptsArr = ptsJson.optJSONArray("data") ?: ptsJson.optJSONArray("points")
-                                if (ptsArr != null) {
-                                    val fetchedPts = mutableListOf<RoutePoint>()
-                                    for (j in 0 until ptsArr.length()) {
-                                        val p = ptsArr.getJSONObject(j)
-                                        fetchedPts.add(RoutePoint(
+
+                                // Try playbackPoints first (full data)
+                                val pbArr = ptsJson.optJSONArray("playbackPoints")
+                                if (pbArr != null && pbArr.length() > 0) {
+                                    for (j in 0 until pbArr.length()) {
+                                        val p = pbArr.getJSONObject(j)
+                                        points.add(RoutePoint(
                                             lat = p.optDouble("lat", 0.0),
-                                            lng = p.optDouble("lng", p.optDouble("lon", 0.0)),
+                                            lng = p.optDouble("lng", 0.0),
                                             speed = p.optInt("speed", 0),
-                                            time = formatTimeOnly(p.optString("device_time", p.optString("time", "")))
+                                            time = formatTimeOnly(p.optString("time", ""))
                                         ))
                                     }
-                                    // Update trip with fetched points
-                                    val idx = parsed.indexOfFirst { it.id == "trip$tripNo" }
-                                    if (idx >= 0) {
-                                        parsed[idx] = parsed[idx].copy(points = fetchedPts)
+                                } else {
+                                    // Fallback to routeCoords [[lat, lng, alt], ...]
+                                    val rcArr = ptsJson.optJSONArray("routeCoords")
+                                    if (rcArr != null && rcArr.length() > 0) {
+                                        for (j in 0 until rcArr.length()) {
+                                            val coord = rcArr.optJSONArray(j)
+                                            if (coord != null && coord.length() >= 2) {
+                                                points.add(RoutePoint(
+                                                    lat = coord.optDouble(0, 0.0),
+                                                    lng = coord.optDouble(1, 0.0),
+                                                    speed = 0, time = ""
+                                                ))
+                                            }
+                                        }
                                     }
                                 }
                             } catch (e: Exception) {
                                 Log.e("RouteHistory", "Failed to load points for trip $tripNo", e)
                             }
                         }
+
+                        // If still no points, use startCoord/endCoord
+                        if (points.isEmpty()) {
+                            val sc = t.optJSONArray("startCoord")
+                            if (sc != null && sc.length() >= 2) {
+                                points.add(RoutePoint(sc.optDouble(0, 0.0), sc.optDouble(1, 0.0), 0, formatTimeOnly(startedAt)))
+                            }
+                            val ec = t.optJSONArray("endCoord")
+                            if (ec != null && ec.length() >= 2) {
+                                points.add(RoutePoint(ec.optDouble(0, 0.0), ec.optDouble(1, 0.0), 0, formatTimeOnly(endedAt)))
+                            }
+                        }
+
+                        val startLabel = t.optString("startTimeLabel", formatTimeOnly(startedAt))
+                        val endLabel = t.optString("endTimeLabel", formatTimeOnly(endedAt))
+
+                        parsed.add(RouteTrip(
+                            id = "trip$tripNo",
+                            dateLabel = formatDateLabel(startedAt),
+                            startTime = formatTimeOnly(startedAt),
+                            endTime = formatTimeOnly(endedAt),
+                            startAddress = startLabel,
+                            endAddress = endLabel,
+                            distance = distStr,
+                            duration = durStr,
+                            maxSpeed = "$maxSpd km/h",
+                            avgSpeed = "$avgSpd km/h",
+                            fuelUsed = "\u2014",
+                            points = points
+                        ))
                     }
                 }
                 trips = parsed
