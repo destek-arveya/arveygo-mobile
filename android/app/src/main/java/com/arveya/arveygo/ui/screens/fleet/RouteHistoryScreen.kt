@@ -113,6 +113,27 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
         return isoString
     }
 
+    // IMEI → device_id cache
+    val imeiToDeviceId = mutableMapOf<String, Int>()
+
+    // Resolve IMEI to backend device_id
+    suspend fun resolveDeviceId(imei: String): Int {
+        imeiToDeviceId[imei]?.let { return it }
+        val json = withContext(Dispatchers.IO) { APIService.get("/api/mobile/route-history/vehicles") }
+        val data = json.optJSONArray("data")
+        if (data != null) {
+            for (i in 0 until data.length()) {
+                val v = data.getJSONObject(i)
+                val vImei = v.optString("imei", "")
+                val vId = v.optInt("id", v.optInt("deviceId", 0))
+                if (vImei.isNotEmpty() && vId > 0) {
+                    imeiToDeviceId[vImei] = vId
+                }
+            }
+        }
+        return imeiToDeviceId[imei] ?: throw Exception("Araç bulunamadı (IMEI: $imei)")
+    }
+
     // Load routes from API
     fun loadRoutes(vehicle: Vehicle, from: Date, to: Date) {
         scope.launch {
@@ -121,7 +142,9 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
             try {
                 val startStr = dateFormat.format(from)
                 val endStr = dateFormat.format(to)
-                val path = "/api/mobile/route-history/${vehicle.id}/trips?started_at=$startStr&ended_at=$endStr&per_page=4"
+                // Resolve IMEI to backend device_id
+                val deviceId = resolveDeviceId(vehicle.id)
+                val path = "/api/mobile/route-history/$deviceId/trips?started_at=$startStr&ended_at=$endStr&per_page=4"
                 Log.d("RouteHistory", "Loading: $path")
                 val json = withContext(Dispatchers.IO) { APIService.get(path) }
 
@@ -179,7 +202,7 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
                         // If no inline points, fetch separately
                         if (points.isEmpty()) {
                             try {
-                                val ptsPath = "/api/mobile/route-history/${vehicle.id}/trips/$tripNo/points?started_at=$startStr&ended_at=$endStr"
+                                val ptsPath = "/api/mobile/route-history/$deviceId/trips/$tripNo/points?started_at=$startStr&ended_at=$endStr"
                                 val ptsJson = withContext(Dispatchers.IO) { APIService.get(ptsPath) }
                                 val ptsArr = ptsJson.optJSONArray("data") ?: ptsJson.optJSONArray("points")
                                 if (ptsArr != null) {

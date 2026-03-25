@@ -700,6 +700,29 @@ class RouteHistoryViewModel: ObservableObject {
         selectedRoute = route
     }
 
+    // MARK: - IMEI → device_id mapping cache
+    private var imeiToDeviceId: [String: Int] = [:]
+
+    /// Resolve the backend device_id for a given IMEI via /api/mobile/route-history/vehicles
+    private func resolveDeviceId(for imei: String) async throws -> Int {
+        if let cached = imeiToDeviceId[imei] { return cached }
+
+        let json = try await APIService.shared.get("/api/mobile/route-history/vehicles")
+        if let data = json["data"] as? [[String: Any]] {
+            for v in data {
+                let vImei = v["imei"] as? String ?? ""
+                let vId = v["id"] as? Int ?? v["deviceId"] as? Int ?? 0
+                if !vImei.isEmpty && vId > 0 {
+                    imeiToDeviceId[vImei] = vId
+                }
+            }
+        }
+        guard let deviceId = imeiToDeviceId[imei], deviceId > 0 else {
+            throw NSError(domain: "RouteHistory", code: 404, userInfo: [NSLocalizedDescriptionKey: "Araç bulunamadı (IMEI: \(imei))"])
+        }
+        return deviceId
+    }
+
     // MARK: - Load routes from API
     func loadRoutes(from startDate: Date, to endDate: Date) {
         guard let vehicleId = selectedVehicleId else { return }
@@ -715,8 +738,11 @@ class RouteHistoryViewModel: ObservableObject {
 
         Task {
             do {
+                // Resolve IMEI to backend device_id
+                let deviceId = try await resolveDeviceId(for: vehicleId)
+
                 let json = try await APIService.shared.get(
-                    "/api/mobile/route-history/\(vehicleId)/trips?started_at=\(startStr)&ended_at=\(endStr)&per_page=4"
+                    "/api/mobile/route-history/\(deviceId)/trips?started_at=\(startStr)&ended_at=\(endStr)&per_page=4"
                 )
 
                 let tripsArray = json["trips"] as? [[String: Any]] ?? json["data"] as? [[String: Any]] ?? []
@@ -756,7 +782,7 @@ class RouteHistoryViewModel: ObservableObject {
                     if points.isEmpty {
                         do {
                             let pointsJson = try await APIService.shared.get(
-                                "/api/mobile/route-history/\(vehicleId)/trips/\(tripNo)/points?started_at=\(startStr)&ended_at=\(endStr)"
+                                "/api/mobile/route-history/\(deviceId)/trips/\(tripNo)/points?started_at=\(startStr)&ended_at=\(endStr)"
                             )
                             let ptsArray = pointsJson["points"] as? [[String: Any]] ?? pointsJson["data"] as? [[String: Any]] ?? []
                             for pt in ptsArray {
