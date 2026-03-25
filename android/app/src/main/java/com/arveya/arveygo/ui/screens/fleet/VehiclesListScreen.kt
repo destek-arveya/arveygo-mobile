@@ -499,15 +499,16 @@ private fun VehicleTableRow(vehicle: Vehicle, onClick: () -> Unit) {
                                 color = if (temp < 0) Color.Blue else if (temp < 30) AppColors.Online else Color.Red
                             )
                         }
-                    }
-                    // Son Veri Zamanı
-                    if (vehicle.deviceTime != null) {
-                        Text(
-                            "⏱ ${vehicle.formattedDeviceTime}",
-                            fontSize = 8.sp,
-                            color = AppColors.TextFaint,
-                            maxLines = 1
-                        )
+                        if (vehicle.deviceTime != null) {
+                            Text(" • ", fontSize = 8.sp, color = AppColors.TextFaint)
+                            Text(
+                                "⏱${vehicle.formattedDeviceTime}",
+                                fontSize = 8.sp,
+                                color = AppColors.TextFaint,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }

@@ -34,6 +34,10 @@ class LoginStrings: ObservableObject {
     var otpInvalid: String { s("Doğrulama kodu hatalı", "Invalid verification code") }
     var phoneRequired: String { s("Telefon numarası gerekli", "Phone number is required") }
     var otpRequired: String { s("Doğrulama kodu gerekli", "Verification code is required") }
+    var resendCode: String { s("Kodu Tekrar Gönder", "Resend Code") }
+    var resendCooldown: String { s("Tekrar gönder", "Resend in") }
+    var otpStep2Title: String { s("Doğrulama", "Verification") }
+    var otpStep2Subtitle: String { s("Telefonunuza gönderilen 6 haneli kodu girin", "Enter the 6-digit code sent to your phone") }
 
     // Remember Me
     var rememberMe: String { s("Beni Hatırla", "Remember Me") }

@@ -281,15 +281,14 @@ struct VehiclesListView: View {
                                     .font(.system(size: 10, weight: .semibold))
                                     .foregroundColor(temp < 0 ? .blue : temp < 30 ? AppTheme.online : .red)
                             }
-                        }
-                        if vehicle.deviceTime != nil {
-                            HStack(spacing: 2) {
-                                Text("⏱")
+                            if vehicle.deviceTime != nil {
+                                Text("•")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(AppTheme.textFaint)
+                                Text("⏱\(vehicle.formattedDeviceTime)")
                                     .font(.system(size: 7))
                                     .foregroundColor(AppTheme.textFaint)
-                                Text(vehicle.formattedDeviceTime)
-                                    .font(.system(size: 7))
-                                    .foregroundColor(AppTheme.textFaint)
+                                    .lineLimit(1)
                             }
                         }
                     }

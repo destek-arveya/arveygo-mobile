@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +33,8 @@ import com.arveya.arveygo.ui.components.GradientButton
 import com.arveya.arveygo.ui.components.LanguageSwitcher
 import com.arveya.arveygo.ui.theme.AppColors
 import com.arveya.arveygo.utils.LoginStrings
+import androidx.compose.ui.res.painterResource
+import com.arveya.arveygo.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -57,6 +60,7 @@ fun LoginScreen() {
     var otpSent by remember { mutableStateOf(false) }
     var otpError by remember { mutableStateOf<String?>(null) }
     var otpLoading by remember { mutableStateOf(false) }
+    var resendCooldown by remember { mutableIntStateOf(0) }
 
     var showRegister by remember { mutableStateOf(false) }
     var showForgot by remember { mutableStateOf(false) }
@@ -110,12 +114,13 @@ fun LoginScreen() {
 
                     // Logo
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(AppColors.Navy)
-                        ) {
-                            Icon(Icons.Default.Navigation, null, tint = Color.White, modifier = Modifier.size(22.dp))
-                        }
+                        Image(
+                            painter = painterResource(id = R.drawable.logo_arveygo),
+                            contentDescription = "ArveyGo Logo",
+                            modifier = Modifier
+                                .height(64.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                        )
                         Spacer(Modifier.height(8.dp))
                         Text("ArveyGo", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
                         Text(L.appSubtitle, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted, letterSpacing = 2.sp)
@@ -280,33 +285,32 @@ fun LoginScreen() {
 
                         // ═══ PHONE/OTP MODE ═══
                         if (loginMode == 1) {
-                            // Phone number
-                            Text(L.phoneLabel, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
-                            Spacer(Modifier.height(6.dp))
-                            OutlinedTextField(
-                                value = phone,
-                                onValueChange = { phone = it.filter { c -> c.isDigit() || c == '+' || c == ' ' } },
-                                placeholder = { Text(L.phonePlaceholder, fontSize = 14.sp) },
-                                leadingIcon = { Icon(Icons.Default.Phone, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp)) },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = AppColors.Navy,
-                                    unfocusedBorderColor = AppColors.BorderSoft,
-                                    focusedContainerColor = AppColors.Bg,
-                                    unfocusedContainerColor = AppColors.Bg,
-                                    focusedTextColor = AppColors.TextPrimary,
-                                    unfocusedTextColor = AppColors.TextPrimary,
-                                    cursorColor = AppColors.Navy
-                                ),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth().height(50.dp),
-                                enabled = !otpSent
-                            )
-
-                            Spacer(Modifier.height(16.dp))
-
                             if (!otpSent) {
+                                // ── Step 1: Phone number entry ──
+                                Text(L.phoneLabel, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
+                                Spacer(Modifier.height(6.dp))
+                                OutlinedTextField(
+                                    value = phone,
+                                    onValueChange = { phone = it.filter { c -> c.isDigit() || c == '+' || c == ' ' } },
+                                    placeholder = { Text(L.phonePlaceholder, fontSize = 14.sp) },
+                                    leadingIcon = { Icon(Icons.Default.Phone, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp)) },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = AppColors.Navy,
+                                        unfocusedBorderColor = AppColors.BorderSoft,
+                                        focusedContainerColor = AppColors.Bg,
+                                        unfocusedContainerColor = AppColors.Bg,
+                                        focusedTextColor = AppColors.TextPrimary,
+                                        unfocusedTextColor = AppColors.TextPrimary,
+                                        cursorColor = AppColors.Navy
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                                )
+
+                                Spacer(Modifier.height(16.dp))
+
                                 // Send OTP button
                                 GradientButton(
                                     text = L.sendOtp,
@@ -323,6 +327,12 @@ fun LoginScreen() {
                                             delay(800)
                                             otpLoading = false
                                             otpSent = true
+                                            resendCooldown = 30
+                                            // Start cooldown timer
+                                            while (resendCooldown > 0) {
+                                                delay(1000)
+                                                resendCooldown--
+                                            }
                                         }
                                     },
                                     isLoading = otpLoading,
@@ -330,6 +340,29 @@ fun LoginScreen() {
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             } else {
+                                // ── Step 2: OTP Verification ──
+
+                                // Step 2 header
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .background(AppColors.Navy.copy(alpha = 0.1f), RoundedCornerShape(14.dp))
+                                    ) {
+                                        Icon(Icons.Default.MarkEmailRead, null, tint = AppColors.Navy, modifier = Modifier.size(24.dp))
+                                    }
+                                    Spacer(Modifier.height(10.dp))
+                                    Text(L.otpStep2Title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(L.otpStep2Subtitle, fontSize = 12.sp, color = AppColors.TextMuted, textAlign = TextAlign.Center)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(phone, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Indigo)
+                                }
+
                                 // OTP sent success message
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -416,17 +449,51 @@ fun LoginScreen() {
                                     modifier = Modifier.fillMaxWidth()
                                 )
 
+                                Spacer(Modifier.height(12.dp))
+
+                                // Resend code with cooldown
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                                    if (resendCooldown > 0) {
+                                        Text(
+                                            "${L.resendCooldown} (${resendCooldown}s)",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = AppColors.TextFaint
+                                        )
+                                    } else {
+                                        Text(
+                                            L.resendCode,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = AppColors.Indigo,
+                                            modifier = Modifier.clickable {
+                                                otpCode = ""; otpError = null
+                                                otpLoading = true
+                                                coroutineScope.launch {
+                                                    delay(800)
+                                                    otpLoading = false
+                                                    resendCooldown = 30
+                                                    while (resendCooldown > 0) {
+                                                        delay(1000)
+                                                        resendCooldown--
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+
                                 Spacer(Modifier.height(8.dp))
 
-                                // Resend code
+                                // Back to phone number
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                                     Text(
-                                        if (lang == "TR") "Kodu tekrar gönder" else "Resend code",
-                                        fontSize = 12.sp,
+                                        if (lang == "TR") "Numarayı Değiştir" else "Change Number",
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium,
-                                        color = AppColors.Indigo,
+                                        color = AppColors.TextMuted,
                                         modifier = Modifier.clickable {
-                                            otpSent = false; otpCode = ""; otpError = null
+                                            otpSent = false; otpCode = ""; otpError = null; resendCooldown = 0
                                         }
                                     )
                                 }

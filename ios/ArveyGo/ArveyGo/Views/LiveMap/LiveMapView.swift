@@ -10,6 +10,7 @@ struct LiveMapView: View {
     @State private var showVehicleDetail = false
     @State private var detailVehicle: Vehicle?
     @State private var hasFittedBounds = false
+    @State private var trackingVehicleId: String?
     @State private var mapCameraPosition: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 39.9, longitude: 32.8),
@@ -83,6 +84,16 @@ struct LiveMapView: View {
                 }
                 .onChange(of: vm.vehicles) { _, vehicles in
                     fitBoundsIfNeeded(vehicles: vehicles)
+                    // If tracking a vehicle, follow it
+                    if let trackId = trackingVehicleId,
+                       let tracked = vehicles.first(where: { $0.id == trackId }) {
+                        withAnimation(.easeInOut(duration: 0.6)) {
+                            mapCameraPosition = .region(MKCoordinateRegion(
+                                center: CLLocationCoordinate2D(latitude: tracked.lat, longitude: tracked.lng),
+                                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                            ))
+                        }
+                    }
                 }
             }
     }
@@ -139,6 +150,25 @@ struct LiveMapView: View {
     // MARK: - Top Overlay (filter chips + WS status)
     var topOverlay: some View {
         VStack(spacing: 6) {
+            // Live tracking indicator
+            if trackingVehicleId != nil {
+                Button(action: { trackingVehicleId = nil }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "location.circle.fill")
+                            .font(.system(size: 12))
+                        Text("Canlı İzleme Aktif")
+                            .font(.system(size: 10, weight: .semibold))
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 10))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(AppTheme.online)
+                    .cornerRadius(20)
+                }
+            }
+
             // Filter chips row (like Android)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
@@ -291,6 +321,31 @@ struct LiveMapView: View {
                         quickAction(icon: "clock.arrow.circlepath", label: "Rota Geçmişi", color: AppTheme.indigo)
                         quickAction(icon: "bell.fill", label: "Alarm Kur", color: .orange)
                         quickAction(icon: "lock.fill", label: "Blokaj", color: .red)
+                    }
+                    .padding(.horizontal, 20)
+
+                    // CANLI İZLE Button
+                    Button(action: {
+                        trackingVehicleId = vehicle.id
+                        selectedVehicle = nil
+                        withAnimation(.easeInOut(duration: 0.6)) {
+                            mapCameraPosition = .region(MKCoordinateRegion(
+                                center: CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng),
+                                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                            ))
+                        }
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "location.circle.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Canlı İzle")
+                                .font(.system(size: 14, weight: .bold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(AppTheme.online)
+                        .cornerRadius(14)
                     }
                     .padding(.horizontal, 20)
 

@@ -16,6 +16,8 @@ struct LoginView: View {
     @State private var otpSent = false
     @State private var otpError: String?
     @State private var otpLoading = false
+    @State private var resendCooldown = 0
+    @State private var cooldownTimer: Timer?
 
     var body: some View {
         ZStack {
@@ -48,15 +50,11 @@ struct LoginView: View {
 
                     // Logo
                     VStack(spacing: 8) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(AppTheme.navy)
-                                .frame(width: 52, height: 52)
-
-                            Image(systemName: "location.north.fill")
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundColor(.white)
-                        }
+                        Image("Logo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 64)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
 
                         VStack(spacing: 2) {
                             Text("ArveyGo")
@@ -240,37 +238,36 @@ struct LoginView: View {
 
                         // ═══ PHONE/OTP MODE ═══
                         if loginMode == 1 {
-                            // Phone Field
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(L.phoneLabel)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(AppTheme.textSecondary)
-
-                                HStack(spacing: 12) {
-                                    Image(systemName: "phone")
-                                        .font(.system(size: 15))
-                                        .foregroundColor(AppTheme.textMuted)
-                                        .frame(width: 20)
-
-                                    TextField(L.phonePlaceholder, text: $phone)
-                                        .font(.system(size: 14))
-                                        .foregroundColor(AppTheme.navy)
-                                        .keyboardType(.phonePad)
-                                        .focused($focusedField, equals: .phone)
-                                        .disabled(otpSent)
-                                }
-                                .padding(.horizontal, 16)
-                                .frame(height: 50)
-                                .background(AppTheme.bg)
-                                .cornerRadius(12)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(focusedField == .phone ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .phone ? 1.5 : 1)
-                                )
-                            }
-                            .padding(.bottom, 16)
-
                             if !otpSent {
+                                // ── Step 1: Phone number entry ──
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(L.phoneLabel)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(AppTheme.textSecondary)
+
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "phone")
+                                            .font(.system(size: 15))
+                                            .foregroundColor(AppTheme.textMuted)
+                                            .frame(width: 20)
+
+                                        TextField(L.phonePlaceholder, text: $phone)
+                                            .font(.system(size: 14))
+                                            .foregroundColor(AppTheme.navy)
+                                            .keyboardType(.phonePad)
+                                            .focused($focusedField, equals: .phone)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .frame(height: 50)
+                                    .background(AppTheme.bg)
+                                    .cornerRadius(12)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(focusedField == .phone ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .phone ? 1.5 : 1)
+                                    )
+                                }
+                                .padding(.bottom, 16)
+
                                 // Send OTP Button
                                 Button(action: {
                                     focusedField = nil
@@ -284,6 +281,7 @@ struct LoginView: View {
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                                         otpLoading = false
                                         otpSent = true
+                                        startCooldownTimer()
                                     }
                                 }) {
                                     HStack(spacing: 8) {
@@ -299,6 +297,34 @@ struct LoginView: View {
                                 .buttonStyle(ArveyButtonStyle())
                                 .disabled(otpLoading)
                             } else {
+                                // ── Step 2: OTP Verification ──
+
+                                // Step 2 header
+                                VStack(spacing: 4) {
+                                    Image(systemName: "envelope.badge.shield.half.filled")
+                                        .font(.system(size: 28))
+                                        .foregroundColor(AppTheme.navy)
+                                        .frame(width: 48, height: 48)
+                                        .background(AppTheme.navy.opacity(0.1))
+                                        .cornerRadius(14)
+
+                                    Text(L.otpStep2Title)
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(AppTheme.navy)
+                                        .padding(.top, 6)
+
+                                    Text(L.otpStep2Subtitle)
+                                        .font(.system(size: 12))
+                                        .foregroundColor(AppTheme.textMuted)
+                                        .multilineTextAlignment(.center)
+
+                                    Text(phone)
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundColor(AppTheme.indigo)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.bottom, 16)
+
                                 // OTP sent success
                                 HStack(spacing: 8) {
                                     Image(systemName: "checkmark.circle.fill")
@@ -386,15 +412,43 @@ struct LoginView: View {
                                 }
                                 .buttonStyle(ArveyButtonStyle())
                                 .disabled(authVM.isLoading)
-                                .padding(.bottom, 8)
+                                .padding(.bottom, 12)
 
-                                // Resend code
-                                Button(action: { otpSent = false; otpCode = ""; otpError = nil }) {
-                                    Text(L.currentLang == "TR" ? "Kodu tekrar gönder" : "Resend code")
+                                // Resend code with cooldown
+                                if resendCooldown > 0 {
+                                    Text("\(L.resendCooldown) (\(resendCooldown)s)")
                                         .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(AppTheme.indigo)
+                                        .foregroundColor(AppTheme.textFaint)
+                                        .frame(maxWidth: .infinity)
+                                } else {
+                                    Button(action: {
+                                        otpCode = ""; otpError = nil
+                                        otpLoading = true
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                                            otpLoading = false
+                                            startCooldownTimer()
+                                        }
+                                    }) {
+                                        Text(L.resendCode)
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundColor(AppTheme.indigo)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                }
+
+                                // Back to phone number
+                                Button(action: {
+                                    cooldownTimer?.invalidate()
+                                    cooldownTimer = nil
+                                    resendCooldown = 0
+                                    otpSent = false; otpCode = ""; otpError = nil
+                                }) {
+                                    Text(L.currentLang == "TR" ? "Numarayı Değiştir" : "Change Number")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(AppTheme.textMuted)
                                 }
                                 .frame(maxWidth: .infinity)
+                                .padding(.top, 4)
                             }
                         }
 
@@ -449,6 +503,25 @@ struct LoginView: View {
         .navigationBarHidden(true)
         .onTapGesture { focusedField = nil }
         .onAppear { authVM.clearLoginFields() }
+        .onDisappear {
+            cooldownTimer?.invalidate()
+            cooldownTimer = nil
+        }
+    }
+
+    private func startCooldownTimer() {
+        resendCooldown = 30
+        cooldownTimer?.invalidate()
+        cooldownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            DispatchQueue.main.async {
+                if resendCooldown > 0 {
+                    resendCooldown -= 1
+                } else {
+                    timer.invalidate()
+                    cooldownTimer = nil
+                }
+            }
+        }
     }
 }
 

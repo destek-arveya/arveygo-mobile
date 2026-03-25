@@ -42,6 +42,10 @@ object LoginStrings {
     val otpInvalid: String get() = s("Doğrulama kodu hatalı", "Invalid verification code")
     val phoneRequired: String get() = s("Telefon numarası gerekli", "Phone number is required")
     val otpRequired: String get() = s("Doğrulama kodu gerekli", "Verification code is required")
+    val resendCode: String get() = s("Kodu Tekrar Gönder", "Resend Code")
+    val resendCooldown: String get() = s("Tekrar gönder", "Resend in")
+    val otpStep2Title: String get() = s("Doğrulama", "Verification")
+    val otpStep2Subtitle: String get() = s("Telefonunuza gönderilen 6 haneli kodu girin", "Enter the 6-digit code sent to your phone")
 
     // Remember Me
     val rememberMe: String get() = s("Beni Hatırla", "Remember Me")

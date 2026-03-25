@@ -211,6 +211,7 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
     var selectedVehicle by remember { mutableStateOf<Vehicle?>(null) }
     var detailVehicle by remember { mutableStateOf<Vehicle?>(null) }
     var showVehicleList by remember { mutableStateOf(true) }
+    var trackingVehicleId by remember { mutableStateOf<String?>(null) }
 
     // If detail vehicle is set, show VehicleDetailScreen
     detailVehicle?.let { vehicle ->
@@ -293,6 +294,13 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
             }
         }
         mapView.invalidate()
+
+        // If tracking a vehicle, keep centering on it
+        trackingVehicleId?.let { trackId ->
+            filteredVehicles.find { it.id == trackId }?.let { trackedVehicle ->
+                mapView.controller?.animateTo(GeoPoint(trackedVehicle.lat, trackedVehicle.lng), 16.0, 600L)
+            }
+        }
     }
 
     // Fit bounds on first load
@@ -383,6 +391,17 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
                     .align(Alignment.CenterEnd)
                     .padding(end = 12.dp)
             ) {
+                // Live tracking indicator
+                AnimatedVisibility(visible = trackingVehicleId != null) {
+                    FloatingActionButton(
+                        onClick = { trackingVehicleId = null },
+                        containerColor = AppColors.Online,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(Icons.Default.MyLocation, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
                 FloatingActionButton(
                     onClick = { mapViewRef.value?.controller?.zoomIn() },
                     containerColor = AppColors.Surface,
@@ -443,6 +462,11 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
                             selectedVehicle = null
                             mapViewRef.value?.controller?.animateTo(GeoPoint(v.lat, v.lng), 16.0, 600L)
                         },
+                        onLiveTrack = {
+                            trackingVehicleId = v.id
+                            selectedVehicle = null
+                            mapViewRef.value?.controller?.animateTo(GeoPoint(v.lat, v.lng), 16.0, 600L)
+                        },
                         onDetail = {
                             val vehicleToOpen = v
                             selectedVehicle = null
@@ -500,6 +524,7 @@ private fun VehiclePopupCard(
     vehicle: Vehicle,
     onClose: () -> Unit,
     onZoomTo: () -> Unit,
+    onLiveTrack: () -> Unit,
     onDetail: () -> Unit
 ) {
     Column(
@@ -600,6 +625,23 @@ private fun VehiclePopupCard(
         }
 
         Spacer(Modifier.height(14.dp))
+
+        // CANLI İZLE Button
+        Button(
+            onClick = onLiveTrack,
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Online),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .height(44.dp)
+        ) {
+            Icon(Icons.Default.MyLocation, null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Canl\u0131 \u0130zle", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(Modifier.height(8.dp))
 
         // DETAY GÖR Button
         Button(
