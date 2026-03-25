@@ -25,6 +25,7 @@ import com.arveya.arveygo.LocalAuthViewModel
 import com.arveya.arveygo.models.*
 import com.arveya.arveygo.ui.components.*
 import com.arveya.arveygo.ui.theme.AppColors
+import com.arveya.arveygo.utils.DashboardStrings
 import com.arveya.arveygo.viewmodels.DashboardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,6 +40,8 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}) {
     val selectedPeriod by vm.selectedPeriod.collectAsState()
     val isRefreshing by vm.isRefreshing.collectAsState()
     var selectedVehicle by remember { mutableStateOf<Vehicle?>(null) }
+    val dlLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
 
     // Connect WebSocket when dashboard appears
     LaunchedEffect(Unit) {
@@ -55,8 +58,8 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}) {
                 },
                 title = {
                     Column {
-                        Text("Dashboard", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-                        Text("Filo Yönetim Paneli", fontSize = 10.sp, color = AppColors.TextMuted)
+                        Text(DL.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+                        Text(DL.subtitle, fontSize = 10.sp, color = AppColors.TextMuted)
                     }
                 },
                 actions = {
@@ -93,15 +96,15 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}) {
                         Text("👋", fontSize = 22.sp)
                         Spacer(Modifier.width(10.dp))
                         Column {
-                            Text("Hoş Geldiniz, ${user?.name ?: "Admin"}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("Filonuzun son durumunu görüntüleyin", fontSize = 12.sp, color = Color.White.copy(alpha = 0.7f))
+                            Text(DL.welcomeMsg(user?.name ?: "Admin"), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(DL.welcomeSubtitle, fontSize = 12.sp, color = Color.White.copy(alpha = 0.7f))
                         }
                     }
                     Spacer(Modifier.height(16.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        WelcomeChip("${vm.kontakOnCount} Kontak Açık", AppColors.Online)
-                        WelcomeChip("${vm.kontakOffCount} Kontak Kapalı", AppColors.Idle)
-                        WelcomeChip("${vm.bilgiYokCount} Bilgi Yok", AppColors.Offline)
+                        WelcomeChip(DL.kontakOnChip(vm.kontakOnCount), AppColors.Online)
+                        WelcomeChip(DL.kontakOffChip(vm.kontakOffCount), AppColors.Idle)
+                        WelcomeChip(DL.bilgiYokChip(vm.bilgiYokCount), AppColors.Offline)
                     }
                 }
             }
@@ -131,9 +134,9 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}) {
 
             // Active Vehicles
             CardView(
-                title = "Aktif Araçlar",
+                title = DL.activeVehicles,
                 count = "${vm.onlineCount}",
-                actionLabel = "Tümü",
+                actionLabel = DL.allLabel,
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {
                 Column {
@@ -147,9 +150,9 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}) {
 
             // Driver Scores
             CardView(
-                title = "Sürücü Performansı",
+                title = DL.driverPerformance,
                 count = "${drivers.size}",
-                actionLabel = "Detay",
+                actionLabel = DL.detailLabel,
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {
                 Column {
@@ -163,9 +166,9 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}) {
 
             // Alerts
             CardView(
-                title = "Son Alarmlar",
+                title = DL.recentAlarms,
                 count = "${alerts.size}",
-                actionLabel = "Tümü",
+                actionLabel = DL.allLabel,
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {
                 Column {
@@ -196,14 +199,14 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}) {
                             modifier = Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(AppColors.Indigo.copy(alpha = 0.1f))
                         ) { Icon(Icons.Default.AutoAwesome, null, tint = AppColors.Indigo, modifier = Modifier.size(14.dp)) }
                         Spacer(Modifier.width(8.dp))
-                        Text("AI Filo İçgörüleri", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+                        Text(DL.aiInsights, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
                     }
                     Spacer(Modifier.height(12.dp))
-                    InsightChip("💡 Yüksek yakıt tüketimi: 34 ABC 123 son 7 günde %15 artış gösterdi")
+                    InsightChip(if (dlLang == "TR") "💡 Yüksek yakıt tüketimi: 34 ABC 123 son 7 günde %15 artış gösterdi" else "💡 High fuel consumption: 34 ABC 123 showed 15% increase in 7 days")
                     Spacer(Modifier.height(8.dp))
-                    InsightChip("📍 Optimum rota: Ankara-İstanbul hattında alternatif güzergah %12 tasarruf sağlayabilir")
+                    InsightChip(if (dlLang == "TR") "📍 Optimum rota: Ankara-İstanbul hattında alternatif güzergah %12 tasarruf sağlayabilir" else "📍 Optimal route: Alternative route on Ankara-Istanbul line can save 12%")
                     Spacer(Modifier.height(8.dp))
-                    InsightChip("🔧 07 MNO 987 için bakım zamanı yaklaşıyor (3 gün)")
+                    InsightChip(if (dlLang == "TR") "🔧 07 MNO 987 için bakım zamanı yaklaşıyor (3 gün)" else "🔧 Maintenance due for 07 MNO 987 (3 days)")
                 }
             }
 
@@ -237,7 +240,8 @@ private fun WelcomeChip(text: String, color: Color) {
 
 @Composable
 private fun PeriodFilter(selected: String, onSelect: (String) -> Unit) {
-    val periods = listOf("today" to "Bugün", "week" to "Hafta", "month" to "Ay", "year" to "Yıl")
+    val DL = DashboardStrings
+    val periods = listOf("today" to DL.periodToday, "week" to DL.periodWeek, "month" to DL.periodMonth, "year" to DL.periodYear)
     Row(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)

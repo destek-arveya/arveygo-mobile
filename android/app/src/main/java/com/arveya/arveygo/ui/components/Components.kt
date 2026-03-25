@@ -284,7 +284,10 @@ fun LanguageSwitcher() {
                     .size(36.dp, 28.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(if (selectedLang == lang) AppColors.Navy else Color.Transparent)
-                    .clickable { com.arveya.arveygo.utils.LoginStrings.setLanguage(lang) }
+                    .clickable {
+                        com.arveya.arveygo.utils.LoginStrings.setLanguage(lang)
+                        com.arveya.arveygo.utils.DashboardStrings.setLanguage(lang)
+                    }
             ) {
                 Text(
                     text = lang,

@@ -4,6 +4,7 @@ import MapKit
 struct DashboardView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @StateObject private var dashVM = DashboardViewModel()
+    @ObservedObject private var DL = DashboardStrings.shared
     @Binding var showSideMenu: Bool
     @Binding var selectedPage: AppPage
     @State private var selectedVehicle: Vehicle?
@@ -64,10 +65,10 @@ struct DashboardView: View {
                     }
                     ToolbarItem(placement: .principal) {
                         VStack(spacing: 1) {
-                            Text("Dashboard")
+                            Text(DL.title)
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundColor(AppTheme.navy)
-                            Text("Araç Takip / Genel Bakış")
+                            Text(DL.subtitle)
                                 .font(.system(size: 10))
                                 .foregroundColor(AppTheme.textMuted)
                         }
@@ -126,7 +127,7 @@ struct DashboardView: View {
                         .stroke(AppTheme.borderSoft, lineWidth: 1)
                 )
             }
-            Text("Filonuzun güncel durumu aşağıda özetlenmiştir.")
+            Text(DL.fleetSummaryDesc)
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.textMuted)
         }
@@ -134,9 +135,9 @@ struct DashboardView: View {
 
     var greetingText: String {
         let hour = Calendar.current.component(.hour, from: Date())
-        if hour < 12 { return "Günaydın" }
-        if hour < 18 { return "İyi Günler" }
-        return "İyi Akşamlar"
+        if hour < 12 { return DL.goodMorning }
+        if hour < 18 { return DL.goodAfternoon }
+        return DL.goodEvening
     }
 
     var dateString: String {
@@ -154,7 +155,7 @@ struct DashboardView: View {
                     Image(systemName: "waveform.path.ecg")
                         .font(.system(size: 12))
                         .foregroundColor(AppTheme.textMuted)
-                    Text("Filo Özeti")
+                    Text(DL.fleetOverview)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(AppTheme.navy)
                 }
@@ -192,10 +193,10 @@ struct DashboardView: View {
 
     func periodLabel(_ period: String) -> String {
         switch period {
-        case "today": return "Bugün"
-        case "week": return "Hafta"
-        case "month": return "Ay"
-        case "quarter": return "3 Ay"
+        case "today": return DL.periodToday
+        case "week": return DL.periodWeek
+        case "month": return DL.periodMonth
+        case "quarter": return DL.periodQuarter
         default: return period
         }
     }
@@ -217,7 +218,7 @@ struct DashboardView: View {
 
     // MARK: - Vehicle List Card
     var vehicleListCard: some View {
-        CardView(title: "Araçlar", count: "\(dashVM.totalVehicles)", actionLabel: "Tümünü Gör") {
+        CardView(title: DL.vehiclesTitle, count: "\(dashVM.totalVehicles)", actionLabel: DL.viewAll) {
             // Action
         } content: {
             VStack(spacing: 0) {
@@ -270,7 +271,7 @@ struct DashboardView: View {
 
     // MARK: - Driver Scores Card
     var driverScoresCard: some View {
-        CardView(title: "Sürücü Skorları", count: "Ort: \(dashVM.avgScore)", actionLabel: "Detay") {
+        CardView(title: DL.driverScores, count: "\(DL.avgPrefix): \(dashVM.avgScore)", actionLabel: DL.detailLabel) {
         } content: {
             VStack(spacing: 0) {
                 ForEach(Array(dashVM.drivers.enumerated()), id: \.element.id) { index, driver in
@@ -330,7 +331,7 @@ struct DashboardView: View {
 
     // MARK: - Map Card
     var mapCard: some View {
-        CardView(title: "Filo Haritası", actionLabel: "Canlı Harita", action: {
+        CardView(title: DL.fleetMap, actionLabel: DL.liveMapAction, action: {
             selectedPage = .liveMap
         }) {
             ZStack(alignment: .bottomLeading) {
@@ -353,9 +354,9 @@ struct DashboardView: View {
 
                 // Legend
                 HStack(spacing: 12) {
-                    legendItem(color: AppTheme.online, text: "Aktif")
-                    legendItem(color: AppTheme.offline, text: "Çevrimdışı")
-                    legendItem(color: AppTheme.idle, text: "Rölanti")
+                    legendItem(color: AppTheme.online, text: DL.activeLabel)
+                    legendItem(color: AppTheme.offline, text: DL.offlineLabel)
+                    legendItem(color: AppTheme.idle, text: DL.idleLabel)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
@@ -377,7 +378,7 @@ struct DashboardView: View {
 
     // MARK: - Alerts Card
     var alertsCard: some View {
-        CardView(title: "Son Alarmlar", count: "\(dashVM.alerts.count)", actionLabel: "Tümü") {
+        CardView(title: DL.recentAlarms, count: "\(dashVM.alerts.count)", actionLabel: DL.allLabel) {
         } content: {
             VStack(spacing: 0) {
                 ForEach(dashVM.alerts) { alert in
@@ -416,29 +417,29 @@ struct DashboardView: View {
 
     // MARK: - AI Insights Card
     var aiInsightsCard: some View {
-        CardView(title: "AI Filo Analizi", actionLabel: nil) {
+        CardView(title: DL.aiAnalysis, actionLabel: nil) {
         } content: {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Filonuzda **\(dashVM.onlineCount)** araç aktif durumda. Günlük toplam **\(dashVM.formatKm(dashVM.todayKm)) km** yol katedildi.")
+                Text(DL.aiSummary(online: dashVM.onlineCount, km: dashVM.formatKm(dashVM.todayKm)))
                     .font(.system(size: 12.5))
                     .foregroundColor(AppTheme.textSecondary)
                     .lineSpacing(4)
 
                 VStack(spacing: 8) {
                     insightRow(
-                        text: "34 ABC 123 plakalı araç bugün en yüksek mesafeyi kat etti (312 km)",
+                        text: DL.currentLang == "TR" ? "34 ABC 123 plakalı araç bugün en yüksek mesafeyi kat etti (312 km)" : "Vehicle 34 ABC 123 covered the highest distance today (312 km)",
                         dotColor: AppTheme.online,
                         tag: nil
                     )
                     insightRow(
-                        text: "2 araç çevrimdışı — bakım kontrolü önerilir",
+                        text: DL.currentLang == "TR" ? "2 araç çevrimdışı — bakım kontrolü önerilir" : "2 vehicles offline — maintenance check recommended",
                         dotColor: AppTheme.offline,
-                        tag: ("Yüksek", Color.red)
+                        tag: (DL.highPriority, Color.red)
                     )
                     insightRow(
-                        text: "Ortalama sürücü skoru 78 — geçen aya göre %3 artış",
+                        text: DL.currentLang == "TR" ? "Ortalama sürücü skoru 78 — geçen aya göre %3 artış" : "Average driver score 78 — 3% increase over last month",
                         dotColor: AppTheme.indigo,
-                        tag: ("Düşük", AppTheme.online)
+                        tag: (DL.lowPriority, AppTheme.online)
                     )
                 }
             }

@@ -156,7 +156,10 @@ struct LanguageSwitcher: View {
     var body: some View {
         HStack(spacing: 0) {
             ForEach(languages, id: \.self) { lang in
-                Button(action: { strings.currentLang = lang }) {
+                Button(action: {
+                    strings.currentLang = lang
+                    DashboardStrings.shared.currentLang = lang
+                }) {
                     Text(lang)
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(strings.currentLang == lang ? .white : AppTheme.textMuted)

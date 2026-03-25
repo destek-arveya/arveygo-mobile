@@ -35,6 +35,7 @@ import com.arveya.arveygo.ui.theme.AppColors
 import com.arveya.arveygo.utils.LoginStrings
 import androidx.compose.ui.res.painterResource
 import com.arveya.arveygo.R
+import com.arveya.arveygo.models.CountryCode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -61,6 +62,9 @@ fun LoginScreen() {
     var otpError by remember { mutableStateOf<String?>(null) }
     var otpLoading by remember { mutableStateOf(false) }
     var resendCooldown by remember { mutableIntStateOf(0) }
+
+    var selectedCountry by remember { mutableStateOf(CountryCode.all.first { it.id == "TR" }) }
+    var showCountryPicker by remember { mutableStateOf(false) }
 
     var showRegister by remember { mutableStateOf(false) }
     var showForgot by remember { mutableStateOf(false) }
@@ -211,7 +215,7 @@ fun LoginScreen() {
                                     cursorColor = AppColors.Navy
                                 ),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth().height(50.dp)
+                                modifier = Modifier.fillMaxWidth()
                             )
 
                             Spacer(Modifier.height(16.dp))
@@ -238,7 +242,7 @@ fun LoginScreen() {
                                     cursorColor = AppColors.Navy
                                 ),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth().height(50.dp)
+                                modifier = Modifier.fillMaxWidth()
                             )
 
                             Spacer(Modifier.height(12.dp))
@@ -289,25 +293,67 @@ fun LoginScreen() {
                                 // ── Step 1: Phone number entry ──
                                 Text(L.phoneLabel, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
                                 Spacer(Modifier.height(6.dp))
-                                OutlinedTextField(
-                                    value = phone,
-                                    onValueChange = { phone = it.filter { c -> c.isDigit() || c == '+' || c == ' ' } },
-                                    placeholder = { Text(L.phonePlaceholder, fontSize = 14.sp) },
-                                    leadingIcon = { Icon(Icons.Default.Phone, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp)) },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = AppColors.Navy,
-                                        unfocusedBorderColor = AppColors.BorderSoft,
-                                        focusedContainerColor = AppColors.Bg,
-                                        unfocusedContainerColor = AppColors.Bg,
-                                        focusedTextColor = AppColors.TextPrimary,
-                                        unfocusedTextColor = AppColors.TextPrimary,
-                                        cursorColor = AppColors.Navy
-                                    ),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.fillMaxWidth().height(50.dp)
-                                )
+
+                                // Country code + Phone input row
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Country code picker button
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .height(56.dp)
+                                            .background(AppColors.Bg, RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp))
+                                            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp))
+                                            .clickable { showCountryPicker = true }
+                                            .padding(horizontal = 10.dp)
+                                    ) {
+                                        Text(selectedCountry.flag, fontSize = 20.sp)
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(selectedCountry.dialCode, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+                                        Spacer(Modifier.width(2.dp))
+                                        Icon(Icons.Default.ArrowDropDown, null, tint = AppColors.TextMuted, modifier = Modifier.size(16.dp))
+                                    }
+
+                                    // Phone number input
+                                    OutlinedTextField(
+                                        value = phone,
+                                        onValueChange = { newValue ->
+                                            val digits = newValue.filter { c -> c.isDigit() }
+                                            phone = digits.take(selectedCountry.maxDigits)
+                                        },
+                                        placeholder = {
+                                            Text(
+                                                selectedCountry.format.replace('#', '0'),
+                                                fontSize = 14.sp
+                                            )
+                                        },
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = AppColors.Navy,
+                                            unfocusedBorderColor = AppColors.BorderSoft,
+                                            focusedContainerColor = AppColors.Bg,
+                                            unfocusedContainerColor = AppColors.Bg,
+                                            focusedTextColor = AppColors.TextPrimary,
+                                            unfocusedTextColor = AppColors.TextPrimary,
+                                            cursorColor = AppColors.Navy
+                                        ),
+                                        shape = RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                // Formatted preview
+                                if (phone.isNotEmpty()) {
+                                    Text(
+                                        CountryCode.formatPhone(phone, selectedCountry.format),
+                                        fontSize = 11.sp,
+                                        color = AppColors.TextMuted,
+                                        modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                                    )
+                                }
 
                                 Spacer(Modifier.height(16.dp))
 
@@ -360,7 +406,12 @@ fun LoginScreen() {
                                     Spacer(Modifier.height(4.dp))
                                     Text(L.otpStep2Subtitle, fontSize = 12.sp, color = AppColors.TextMuted, textAlign = TextAlign.Center)
                                     Spacer(Modifier.height(4.dp))
-                                    Text(phone, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Indigo)
+                                    Text(
+                                        "${selectedCountry.flag} ${selectedCountry.dialCode} ${CountryCode.formatPhone(phone, selectedCountry.format)}",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = AppColors.Indigo
+                                    )
                                 }
 
                                 // OTP sent success message
@@ -399,7 +450,7 @@ fun LoginScreen() {
                                         cursorColor = AppColors.Navy
                                     ),
                                     shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                                    modifier = Modifier.fillMaxWidth(),
                                     textStyle = androidx.compose.ui.text.TextStyle(
                                         fontSize = 18.sp,
                                         fontWeight = FontWeight.Bold,
@@ -531,7 +582,88 @@ fun LoginScreen() {
 
                     Spacer(Modifier.height(20.dp))
                 }
+
+                // Country Code Picker Dialog
+                if (showCountryPicker) {
+                    CountryPickerDialog(
+                        countries = CountryCode.all,
+                        selected = selectedCountry,
+                        onSelect = { selectedCountry = it; showCountryPicker = false },
+                        onDismiss = { showCountryPicker = false }
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun CountryPickerDialog(
+    countries: List<CountryCode>,
+    selected: CountryCode,
+    onSelect: (CountryCode) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var searchText by remember { mutableStateOf("") }
+    val filtered = if (searchText.isEmpty()) countries
+    else countries.filter {
+        it.name.contains(searchText, ignoreCase = true) ||
+        it.dialCode.contains(searchText) ||
+        it.id.contains(searchText, ignoreCase = true)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {},
+        title = {
+            Text("Ülke Kodu", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().height(400.dp)) {
+                // Search
+                OutlinedTextField(
+                    value = searchText,
+                    onValueChange = { searchText = it },
+                    placeholder = { Text("Ülke ara / Search", fontSize = 13.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(16.dp)) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AppColors.Navy,
+                        unfocusedBorderColor = AppColors.BorderSoft,
+                        cursorColor = AppColors.Navy
+                    )
+                )
+                Spacer(Modifier.height(8.dp))
+
+                // List
+                Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                    filtered.forEach { country ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (country.id == selected.id) AppColors.Navy.copy(alpha = 0.08f) else Color.Transparent)
+                                .clickable { onSelect(country) }
+                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            Text(country.flag, fontSize = 22.sp)
+                            Spacer(Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(country.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                                Text(country.dialCode, fontSize = 11.sp, color = AppColors.TextMuted)
+                            }
+                            if (country.id == selected.id) {
+                                Icon(Icons.Default.CheckCircle, null, tint = AppColors.Navy, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        containerColor = AppColors.Surface,
+        shape = RoundedCornerShape(16.dp)
+    )
 }

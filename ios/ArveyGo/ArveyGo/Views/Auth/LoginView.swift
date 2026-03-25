@@ -18,6 +18,8 @@ struct LoginView: View {
     @State private var otpLoading = false
     @State private var resendCooldown = 0
     @State private var cooldownTimer: Timer?
+    @State private var selectedCountry = CountryCode.all.first(where: { $0.id == "TR" })!
+    @State private var showCountryPicker = false
 
     var body: some View {
         ZStack {
@@ -245,26 +247,60 @@ struct LoginView: View {
                                         .font(.system(size: 12, weight: .medium))
                                         .foregroundColor(AppTheme.textSecondary)
 
-                                    HStack(spacing: 12) {
-                                        Image(systemName: "phone")
-                                            .font(.system(size: 15))
-                                            .foregroundColor(AppTheme.textMuted)
-                                            .frame(width: 20)
+                                    HStack(spacing: 0) {
+                                        // Country code picker button
+                                        Button(action: { showCountryPicker = true }) {
+                                            HStack(spacing: 6) {
+                                                Text(selectedCountry.flag)
+                                                    .font(.system(size: 18))
+                                                Text(selectedCountry.dialCode)
+                                                    .font(.system(size: 13, weight: .semibold))
+                                                    .foregroundColor(AppTheme.navy)
+                                                Image(systemName: "chevron.down")
+                                                    .font(.system(size: 8, weight: .bold))
+                                                    .foregroundColor(AppTheme.textMuted)
+                                            }
+                                            .padding(.horizontal, 12)
+                                            .frame(height: 50)
+                                            .background(AppTheme.bg)
+                                            .cornerRadius(12, corners: [.topLeft, .bottomLeft])
+                                            .overlay(
+                                                RoundedCorner(radius: 12, corners: [.topLeft, .bottomLeft])
+                                                    .stroke(focusedField == .phone ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .phone ? 1.5 : 1)
+                                            )
+                                        }
 
-                                        TextField(L.phonePlaceholder, text: $phone)
+                                        // Phone number input
+                                        TextField(phonePlaceholder, text: Binding(
+                                            get: { phone },
+                                            set: { newValue in
+                                                let digits = newValue.filter { $0.isNumber }
+                                                let limited = String(digits.prefix(selectedCountry.maxDigits))
+                                                phone = limited
+                                            }
+                                        ))
                                             .font(.system(size: 14))
                                             .foregroundColor(AppTheme.navy)
-                                            .keyboardType(.phonePad)
+                                            .keyboardType(.numberPad)
                                             .focused($focusedField, equals: .phone)
+                                            .padding(.horizontal, 12)
+                                            .frame(height: 50)
+                                            .background(AppTheme.bg)
+                                            .cornerRadius(12, corners: [.topRight, .bottomRight])
+                                            .overlay(
+                                                RoundedCorner(radius: 12, corners: [.topRight, .bottomRight])
+                                                    .stroke(focusedField == .phone ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .phone ? 1.5 : 1)
+                                            )
                                     }
-                                    .padding(.horizontal, 16)
-                                    .frame(height: 50)
-                                    .background(AppTheme.bg)
-                                    .cornerRadius(12)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(focusedField == .phone ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .phone ? 1.5 : 1)
-                                    )
+
+                                    // Formatted preview
+                                    if !phone.isEmpty {
+                                        Text(formattedPhoneDisplay)
+                                            .font(.system(size: 11))
+                                            .foregroundColor(AppTheme.textMuted)
+                                            .padding(.leading, 4)
+                                            .padding(.top, 2)
+                                    }
                                 }
                                 .padding(.bottom, 16)
 
@@ -318,7 +354,7 @@ struct LoginView: View {
                                         .foregroundColor(AppTheme.textMuted)
                                         .multilineTextAlignment(.center)
 
-                                    Text(phone)
+                                    Text("\(selectedCountry.flag) \(selectedCountry.dialCode) \(formattedPhoneDisplay)")
                                         .font(.system(size: 13, weight: .semibold))
                                         .foregroundColor(AppTheme.indigo)
                                 }
@@ -507,6 +543,18 @@ struct LoginView: View {
             cooldownTimer?.invalidate()
             cooldownTimer = nil
         }
+        .sheet(isPresented: $showCountryPicker) {
+            CountryPickerSheet(selected: $selectedCountry, isPresented: $showCountryPicker)
+        }
+    }
+
+    // MARK: - Formatted phone helpers
+    var formattedPhoneDisplay: String {
+        CountryCode.formatPhone(phone, format: selectedCountry.format)
+    }
+
+    var phonePlaceholder: String {
+        selectedCountry.format.replacingOccurrences(of: "#", with: "0")
     }
 
     private func startCooldownTimer() {
