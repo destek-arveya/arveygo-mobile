@@ -543,9 +543,9 @@ private fun InfoCell(icon: ImageVector, label: String, value: String, modifier: 
             Icon(icon, null, tint = AppColors.Indigo, modifier = Modifier.size(12.dp))
         }
         Spacer(Modifier.width(10.dp))
-        Column {
+        Column(modifier = Modifier.weight(1f, fill = false)) {
             Text(label, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = AppColors.TextFaint, letterSpacing = 0.3.sp)
-            Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

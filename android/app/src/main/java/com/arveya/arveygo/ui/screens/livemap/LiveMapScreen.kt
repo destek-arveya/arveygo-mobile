@@ -270,6 +270,7 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
                 existing.marker.icon = BitmapDrawable(context.resources, bmp)
                 existing.marker.title = vehicle.plate
                 existing.marker.snippet = "${vehicle.formattedSpeed} \u00b7 ${vehicle.status.label}"
+                existing.marker.infoWindow = null
                 // SMOOTH ANIMATE to new position
                 existing.animateTo(target)
             } else {
@@ -280,6 +281,8 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
                     val bmp = createVehiclePinBitmap(context, statusColor, vehicle.direction.toFloat(), vehicle.plate, vehicle.formattedSpeed, isSel)
                     icon = BitmapDrawable(context.resources, bmp)
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    // Disable osmdroid's built-in info window to prevent double popup
+                    infoWindow = null
                     setOnMarkerClickListener { _, _ ->
                         selectedVehicle = vehicle
                         true
@@ -640,9 +643,9 @@ private fun PopupInfoCell(
             Icon(icon, null, tint = color, modifier = Modifier.size(14.dp))
         }
         Spacer(Modifier.width(10.dp))
-        Column {
+        Column(modifier = Modifier.weight(1f, fill = false)) {
             Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = AppColors.TextFaint, letterSpacing = 0.3.sp)
-            Text(value, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(value, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

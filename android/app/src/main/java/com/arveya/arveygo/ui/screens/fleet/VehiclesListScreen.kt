@@ -502,18 +502,12 @@ private fun VehicleTableRow(vehicle: Vehicle, onClick: () -> Unit) {
                     }
                     // Son Veri Zamanı
                     if (vehicle.deviceTime != null) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "⏱ ",
-                                fontSize = 9.sp,
-                                color = AppColors.TextFaint
-                            )
-                            Text(
-                                vehicle.formattedDeviceTime,
-                                fontSize = 9.sp,
-                                color = AppColors.TextFaint
-                            )
-                        }
+                        Text(
+                            "⏱ ${vehicle.formattedDeviceTime}",
+                            fontSize = 8.sp,
+                            color = AppColors.TextFaint,
+                            maxLines = 1
+                        )
                     }
                 }
             }

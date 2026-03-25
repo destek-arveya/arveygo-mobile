@@ -3,7 +3,6 @@ package com.arveya.arveygo.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arveya.arveygo.models.*
-import com.arveya.arveygo.services.WSEvent
 import com.arveya.arveygo.services.WebSocketManager
 import com.arveya.arveygo.ui.theme.AppColors
 import kotlinx.coroutines.delay
@@ -71,29 +70,11 @@ class DashboardViewModel : ViewModel() {
     }
 
     private fun subscribeToWebSocket() {
-        // Observe vehicle list from WebSocketManager
+        // Single source of truth: observe vehicle list from WebSocketManager
         viewModelScope.launch {
             WebSocketManager.vehicleList.collectLatest { list ->
                 if (list.isNotEmpty()) {
                     _vehicles.value = list
-                }
-            }
-        }
-        // Also listen for individual events
-        viewModelScope.launch {
-            WebSocketManager.events.collect { event ->
-                when (event) {
-                    is WSEvent.Snapshot -> {
-                        _vehicles.value = event.vehicles
-                    }
-                    is WSEvent.Update -> {
-                        val current = _vehicles.value.toMutableList()
-                        val idx = current.indexOfFirst { it.id == event.vehicle.id }
-                        if (idx >= 0) current[idx] = event.vehicle
-                        else current.add(event.vehicle)
-                        _vehicles.value = current
-                    }
-                    else -> {}
                 }
             }
         }
