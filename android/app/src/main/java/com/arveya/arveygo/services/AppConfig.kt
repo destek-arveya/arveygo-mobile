@@ -5,7 +5,7 @@ package com.arveya.arveygo.services
  */
 object AppConfig {
     // API / Backend
-    const val API_BASE_URL = "https://arveygo.com"
+    const val API_BASE_URL = "https://demo.arveygo.com"
 
     // ATS WebSocket
     const val WS_URL = "wss://websocket.arveygo.com/ws"

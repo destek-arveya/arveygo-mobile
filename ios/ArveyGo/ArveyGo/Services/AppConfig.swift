@@ -4,8 +4,8 @@ import Foundation
 enum AppConfig {
 
     // MARK: - API / Backend
-    /// Base URL for the Laravel backend (session-based auth)
-    static let apiBaseURL = "https://arveygo.com"
+    /// Base URL for the Laravel backend (token-based auth)
+    static let apiBaseURL = "https://demo.arveygo.com"
 
     // MARK: - ATS WebSocket
     /// Secure WebSocket endpoint
