@@ -337,7 +337,7 @@ struct LiveMapView: View {
                     .foregroundColor(AppTheme.textFaint)
                     .textCase(.uppercase)
                 Text(value)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(AppTheme.navy)
                     .lineLimit(1)
             }

@@ -39,6 +39,9 @@ class AuthViewModel : ViewModel() {
     private val _resetSent = MutableStateFlow(false)
     val resetSent: StateFlow<Boolean> = _resetSent
 
+    // Remember Me
+    val rememberMe = MutableStateFlow(false)
+
     // WS config
     private var wsConfig: WSConfig? = null
 
@@ -148,6 +151,28 @@ class AuthViewModel : ViewModel() {
 
     fun disconnectWebSocket() {
         WebSocketManager.disconnect()
+    }
+
+    // MARK: - Login via Phone + OTP
+    fun loginWithOTP(phone: String, otp: String, onResult: (Boolean) -> Unit) {
+        _errorMessage.value = null
+        _isLoading.value = true
+
+        viewModelScope.launch {
+            delay(800)
+            _isLoading.value = false
+
+            // Dummy OTP: accept "000000"
+            if (otp == "000000") {
+                _currentUser.value = AppUser.dummy
+                _isLoggedIn.value = true
+                generateLocalWSConfig(AppUser.dummy)
+                connectWebSocket()
+                onResult(true)
+            } else {
+                onResult(false)
+            }
+        }
     }
 
     // MARK: - Register

@@ -150,18 +150,18 @@ struct LoadingSpinner: View {
 
 // MARK: - Language Switcher
 struct LanguageSwitcher: View {
-    @State private var selectedLang = "TR"
+    @ObservedObject private var strings = LoginStrings.shared
     let languages = ["TR", "EN"]
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(languages, id: \.self) { lang in
-                Button(action: { selectedLang = lang }) {
+                Button(action: { strings.currentLang = lang }) {
                     Text(lang)
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(selectedLang == lang ? .white : AppTheme.textMuted)
+                        .foregroundColor(strings.currentLang == lang ? .white : AppTheme.textMuted)
                         .frame(width: 36, height: 28)
-                        .background(selectedLang == lang ? AppTheme.navy : Color.clear)
+                        .background(strings.currentLang == lang ? AppTheme.navy : Color.clear)
                         .cornerRadius(6)
                 }
             }

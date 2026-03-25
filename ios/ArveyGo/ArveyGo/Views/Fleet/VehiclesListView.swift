@@ -283,12 +283,12 @@ struct VehiclesListView: View {
                             }
                         }
                         if vehicle.deviceTime != nil {
-                            HStack(spacing: 3) {
+                            HStack(spacing: 2) {
                                 Text("⏱")
-                                    .font(.system(size: 9))
+                                    .font(.system(size: 7))
                                     .foregroundColor(AppTheme.textFaint)
                                 Text(vehicle.formattedDeviceTime)
-                                    .font(.system(size: 9))
+                                    .font(.system(size: 7))
                                     .foregroundColor(AppTheme.textFaint)
                             }
                         }

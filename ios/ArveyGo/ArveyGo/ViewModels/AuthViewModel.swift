@@ -23,6 +23,9 @@ class AuthViewModel: ObservableObject {
     @Published var forgotEmail = ""
     @Published var resetSent = false
 
+    // Remember Me
+    @Published var rememberMe = false
+
     // WebSocket config received from server (or generated locally)
     @Published var wsConfig: WSConfig?
 
@@ -160,6 +163,28 @@ class AuthViewModel: ObservableObject {
     /// Disconnect WebSocket
     func disconnectWebSocket() {
         WebSocketManager.shared.disconnect()
+    }
+
+    // MARK: - Login via Phone + OTP
+    func loginWithOTP(phone: String, otp: String, completion: @escaping (Bool) -> Void) {
+        errorMessage = nil
+        isLoading = true
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            guard let self = self else { return }
+            self.isLoading = false
+
+            // Dummy OTP: accept "000000"
+            if otp == "000000" {
+                self.currentUser = AppUser.dummy
+                self.isLoggedIn = true
+                self.generateLocalWSConfig(for: AppUser.dummy)
+                self.connectWebSocket()
+                completion(true)
+            } else {
+                completion(false)
+            }
+        }
     }
 
     // MARK: - Register

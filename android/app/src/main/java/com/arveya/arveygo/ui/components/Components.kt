@@ -268,7 +268,7 @@ fun GradientButton(
 // MARK: - Language Switcher
 @Composable
 fun LanguageSwitcher() {
-    var selectedLang by remember { mutableStateOf("TR") }
+    val selectedLang by com.arveya.arveygo.utils.LoginStrings.currentLang.collectAsState()
     val languages = listOf("TR", "EN")
 
     Row(
@@ -284,7 +284,7 @@ fun LanguageSwitcher() {
                     .size(36.dp, 28.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(if (selectedLang == lang) AppColors.Navy else Color.Transparent)
-                    .clickable { selectedLang = lang }
+                    .clickable { com.arveya.arveygo.utils.LoginStrings.setLanguage(lang) }
             ) {
                 Text(
                     text = lang,

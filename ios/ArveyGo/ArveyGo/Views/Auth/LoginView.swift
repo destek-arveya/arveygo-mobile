@@ -2,9 +2,20 @@ import SwiftUI
 
 struct LoginView: View {
     @EnvironmentObject var authVM: AuthViewModel
+    @ObservedObject private var L = LoginStrings.shared
     @FocusState private var focusedField: Field?
 
-    enum Field { case email, password }
+    enum Field { case email, password, phone, otp }
+
+    // Login mode: 0 = email, 1 = phone
+    @State private var loginMode = 0
+
+    // Phone / OTP
+    @State private var phone = ""
+    @State private var otpCode = ""
+    @State private var otpSent = false
+    @State private var otpError: String?
+    @State private var otpLoading = false
 
     var body: some View {
         ZStack {
@@ -52,7 +63,7 @@ struct LoginView: View {
                                 .font(.system(size: 22, weight: .bold))
                                 .foregroundColor(AppTheme.navy)
 
-                            Text("ARAÇ TAKİP SİSTEMİ")
+                            Text(L.appSubtitle)
                                 .font(.system(size: 9, weight: .medium))
                                 .tracking(2)
                                 .foregroundColor(AppTheme.textMuted)
@@ -63,19 +74,52 @@ struct LoginView: View {
                     // Login Card
                     VStack(spacing: 0) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Tekrar Hoş Geldiniz")
+                            Text(L.welcomeBack)
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(AppTheme.navy)
 
-                            Text("Hesabınıza giriş yapın")
+                            Text(L.loginSubtitle)
                                 .font(.system(size: 13))
                                 .foregroundColor(AppTheme.textMuted)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.bottom, 28)
+                        .padding(.bottom, 20)
+
+                        // ═══ Tab Switcher: E-posta / Telefon ═══
+                        HStack(spacing: 0) {
+                            ForEach([0, 1], id: \.self) { mode in
+                                let tabLabel = mode == 0 ? L.emailTab : L.phoneTab
+                                let icon = mode == 0 ? "envelope.fill" : "phone.fill"
+
+                                Button(action: {
+                                    withAnimation(.easeInOut(duration: 0.2)) { loginMode = mode }
+                                    otpSent = false; otpError = nil
+                                }) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: icon)
+                                            .font(.system(size: 11))
+                                        Text(tabLabel)
+                                            .font(.system(size: 12, weight: .semibold))
+                                    }
+                                    .foregroundColor(loginMode == mode ? .white : AppTheme.textMuted)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                                    .background(loginMode == mode ? AppTheme.navy : Color.clear)
+                                    .cornerRadius(8)
+                                }
+                            }
+                        }
+                        .padding(3)
+                        .background(AppTheme.bg)
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(AppTheme.borderSoft, lineWidth: 1)
+                        )
+                        .padding(.bottom, 20)
 
                         // Error message
-                        if let error = authVM.errorMessage {
+                        if let error = authVM.errorMessage ?? otpError {
                             HStack(spacing: 8) {
                                 Image(systemName: "exclamationmark.circle.fill")
                                     .font(.system(size: 14))
@@ -91,98 +135,277 @@ struct LoginView: View {
                             .transition(.move(edge: .top).combined(with: .opacity))
                         }
 
-                        // Email Field
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("E-posta")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(AppTheme.textSecondary)
-
-                            HStack(spacing: 12) {
-                                Image(systemName: "envelope")
-                                    .font(.system(size: 15))
-                                    .foregroundColor(AppTheme.textMuted)
-                                    .frame(width: 20)
-
-                                TextField("ornek@email.com", text: $authVM.loginEmail)
-                                    .font(.system(size: 14))
-                                    .textContentType(.emailAddress)
-                                    .keyboardType(.emailAddress)
-                                    .autocapitalization(.none)
-                                    .disableAutocorrection(true)
-                                    .focused($focusedField, equals: .email)
-                            }
-                            .padding(.horizontal, 16)
-                            .frame(height: 50)
-                            .background(AppTheme.bg)
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(focusedField == .email ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .email ? 1.5 : 1)
-                            )
-                        }
-                        .padding(.bottom, 16)
-
-                        // Password Field
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Şifre")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(AppTheme.textSecondary)
-
-                            HStack(spacing: 12) {
-                                Image(systemName: "lock")
-                                    .font(.system(size: 15))
-                                    .foregroundColor(AppTheme.textMuted)
-                                    .frame(width: 20)
-
-                                SecureField("••••••••", text: $authVM.loginPassword)
-                                    .font(.system(size: 14))
-                                    .textContentType(.password)
-                                    .focused($focusedField, equals: .password)
-                            }
-                            .padding(.horizontal, 16)
-                            .frame(height: 50)
-                            .background(AppTheme.bg)
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(focusedField == .password ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .password ? 1.5 : 1)
-                            )
-                        }
-                        .padding(.bottom, 12)
-
-                        // Forgot Password
-                        HStack {
-                            Spacer()
-                            NavigationLink(destination: ForgotPasswordView()) {
-                                Text("Şifremi Unuttum")
+                        // ═══ EMAIL/PASSWORD MODE ═══
+                        if loginMode == 0 {
+                            // Email Field
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(L.emailLabel)
                                     .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(AppTheme.indigo)
-                            }
-                        }
-                        .padding(.bottom, 24)
+                                    .foregroundColor(AppTheme.textSecondary)
 
-                        // Login Button
-                        Button(action: { authVM.login() }) {
-                            HStack(spacing: 8) {
-                                if authVM.isLoading {
-                                    LoadingSpinner()
-                                } else {
-                                    Text("Giriş Yap")
-                                    Image(systemName: "arrow.right")
-                                        .font(.system(size: 13, weight: .semibold))
+                                HStack(spacing: 12) {
+                                    Image(systemName: "envelope")
+                                        .font(.system(size: 15))
+                                        .foregroundColor(AppTheme.textMuted)
+                                        .frame(width: 20)
+
+                                    TextField(L.emailPlaceholder, text: $authVM.loginEmail)
+                                        .font(.system(size: 14))
+                                        .foregroundColor(AppTheme.navy)
+                                        .textContentType(.emailAddress)
+                                        .keyboardType(.emailAddress)
+                                        .autocapitalization(.none)
+                                        .disableAutocorrection(true)
+                                        .focused($focusedField, equals: .email)
+                                }
+                                .padding(.horizontal, 16)
+                                .frame(height: 50)
+                                .background(AppTheme.bg)
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(focusedField == .email ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .email ? 1.5 : 1)
+                                )
+                            }
+                            .padding(.bottom, 16)
+
+                            // Password Field
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(L.passwordLabel)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(AppTheme.textSecondary)
+
+                                HStack(spacing: 12) {
+                                    Image(systemName: "lock")
+                                        .font(.system(size: 15))
+                                        .foregroundColor(AppTheme.textMuted)
+                                        .frame(width: 20)
+
+                                    SecureField(L.passwordPlaceholder, text: $authVM.loginPassword)
+                                        .font(.system(size: 14))
+                                        .foregroundColor(AppTheme.navy)
+                                        .textContentType(.password)
+                                        .focused($focusedField, equals: .password)
+                                }
+                                .padding(.horizontal, 16)
+                                .frame(height: 50)
+                                .background(AppTheme.bg)
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(focusedField == .password ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .password ? 1.5 : 1)
+                                )
+                            }
+                            .padding(.bottom, 12)
+
+                            // Remember Me + Forgot Password
+                            HStack {
+                                // Remember Me
+                                Button(action: { authVM.rememberMe.toggle() }) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: authVM.rememberMe ? "checkmark.square.fill" : "square")
+                                            .font(.system(size: 16))
+                                            .foregroundColor(authVM.rememberMe ? AppTheme.navy : AppTheme.textMuted)
+                                        Text(L.rememberMe)
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundColor(AppTheme.textSecondary)
+                                    }
+                                }
+
+                                Spacer()
+
+                                NavigationLink(destination: ForgotPasswordView()) {
+                                    Text(L.forgotPassword)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(AppTheme.indigo)
                                 }
                             }
+                            .padding(.bottom, 24)
+
+                            // Login Button
+                            Button(action: { focusedField = nil; authVM.login() }) {
+                                HStack(spacing: 8) {
+                                    if authVM.isLoading {
+                                        LoadingSpinner()
+                                    } else {
+                                        Text(L.loginButton)
+                                        Image(systemName: "arrow.right")
+                                            .font(.system(size: 13, weight: .semibold))
+                                    }
+                                }
+                            }
+                            .buttonStyle(ArveyButtonStyle())
+                            .disabled(authVM.isLoading)
                         }
-                        .buttonStyle(ArveyButtonStyle())
-                        .disabled(authVM.isLoading)
-                        .padding(.bottom, 20)
+
+                        // ═══ PHONE/OTP MODE ═══
+                        if loginMode == 1 {
+                            // Phone Field
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(L.phoneLabel)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(AppTheme.textSecondary)
+
+                                HStack(spacing: 12) {
+                                    Image(systemName: "phone")
+                                        .font(.system(size: 15))
+                                        .foregroundColor(AppTheme.textMuted)
+                                        .frame(width: 20)
+
+                                    TextField(L.phonePlaceholder, text: $phone)
+                                        .font(.system(size: 14))
+                                        .foregroundColor(AppTheme.navy)
+                                        .keyboardType(.phonePad)
+                                        .focused($focusedField, equals: .phone)
+                                        .disabled(otpSent)
+                                }
+                                .padding(.horizontal, 16)
+                                .frame(height: 50)
+                                .background(AppTheme.bg)
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(focusedField == .phone ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .phone ? 1.5 : 1)
+                                )
+                            }
+                            .padding(.bottom, 16)
+
+                            if !otpSent {
+                                // Send OTP Button
+                                Button(action: {
+                                    focusedField = nil
+                                    otpError = nil
+                                    let clean = phone.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "+", with: "")
+                                    guard clean.count >= 10 else {
+                                        otpError = L.phoneRequired
+                                        return
+                                    }
+                                    otpLoading = true
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                                        otpLoading = false
+                                        otpSent = true
+                                    }
+                                }) {
+                                    HStack(spacing: 8) {
+                                        if otpLoading {
+                                            LoadingSpinner()
+                                        } else {
+                                            Text(L.sendOtp)
+                                            Image(systemName: "paperplane.fill")
+                                                .font(.system(size: 13, weight: .semibold))
+                                        }
+                                    }
+                                }
+                                .buttonStyle(ArveyButtonStyle())
+                                .disabled(otpLoading)
+                            } else {
+                                // OTP sent success
+                                HStack(spacing: 8) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 14))
+                                    Text(L.otpSent)
+                                        .font(.system(size: 12, weight: .medium))
+                                    Spacer()
+                                }
+                                .foregroundColor(AppTheme.online)
+                                .padding(12)
+                                .background(AppTheme.online.opacity(0.08))
+                                .cornerRadius(10)
+                                .padding(.bottom, 16)
+
+                                // OTP Field
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(L.otpLabel)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(AppTheme.textSecondary)
+
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "lock.shield")
+                                            .font(.system(size: 15))
+                                            .foregroundColor(AppTheme.textMuted)
+                                            .frame(width: 20)
+
+                                        TextField(L.otpPlaceholder, text: $otpCode)
+                                            .font(.system(size: 18, weight: .bold))
+                                            .foregroundColor(AppTheme.navy)
+                                            .keyboardType(.numberPad)
+                                            .multilineTextAlignment(.center)
+                                            .focused($focusedField, equals: .otp)
+                                            .onChange(of: otpCode) {
+                                                let filtered = otpCode.filter { $0.isNumber }
+                                                if filtered.count > 6 { otpCode = String(filtered.prefix(6)) }
+                                                else { otpCode = filtered }
+                                            }
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .frame(height: 50)
+                                    .background(AppTheme.bg)
+                                    .cornerRadius(12)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(focusedField == .otp ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .otp ? 1.5 : 1)
+                                    )
+                                }
+                                .padding(.bottom, 16)
+
+                                // Remember Me (phone mode)
+                                Button(action: { authVM.rememberMe.toggle() }) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: authVM.rememberMe ? "checkmark.square.fill" : "square")
+                                            .font(.system(size: 16))
+                                            .foregroundColor(authVM.rememberMe ? AppTheme.navy : AppTheme.textMuted)
+                                        Text(L.rememberMe)
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundColor(AppTheme.textSecondary)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.bottom, 20)
+
+                                // Verify OTP Button
+                                Button(action: {
+                                    focusedField = nil
+                                    otpError = nil
+                                    guard !otpCode.isEmpty else {
+                                        otpError = L.otpRequired
+                                        return
+                                    }
+                                    authVM.loginWithOTP(phone: phone, otp: otpCode) { success in
+                                        if !success { otpError = L.otpInvalid }
+                                    }
+                                }) {
+                                    HStack(spacing: 8) {
+                                        if authVM.isLoading {
+                                            LoadingSpinner()
+                                        } else {
+                                            Text(L.loginButton)
+                                            Image(systemName: "arrow.right")
+                                                .font(.system(size: 13, weight: .semibold))
+                                        }
+                                    }
+                                }
+                                .buttonStyle(ArveyButtonStyle())
+                                .disabled(authVM.isLoading)
+                                .padding(.bottom, 8)
+
+                                // Resend code
+                                Button(action: { otpSent = false; otpCode = ""; otpError = nil }) {
+                                    Text(L.currentLang == "TR" ? "Kodu tekrar gönder" : "Resend code")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(AppTheme.indigo)
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                        }
+
+                        Spacer().frame(height: 20)
 
                         // Divider
                         HStack {
                             Rectangle()
                                 .fill(AppTheme.borderSoft)
                                 .frame(height: 1)
-                            Text("veya")
+                            Text(L.orDivider)
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(AppTheme.textFaint)
                             Rectangle()
@@ -194,10 +417,10 @@ struct LoginView: View {
                         // Register Link
                         NavigationLink(destination: RegisterView()) {
                             HStack(spacing: 4) {
-                                Text("Hesabınız yok mu?")
+                                Text(L.noAccount)
                                     .font(.system(size: 13))
                                     .foregroundColor(AppTheme.textMuted)
-                                Text("Kayıt Ol")
+                                Text(L.register)
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundColor(AppTheme.navy)
                             }
@@ -211,10 +434,10 @@ struct LoginView: View {
 
                     // Footer
                     VStack(spacing: 4) {
-                        Text("© 2026 Arveya Teknoloji")
+                        Text(L.copyright)
                             .font(.system(size: 10))
                             .foregroundColor(AppTheme.textFaint)
-                        Text("v1.0.0")
+                        Text(L.version)
                             .font(.system(size: 9))
                             .foregroundColor(AppTheme.textFaint.opacity(0.6))
                     }

@@ -28,10 +28,9 @@
 		AA000021 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000021 /* AppConfig.swift */; };
 		AA000022 /* JWTHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000022 /* JWTHelper.swift */; };
 		AA000023 /* WebSocketManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000023 /* WebSocketManager.swift */; };
-		AA000024 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000024 /* APIService.swift */; };
-/* End PBXBuildFile section */
-
-/* Begin PBXFileReference section */
+			AA000024 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000024 /* APIService.swift */; };
+			AA000025 /* LoginStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000025 /* LoginStrings.swift */; };
+/* End PBXBuildFile section *//* Begin PBXFileReference section */
 		BB000000 /* ArveyGo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ArveyGo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB000001 /* ArveyGoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArveyGoApp.swift; sourceTree = "<group>"; };
 		BB000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -55,10 +54,9 @@
 		BB000021 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		BB000022 /* JWTHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JWTHelper.swift; sourceTree = "<group>"; };
 		BB000023 /* WebSocketManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketManager.swift; sourceTree = "<group>"; };
-		BB000024 /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
-/* End PBXFileReference section */
-
-/* Begin PBXFrameworksBuildPhase section */
+			BB000024 /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
+			BB000025 /* LoginStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginStrings.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section *//* Begin PBXFrameworksBuildPhase section */
 		CC000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -89,6 +87,7 @@
 				DD000006 /* Theme */,
 				DD000007 /* Components */,
 				DD000015 /* Services */,
+				DD000016 /* Utils */,
 				DD000008 /* Resources */,
 				DD000010 /* Preview Content */,
 			);
@@ -211,6 +210,14 @@
 			path = Services;
 			sourceTree = "<group>";
 		};
+		DD000016 /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				BB000025 /* LoginStrings.swift */,
+			);
+			path = Utils;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -301,7 +308,8 @@
 				AA000021 /* AppConfig.swift in Sources */,
 				AA000022 /* JWTHelper.swift in Sources */,
 				AA000023 /* WebSocketManager.swift in Sources */,
-				AA000024 /* APIService.swift in Sources */,
+					AA000024 /* APIService.swift in Sources */,
+					AA000025 /* LoginStrings.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

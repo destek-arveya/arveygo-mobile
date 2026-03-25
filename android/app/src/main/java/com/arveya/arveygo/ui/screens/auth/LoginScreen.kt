@@ -24,12 +24,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arveya.arveygo.LocalAuthViewModel
 import com.arveya.arveygo.ui.components.GradientButton
 import com.arveya.arveygo.ui.components.LanguageSwitcher
 import com.arveya.arveygo.ui.theme.AppColors
+import com.arveya.arveygo.utils.LoginStrings
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen() {
@@ -38,12 +42,28 @@ fun LoginScreen() {
     val password by authVM.loginPassword.collectAsState()
     val isLoading by authVM.isLoading.collectAsState()
     val errorMessage by authVM.errorMessage.collectAsState()
+    val rememberMe by authVM.rememberMe.collectAsState()
+
+    // Force recomposition when language changes
+    val lang by LoginStrings.currentLang.collectAsState()
+    val L = LoginStrings
+
+    // Login mode: 0 = email, 1 = phone
+    var loginMode by remember { mutableStateOf(0) }
+
+    // Phone / OTP local state
+    var phone by remember { mutableStateOf("") }
+    var otpCode by remember { mutableStateOf("") }
+    var otpSent by remember { mutableStateOf(false) }
+    var otpError by remember { mutableStateOf<String?>(null) }
+    var otpLoading by remember { mutableStateOf(false) }
 
     var showRegister by remember { mutableStateOf(false) }
     var showForgot by remember { mutableStateOf(false) }
     var emailFocused by remember { mutableStateOf(false) }
     var passwordFocused by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { authVM.clearLoginFields() }
 
@@ -98,7 +118,7 @@ fun LoginScreen() {
                         }
                         Spacer(Modifier.height(8.dp))
                         Text("ArveyGo", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
-                        Text("ARAÇ TAKİP SİSTEMİ", fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted, letterSpacing = 2.sp)
+                        Text(L.appSubtitle, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted, letterSpacing = 2.sp)
                     }
 
                     Spacer(Modifier.height(24.dp))
@@ -112,13 +132,44 @@ fun LoginScreen() {
                             .background(AppColors.Surface, RoundedCornerShape(16.dp))
                             .padding(22.dp)
                     ) {
-                        Text("Tekrar Hoş Geldiniz", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                        Text(L.welcomeBack, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
                         Spacer(Modifier.height(6.dp))
-                        Text("Hesabınıza giriş yapın", fontSize = 13.sp, color = AppColors.TextMuted)
-                        Spacer(Modifier.height(28.dp))
+                        Text(L.loginSubtitle, fontSize = 13.sp, color = AppColors.TextMuted)
+                        Spacer(Modifier.height(20.dp))
+
+                        // ═══ Tab Switcher: E-posta / Telefon ═══
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(AppColors.Bg, RoundedCornerShape(10.dp))
+                                .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(10.dp))
+                                .padding(3.dp)
+                        ) {
+                            listOf(0, 1).forEach { mode ->
+                                val tabLabel = if (mode == 0) L.emailTab else L.phoneTab
+                                val icon = if (mode == 0) Icons.Default.Email else Icons.Default.Phone
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (loginMode == mode) AppColors.Navy else Color.Transparent)
+                                        .clickable { loginMode = mode; otpSent = false; otpError = null }
+                                        .padding(vertical = 8.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                                        Icon(icon, null, tint = if (loginMode == mode) Color.White else AppColors.TextMuted, modifier = Modifier.size(14.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(tabLabel, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (loginMode == mode) Color.White else AppColors.TextMuted)
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(20.dp))
 
                         // Error
-                        AnimatedVisibility(visible = errorMessage != null) {
+                        AnimatedVisibility(visible = (errorMessage != null || otpError != null)) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
@@ -128,85 +179,266 @@ fun LoginScreen() {
                             ) {
                                 Icon(Icons.Default.Error, null, tint = Color.Red, modifier = Modifier.size(14.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text(errorMessage ?: "", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.Red)
+                                Text(errorMessage ?: otpError ?: "", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.Red)
                             }
                         }
-                        if (errorMessage != null) Spacer(Modifier.height(16.dp))
+                        if (errorMessage != null || otpError != null) Spacer(Modifier.height(16.dp))
 
-                        // Email
-                        Text("E-posta", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
-                        Spacer(Modifier.height(6.dp))
-                        OutlinedTextField(
-                            value = email,
-                            onValueChange = { authVM.loginEmail.value = it },
-                            placeholder = { Text("ornek@email.com", fontSize = 14.sp) },
-                            leadingIcon = { Icon(Icons.Default.Email, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp)) },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = AppColors.Navy,
-                                unfocusedBorderColor = AppColors.BorderSoft,
-                                focusedContainerColor = AppColors.Bg,
-                                unfocusedContainerColor = AppColors.Bg
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth().height(50.dp)
-                        )
+                        // ═══ EMAIL/PASSWORD MODE ═══
+                        if (loginMode == 0) {
+                            // Email
+                            Text(L.emailLabel, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
+                            Spacer(Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = email,
+                                onValueChange = { authVM.loginEmail.value = it },
+                                placeholder = { Text(L.emailPlaceholder, fontSize = 14.sp) },
+                                leadingIcon = { Icon(Icons.Default.Email, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp)) },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = AppColors.Navy,
+                                    unfocusedBorderColor = AppColors.BorderSoft,
+                                    focusedContainerColor = AppColors.Bg,
+                                    unfocusedContainerColor = AppColors.Bg,
+                                    focusedTextColor = AppColors.TextPrimary,
+                                    unfocusedTextColor = AppColors.TextPrimary,
+                                    cursorColor = AppColors.Navy
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth().height(50.dp)
+                            )
 
-                        Spacer(Modifier.height(16.dp))
+                            Spacer(Modifier.height(16.dp))
 
-                        // Password
-                        Text("Şifre", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
-                        Spacer(Modifier.height(6.dp))
-                        OutlinedTextField(
-                            value = password,
-                            onValueChange = { authVM.loginPassword.value = it },
-                            placeholder = { Text("••••••••", fontSize = 14.sp) },
-                            leadingIcon = { Icon(Icons.Default.Lock, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp)) },
-                            visualTransformation = PasswordVisualTransformation(),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); authVM.login() }),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = AppColors.Navy,
-                                unfocusedBorderColor = AppColors.BorderSoft,
-                                focusedContainerColor = AppColors.Bg,
-                                unfocusedContainerColor = AppColors.Bg
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth().height(50.dp)
-                        )
+                            // Password
+                            Text(L.passwordLabel, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
+                            Spacer(Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = password,
+                                onValueChange = { authVM.loginPassword.value = it },
+                                placeholder = { Text(L.passwordPlaceholder, fontSize = 14.sp) },
+                                leadingIcon = { Icon(Icons.Default.Lock, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp)) },
+                                visualTransformation = PasswordVisualTransformation(),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); authVM.login() }),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = AppColors.Navy,
+                                    unfocusedBorderColor = AppColors.BorderSoft,
+                                    focusedContainerColor = AppColors.Bg,
+                                    unfocusedContainerColor = AppColors.Bg,
+                                    focusedTextColor = AppColors.TextPrimary,
+                                    unfocusedTextColor = AppColors.TextPrimary,
+                                    cursorColor = AppColors.Navy
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth().height(50.dp)
+                            )
 
-                        Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(12.dp))
 
-                        // Forgot password
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                            Text(
-                                "Şifremi Unuttum",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = AppColors.Indigo,
-                                modifier = Modifier.clickable { showForgot = true }
+                            // Remember Me + Forgot password
+                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.clickable { authVM.rememberMe.value = !rememberMe }
+                                ) {
+                                    Checkbox(
+                                        checked = rememberMe,
+                                        onCheckedChange = { authVM.rememberMe.value = it },
+                                        colors = CheckboxDefaults.colors(
+                                            checkedColor = AppColors.Navy,
+                                            uncheckedColor = AppColors.TextMuted
+                                        ),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(L.rememberMe, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
+                                }
+                                Spacer(Modifier.weight(1f))
+                                Text(
+                                    L.forgotPassword,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = AppColors.Indigo,
+                                    modifier = Modifier.clickable { showForgot = true }
+                                )
+                            }
+
+                            Spacer(Modifier.height(24.dp))
+
+                            // Login button
+                            GradientButton(
+                                text = L.loginButton,
+                                onClick = { focusManager.clearFocus(); authVM.login() },
+                                isLoading = isLoading,
+                                icon = Icons.Default.ArrowForward,
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
 
-                        Spacer(Modifier.height(24.dp))
+                        // ═══ PHONE/OTP MODE ═══
+                        if (loginMode == 1) {
+                            // Phone number
+                            Text(L.phoneLabel, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
+                            Spacer(Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = phone,
+                                onValueChange = { phone = it.filter { c -> c.isDigit() || c == '+' || c == ' ' } },
+                                placeholder = { Text(L.phonePlaceholder, fontSize = 14.sp) },
+                                leadingIcon = { Icon(Icons.Default.Phone, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp)) },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = AppColors.Navy,
+                                    unfocusedBorderColor = AppColors.BorderSoft,
+                                    focusedContainerColor = AppColors.Bg,
+                                    unfocusedContainerColor = AppColors.Bg,
+                                    focusedTextColor = AppColors.TextPrimary,
+                                    unfocusedTextColor = AppColors.TextPrimary,
+                                    cursorColor = AppColors.Navy
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth().height(50.dp),
+                                enabled = !otpSent
+                            )
 
-                        // Login button
-                        GradientButton(
-                            text = "Giriş Yap",
-                            onClick = { focusManager.clearFocus(); authVM.login() },
-                            isLoading = isLoading,
-                            icon = Icons.Default.ArrowForward,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                            Spacer(Modifier.height(16.dp))
+
+                            if (!otpSent) {
+                                // Send OTP button
+                                GradientButton(
+                                    text = L.sendOtp,
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        otpError = null
+                                        val cleanPhone = phone.replace(" ", "").replace("+", "")
+                                        if (cleanPhone.length < 10) {
+                                            otpError = L.phoneRequired
+                                            return@GradientButton
+                                        }
+                                        otpLoading = true
+                                        coroutineScope.launch {
+                                            delay(800)
+                                            otpLoading = false
+                                            otpSent = true
+                                        }
+                                    },
+                                    isLoading = otpLoading,
+                                    icon = Icons.Default.Send,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            } else {
+                                // OTP sent success message
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(AppColors.Online.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                                        .padding(12.dp)
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, null, tint = AppColors.Online, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(L.otpSent, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.Online)
+                                }
+
+                                Spacer(Modifier.height(16.dp))
+
+                                // OTP input
+                                Text(L.otpLabel, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
+                                Spacer(Modifier.height(6.dp))
+                                OutlinedTextField(
+                                    value = otpCode,
+                                    onValueChange = { if (it.length <= 6) otpCode = it.filter { c -> c.isDigit() } },
+                                    placeholder = { Text(L.otpPlaceholder, fontSize = 14.sp) },
+                                    leadingIcon = { Icon(Icons.Default.Lock, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp)) },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = AppColors.Navy,
+                                        unfocusedBorderColor = AppColors.BorderSoft,
+                                        focusedContainerColor = AppColors.Bg,
+                                        unfocusedContainerColor = AppColors.Bg,
+                                        focusedTextColor = AppColors.TextPrimary,
+                                        unfocusedTextColor = AppColors.TextPrimary,
+                                        cursorColor = AppColors.Navy
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                                    textStyle = androidx.compose.ui.text.TextStyle(
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 8.sp,
+                                        textAlign = TextAlign.Center
+                                    )
+                                )
+
+                                Spacer(Modifier.height(16.dp))
+
+                                // Remember Me (phone mode)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.clickable { authVM.rememberMe.value = !rememberMe }
+                                ) {
+                                    Checkbox(
+                                        checked = rememberMe,
+                                        onCheckedChange = { authVM.rememberMe.value = it },
+                                        colors = CheckboxDefaults.colors(
+                                            checkedColor = AppColors.Navy,
+                                            uncheckedColor = AppColors.TextMuted
+                                        ),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(L.rememberMe, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
+                                }
+
+                                Spacer(Modifier.height(20.dp))
+
+                                // Verify OTP button
+                                GradientButton(
+                                    text = L.loginButton,
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        otpError = null
+                                        if (otpCode.isEmpty()) {
+                                            otpError = L.otpRequired
+                                            return@GradientButton
+                                        }
+                                        authVM.loginWithOTP(phone, otpCode) { success ->
+                                            if (!success) otpError = L.otpInvalid
+                                        }
+                                    },
+                                    isLoading = isLoading,
+                                    icon = Icons.Default.ArrowForward,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                Spacer(Modifier.height(8.dp))
+
+                                // Resend code
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                                    Text(
+                                        if (lang == "TR") "Kodu tekrar gönder" else "Resend code",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = AppColors.Indigo,
+                                        modifier = Modifier.clickable {
+                                            otpSent = false; otpCode = ""; otpError = null
+                                        }
+                                    )
+                                }
+                            }
+                        }
 
                         Spacer(Modifier.height(20.dp))
 
                         // Divider
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             HorizontalDivider(modifier = Modifier.weight(1f), color = AppColors.BorderSoft)
-                            Text("veya", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AppColors.TextFaint, modifier = Modifier.padding(horizontal = 12.dp))
+                            Text(L.orDivider, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AppColors.TextFaint, modifier = Modifier.padding(horizontal = 12.dp))
                             HorizontalDivider(modifier = Modifier.weight(1f), color = AppColors.BorderSoft)
                         }
 
@@ -217,8 +449,8 @@ fun LoginScreen() {
                             horizontalArrangement = Arrangement.Center,
                             modifier = Modifier.fillMaxWidth().clickable { showRegister = true }
                         ) {
-                            Text("Hesabınız yok mu? ", fontSize = 13.sp, color = AppColors.TextMuted)
-                            Text("Kayıt Ol", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+                            Text("${L.noAccount} ", fontSize = 13.sp, color = AppColors.TextMuted)
+                            Text(L.register, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
                         }
                     }
 
@@ -226,8 +458,8 @@ fun LoginScreen() {
 
                     // Footer
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        Text("© 2026 Arveya Teknoloji", fontSize = 10.sp, color = AppColors.TextFaint)
-                        Text("v1.0.0", fontSize = 9.sp, color = AppColors.TextFaint.copy(alpha = 0.6f))
+                        Text(L.copyright, fontSize = 10.sp, color = AppColors.TextFaint)
+                        Text(L.version, fontSize = 9.sp, color = AppColors.TextFaint.copy(alpha = 0.6f))
                     }
 
                     Spacer(Modifier.height(20.dp))
