@@ -116,6 +116,9 @@ fun SideMenu(
                     MenuSection("AYARLAR") {
                         MenuItem(Icons.Default.Settings, "Ayarlar", AppPage.SETTINGS, selectedPage, onPageSelected)
                     }
+                    MenuSection("DESTEK") {
+                        MenuItem(Icons.Default.HelpOutline, "Destek Talebi", AppPage.SUPPORT, selectedPage, onPageSelected)
+                    }
 
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),

@@ -259,77 +259,126 @@ struct LiveMapView: View {
     // MARK: - Vehicle Popup Sheet (half screen with detail button)
     func vehiclePopupSheet(_ vehicle: Vehicle) -> some View {
         VStack(spacing: 0) {
-            // Header with plate & status
-            HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(vehicle.status.color.opacity(0.12))
-                        .frame(width: 52, height: 52)
-                    Image(systemName: "car.fill")
-                        .font(.system(size: 22))
-                        .foregroundColor(vehicle.status.color)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(vehicle.plate)
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(AppTheme.navy)
-                    HStack(spacing: 6) {
-                        Text(vehicle.model)
-                            .font(.system(size: 13))
-                            .foregroundColor(AppTheme.textMuted)
-                        Text("•")
-                            .foregroundColor(AppTheme.textFaint)
-                        Text(vehicle.driver)
-                            .font(.system(size: 13))
-                            .foregroundColor(AppTheme.textMuted)
+            // Identity Card (matching VehicleDetailView)
+            VStack(spacing: 0) {
+                HStack(spacing: 14) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(vehicle.status.color.opacity(0.1))
+                            .frame(width: 52, height: 52)
+                        Image(systemName: "car.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(vehicle.status.color)
                     }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text(vehicle.plate)
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(AppTheme.navy)
+                            StatusBadge(status: vehicle.status)
+                        }
+                        Text(vehicle.model)
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.textMuted)
+                        HStack(spacing: 6) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "folder.fill")
+                                    .font(.system(size: 7))
+                                Text(vehicle.group)
+                                    .font(.system(size: 9, weight: .semibold))
+                            }
+                            .foregroundColor(.blue)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.08))
+                            .cornerRadius(20)
+
+                            HStack(spacing: 3) {
+                                Image(systemName: "car.2.fill")
+                                    .font(.system(size: 7))
+                                Text(vehicle.vehicleType)
+                                    .font(.system(size: 9, weight: .semibold))
+                            }
+                            .foregroundColor(.purple)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.purple.opacity(0.08))
+                            .cornerRadius(20)
+                        }
+                    }
+                    Spacer()
                 }
+                .padding(16)
 
-                Spacer()
+                Divider()
 
-                StatusBadge(status: vehicle.status)
+                // Quick stats row (like detail page)
+                HStack(spacing: 0) {
+                    popupStatItem(icon: "speedometer", value: vehicle.formattedSpeed, label: "Hız", color: .orange)
+                    Divider().frame(height: 36)
+                    popupStatItem(icon: "road.lanes", value: vehicle.formattedTodayKm, label: "Bugün", color: AppTheme.indigo)
+                    Divider().frame(height: 36)
+                    popupStatItem(icon: "person.fill", value: vehicle.driver.components(separatedBy: " ").first ?? "—", label: "Sürücü", color: AppTheme.online)
+                    Divider().frame(height: 36)
+                    popupStatItem(icon: "mappin.circle.fill", value: vehicle.city, label: "Konum", color: .blue)
+                }
+                .padding(.vertical, 10)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 16)
-
-            Divider()
+            .background(AppTheme.surface)
+            .cornerRadius(16)
+            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 2)
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
 
             ScrollView {
-                VStack(spacing: 16) {
-                    // Info grid
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                        infoCell(icon: "mappin.circle.fill", label: "Konum", value: vehicle.city, color: .blue)
-                        infoCell(icon: "speedometer", label: "Hız", value: vehicle.formattedSpeed, color: .orange)
-                        infoCell(icon: "road.lanes", label: "Bugün", value: vehicle.formattedTodayKm, color: AppTheme.indigo)
+                VStack(spacing: 12) {
+                    // Device Time (if available)
+                    if vehicle.deviceTime != nil {
+                        HStack(spacing: 8) {
+                            Image(systemName: "clock.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(AppTheme.indigo)
+                            Text("Son Bilgi Tarihi")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(AppTheme.navy)
+                            Spacer()
+                            Text("⏱ \(vehicle.formattedDeviceTime)")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(AppTheme.textMuted)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(AppTheme.bg)
+                                .cornerRadius(6)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(AppTheme.borderSoft, lineWidth: 1)
+                                )
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(AppTheme.surface)
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(AppTheme.borderSoft, lineWidth: 1)
+                        )
+                        .padding(.horizontal, 20)
+                    }
+
+                    // Detailed info grid
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                         infoCell(icon: "key.fill", label: "Kontak", value: vehicle.kontakOn ? "Açık" : "Kapalı", color: vehicle.kontakOn ? AppTheme.online : AppTheme.offline)
                         infoCell(icon: "gauge.open.with.lines.needle.33percent", label: "Toplam Km", value: vehicle.formattedTotalKm + " km", color: AppTheme.navy)
                         infoCell(icon: "antenna.radiowaves.left.and.right", label: "Sinyal", value: vehicle.status == .online ? "Güçlü" : "Yok", color: vehicle.status == .online ? AppTheme.online : AppTheme.textFaint)
+                        if let temp = vehicle.temperatureC {
+                            infoCell(icon: "thermometer.medium", label: "Sıcaklık", value: String(format: "%.1f°C", temp), color: temp < 0 ? .blue : temp < 30 ? AppTheme.online : .red)
+                        }
+                        if let hum = vehicle.humidityPct {
+                            infoCell(icon: "humidity.fill", label: "Nem", value: "%\(Int(hum))", color: Color(red: 0.05, green: 0.65, blue: 0.88))
+                        }
                     }
                     .padding(.horizontal, 20)
-
-                    // Son Veri Zamanı
-                    if vehicle.deviceTime != nil {
-                        HStack(spacing: 10) {
-                            infoCell(icon: "clock.fill", label: "Son Veri", value: vehicle.formattedDeviceTime, color: AppTheme.indigo)
-                            Spacer().frame(maxWidth: .infinity)
-                        }
-                        .padding(.horizontal, 20)
-                    }
-
-                    // Temperature row (if available)
-                    if let temp = vehicle.temperatureC {
-                        HStack(spacing: 10) {
-                            infoCell(icon: "thermometer.medium", label: "Sıcaklık", value: String(format: "%.1f°C", temp), color: temp < 0 ? .blue : temp < 30 ? AppTheme.online : .red)
-                            if let hum = vehicle.humidityPct {
-                                infoCell(icon: "humidity.fill", label: "Nem", value: "%\(Int(hum))", color: Color(red: 0.05, green: 0.65, blue: 0.88))
-                            } else {
-                                Spacer().frame(maxWidth: .infinity)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    }
 
                     // Quick actions row
                     HStack(spacing: 10) {
@@ -391,6 +440,23 @@ struct LiveMapView: View {
                 .padding(.top, 16)
             }
         }
+    }
+
+    func popupStatItem(icon: String, value: String, label: String, color: Color) -> some View {
+        VStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 11))
+                .foregroundColor(color)
+            Text(value)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(AppTheme.navy)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(label)
+                .font(.system(size: 8))
+                .foregroundColor(AppTheme.textMuted)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     func infoCell(icon: String, label: String, value: String, color: Color) -> some View {

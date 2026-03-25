@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Support Request page — shown when WebSocket connection fails repeatedly.
-/// Modeled after the web's integration request form (settings/index.blade.php).
+/// Support Request page — shown when WebSocket connection fails repeatedly
+/// or navigated to from the side menu.
 struct SupportRequestView: View {
     @Environment(\.dismiss) private var dismiss
+    var showSideMenu: Binding<Bool>?
 
     @State private var selectedCategory: SupportCategory = .connection
     @State private var subject = ""
@@ -58,14 +59,22 @@ struct SupportRequestView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { dismiss() }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 14, weight: .semibold))
-                            Text("Geri")
-                                .font(.system(size: 14, weight: .medium))
+                    if let binding = showSideMenu {
+                        Button(action: { withAnimation(.spring(response: 0.3)) { binding.wrappedValue.toggle() } }) {
+                            Image(systemName: "line.3.horizontal")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(AppTheme.navy)
                         }
-                        .foregroundColor(AppTheme.navy)
+                    } else {
+                        Button(action: { dismiss() }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 14, weight: .semibold))
+                                Text("Geri")
+                                    .font(.system(size: 14, weight: .medium))
+                            }
+                            .foregroundColor(AppTheme.navy)
+                        }
                     }
                 }
                 ToolbarItem(placement: .principal) {

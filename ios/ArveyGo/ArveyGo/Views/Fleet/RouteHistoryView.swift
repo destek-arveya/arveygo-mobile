@@ -13,6 +13,12 @@ struct RouteHistoryView: View {
     @State private var showVehiclePicker = false
     @State private var vehicleSearchText = ""
     @StateObject private var vm = RouteHistoryViewModel()
+    @State private var mapCameraPosition: MapCameraPosition = .region(
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 40.136, longitude: 26.408),
+            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+        )
+    )
 
     var body: some View {
         NavigationStack {
@@ -69,6 +75,30 @@ struct RouteHistoryView: View {
                     vm.loadRoutes(from: startDate, to: endDate)
                 }
             }
+            .onChange(of: vm.selectedRoute?.id) { _, _ in
+                zoomToSelectedRoute()
+            }
+            .onChange(of: vm.routes.count) { _, _ in
+                zoomToSelectedRoute()
+            }
+        }
+    }
+
+    private func zoomToSelectedRoute() {
+        guard let route = vm.selectedRoute, !route.points.isEmpty else { return }
+        let lats = route.points.map { $0.lat }
+        let lngs = route.points.map { $0.lng }
+        guard let minLat = lats.min(), let maxLat = lats.max(),
+              let minLng = lngs.min(), let maxLng = lngs.max() else { return }
+        let centerLat = (minLat + maxLat) / 2.0
+        let centerLng = (minLng + maxLng) / 2.0
+        let spanLat = max((maxLat - minLat) * 2.0, 0.005)
+        let spanLng = max((maxLng - minLng) * 2.0, 0.005)
+        withAnimation(.easeInOut(duration: 0.6)) {
+            mapCameraPosition = .region(MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLng),
+                span: MKCoordinateSpan(latitudeDelta: spanLat, longitudeDelta: spanLng)
+            ))
         }
     }
 
@@ -338,7 +368,7 @@ struct RouteHistoryView: View {
     // MARK: - Map Area
     var mapArea: some View {
         ZStack {
-            Map {
+            Map(position: $mapCameraPosition) {
                 // All routes polylines
                 ForEach(vm.routes) { route in
                     let isSelected = vm.selectedRoute?.id == route.id

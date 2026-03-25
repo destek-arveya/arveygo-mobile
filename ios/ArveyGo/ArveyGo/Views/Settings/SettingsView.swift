@@ -4,6 +4,7 @@ struct SettingsView: View {
     @Binding var showSideMenu: Bool
     @ObservedObject private var DL = DashboardStrings.shared
     @ObservedObject private var LS = LoginStrings.shared
+    @State private var isChangingLang = false
 
     private let languages: [(code: String, flag: String, name: String)] = [
         ("TR", "🇹🇷", "Türkçe"),
@@ -110,6 +111,26 @@ struct SettingsView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 6)
                     .padding(.bottom, 20)
+                }
+            }
+            .overlay {
+                if isChangingLang {
+                    ZStack {
+                        Color.black.opacity(0.3)
+                            .ignoresSafeArea()
+                        VStack(spacing: 14) {
+                            ProgressView()
+                                .scaleEffect(1.3)
+                                .tint(.white)
+                            Text(DL.languageLabel)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                        .padding(28)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(16)
+                    }
+                    .transition(.opacity)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)

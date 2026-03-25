@@ -5,5 +5,6 @@ enum class AppPage(val label: String) {
     LIVE_MAP("Canlı Harita"),
     VEHICLES("Araçlar"),
     ROUTE_HISTORY("Rota Geçmişi"),
-    SETTINGS("Ayarlar")
+    SETTINGS("Ayarlar"),
+    SUPPORT("Destek Talebi")
 }

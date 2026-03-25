@@ -576,7 +576,7 @@ private fun StatusFilterChip(
     }
 }
 
-// Vehicle Popup Sheet (matches iOS vehiclePopupSheet)
+// Vehicle Popup Sheet (redesigned to match VehicleDetailScreen identity card)
 @Composable
 private fun VehiclePopupCard(
     vehicle: Vehicle,
@@ -593,83 +593,122 @@ private fun VehiclePopupCard(
             .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(18.dp))
             .padding(top = 16.dp)
     ) {
-        // Header: icon + plate + model + driver + status
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(52.dp)
-                    .background(vehicle.status.color.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
-            ) {
-                Icon(Icons.Default.DirectionsCar, null, tint = vehicle.status.color, modifier = Modifier.size(22.dp))
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(vehicle.plate, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
-                Row {
-                    Text(vehicle.model, fontSize = 13.sp, color = AppColors.TextMuted)
-                    Text(" \u00b7 ", color = AppColors.TextFaint)
-                    Text(vehicle.driver, fontSize = 13.sp, color = AppColors.TextMuted)
-                }
-            }
-            StatusBadge(vehicle.status)
-        }
-
-        Spacer(Modifier.height(14.dp))
-        HorizontalDivider(color = AppColors.BorderSoft)
-        Spacer(Modifier.height(14.dp))
-
-        // Info grid (2 columns, 3 rows)
+        // Identity Card (matching detail page)
         Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .background(AppColors.Surface, RoundedCornerShape(14.dp))
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PopupInfoCell(Icons.Default.LocationOn, "Konum", vehicle.city, Color.Blue, Modifier.weight(1f))
-                PopupInfoCell(Icons.Default.Speed, "H\u0131z", vehicle.formattedSpeed, Color(0xFFFF9800), Modifier.weight(1f))
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PopupInfoCell(Icons.Default.Route, "Bug\u00fcn", vehicle.formattedTodayKm, AppColors.Indigo, Modifier.weight(1f))
-                PopupInfoCell(Icons.Default.VpnKey, "Kontak", if (vehicle.kontakOn) "A\u00e7\u0131k" else "Kapal\u0131", if (vehicle.kontakOn) AppColors.Online else AppColors.Offline, Modifier.weight(1f))
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PopupInfoCell(Icons.Default.Speed, "Toplam Km", vehicle.formattedTotalKm + " km", AppColors.Navy, Modifier.weight(1f))
-                PopupInfoCell(Icons.Default.CellTower, "Sinyal", if (vehicle.status == VehicleStatus.ONLINE) "G\u00fc\u00e7l\u00fc" else "Yok", if (vehicle.status == VehicleStatus.ONLINE) AppColors.Online else AppColors.TextFaint, Modifier.weight(1f))
-            }
-            // Son Veri Zamanı
-            if (vehicle.deviceTime != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PopupInfoCell(Icons.Default.Schedule, "Son Veri", vehicle.formattedDeviceTime, AppColors.Indigo, Modifier.weight(1f))
-                    Spacer(Modifier.weight(1f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(vehicle.status.color.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                ) {
+                    Icon(Icons.Default.DirectionsCar, null, tint = vehicle.status.color, modifier = Modifier.size(22.dp))
                 }
-            }
-            // Temperature row (if available)
-            vehicle.temperatureC?.let { temp ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PopupInfoCell(
-                        Icons.Default.LocalFireDepartment, "S\u0131cakl\u0131k",
-                        "${"%.1f".format(temp)}\u00b0C",
-                        if (temp < 0) Color.Blue else if (temp < 30) AppColors.Online else Color.Red,
-                        Modifier.weight(1f)
-                    )
-                    if (vehicle.humidityPct != null) {
-                        PopupInfoCell(
-                            Icons.Default.Opacity, "Nem",
-                            "%${vehicle.humidityPct!!.toInt()}",
-                            Color(0xFF0EA5E9),
-                            Modifier.weight(1f)
-                        )
-                    } else {
-                        Spacer(Modifier.weight(1f))
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(vehicle.plate, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                        Spacer(Modifier.width(8.dp))
+                        StatusBadge(vehicle.status)
+                    }
+                    Text(vehicle.model, fontSize = 11.sp, color = AppColors.TextMuted)
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        // Group tag
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .background(Color.Blue.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Icon(Icons.Default.Folder, null, tint = Color.Blue, modifier = Modifier.size(8.dp))
+                            Spacer(Modifier.width(3.dp))
+                            Text(vehicle.group, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = Color.Blue)
+                        }
+                        // Type tag
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .background(Color(0xFF9C27B0).copy(alpha = 0.08f), RoundedCornerShape(20.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Icon(Icons.Default.DirectionsCar, null, tint = Color(0xFF9C27B0), modifier = Modifier.size(8.dp))
+                            Spacer(Modifier.width(3.dp))
+                            Text(vehicle.vehicleType, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF9C27B0))
+                        }
                     }
                 }
             }
+
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = AppColors.BorderSoft)
+
+            // Quick stats row (like detail page)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                PopupStatItem(Icons.Default.Speed, vehicle.formattedSpeed, "H\u0131z", Color(0xFFFF9800))
+                PopupStatItem(Icons.Default.Route, vehicle.formattedTodayKm, "Bug\u00fcn", AppColors.Indigo)
+                PopupStatItem(Icons.Default.Person, vehicle.driver.split(" ").firstOrNull() ?: "\u2014", "S\u00fcr\u00fcc\u00fc", AppColors.Online)
+                PopupStatItem(Icons.Default.LocationOn, vehicle.city, "Konum", Color.Blue)
+            }
         }
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(12.dp))
+
+        // Device Time (if available)
+        if (vehicle.deviceTime != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .background(AppColors.Surface, RoundedCornerShape(10.dp))
+                    .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                Icon(Icons.Default.Schedule, null, tint = AppColors.Indigo, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Son Bilgi Tarihi", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "\u23f1 ${vehicle.formattedDeviceTime}",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = AppColors.TextMuted,
+                    modifier = Modifier
+                        .background(AppColors.Bg, RoundedCornerShape(6.dp))
+                        .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
+        // Info grid (compact)
+        Column(
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(horizontal = 16.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                PopupInfoCell(Icons.Default.VpnKey, "Kontak", if (vehicle.kontakOn) "A\u00e7\u0131k" else "Kapal\u0131", if (vehicle.kontakOn) AppColors.Online else AppColors.Offline, Modifier.weight(1f))
+                PopupInfoCell(Icons.Default.Speed, "Toplam Km", vehicle.formattedTotalKm + " km", AppColors.Navy, Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                PopupInfoCell(Icons.Default.CellTower, "Sinyal", if (vehicle.status == VehicleStatus.ONLINE) "G\u00fc\u00e7l\u00fc" else "Yok", if (vehicle.status == VehicleStatus.ONLINE) AppColors.Online else AppColors.TextFaint, Modifier.weight(1f))
+                vehicle.temperatureC?.let { temp ->
+                    PopupInfoCell(Icons.Default.LocalFireDepartment, "S\u0131cakl\u0131k", "${"%.1f".format(temp)}\u00b0C", if (temp < 0) Color.Blue else if (temp < 30) AppColors.Online else Color.Red, Modifier.weight(1f))
+                } ?: Spacer(Modifier.weight(1f))
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
 
         // Quick actions row
         Row(
@@ -682,7 +721,7 @@ private fun VehiclePopupCard(
             PopupQuickAction(Icons.Default.Lock, "Blokaj", Color.Red, Modifier.weight(1f)) {}
         }
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(12.dp))
 
         // CANLI İZLE Button
         Button(
@@ -717,6 +756,16 @@ private fun VehiclePopupCard(
         }
 
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun PopupStatItem(icon: ImageVector, value: String, label: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(icon, null, tint = color, modifier = Modifier.size(13.dp))
+        Spacer(Modifier.height(2.dp))
+        Text(value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, fontSize = 8.sp, color = AppColors.TextMuted)
     }
 }
 

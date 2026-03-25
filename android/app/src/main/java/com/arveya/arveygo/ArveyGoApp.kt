@@ -86,6 +86,10 @@ fun MainContent(authVM: AuthViewModel) {
             AppPage.SETTINGS -> SettingsScreen(
                 onMenuClick = { showSideMenu = true }
             )
+            AppPage.SUPPORT -> SupportRequestScreen(
+                onBack = { selectedPage = AppPage.DASHBOARD },
+                showSideMenu = { showSideMenu = true }
+            )
         }
 
         // Overlay

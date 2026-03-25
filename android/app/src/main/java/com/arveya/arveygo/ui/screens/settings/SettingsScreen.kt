@@ -9,8 +9,11 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -27,6 +30,8 @@ fun SettingsScreen(onMenuClick: () -> Unit) {
     val currentLang by LoginStrings.currentLang.collectAsState()
     val DL = DashboardStrings
     val dlLang by DashboardStrings.currentLang.collectAsState()
+    var isChangingLang by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     val languages = listOf(
         LangItem("TR", "🇹🇷", "Türkçe"),
@@ -50,10 +55,10 @@ fun SettingsScreen(onMenuClick: () -> Unit) {
             )
         }
     ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
                 .background(AppColors.Bg)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
@@ -78,9 +83,17 @@ fun SettingsScreen(onMenuClick: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                LoginStrings.setLanguage(lang.code)
-                                DashboardStrings.setLanguage(lang.code)
+                            .clickable(enabled = !isChangingLang) {
+                                if (currentLang != lang.code) {
+                                    isChangingLang = true
+                                    coroutineScope.launch {
+                                        delay(600)
+                                        LoginStrings.setLanguage(lang.code)
+                                        DashboardStrings.setLanguage(lang.code)
+                                        delay(300)
+                                        isChangingLang = false
+                                    }
+                                }
                             }
                             .background(
                                 if (currentLang == lang.code) AppColors.Indigo.copy(alpha = 0.06f)
@@ -131,6 +144,32 @@ fun SettingsScreen(onMenuClick: () -> Unit) {
             }
 
             Spacer(Modifier.height(16.dp))
+        }
+
+        // Loading overlay
+        if (isChangingLang) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f))
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier
+                        .background(AppColors.Surface, RoundedCornerShape(16.dp))
+                        .padding(28.dp)
+                ) {
+                    CircularProgressIndicator(
+                        color = AppColors.Indigo,
+                        modifier = Modifier.size(32.dp),
+                        strokeWidth = 3.dp
+                    )
+                    Text(DL.languageLabel, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+                }
+            }
+        }
         }
     }
 }

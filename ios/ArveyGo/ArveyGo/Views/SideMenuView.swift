@@ -78,6 +78,10 @@ struct SideMenuView: View {
                             menuItem(icon: "gearshape.fill", label: "Ayarlar", page: .settings)
                         }
 
+                        menuSection(title: "DESTEK") {
+                            menuItem(icon: "questionmark.circle.fill", label: "Destek Talebi", page: .support)
+                        }
+
                         Divider()
                             .padding(.vertical, 8)
                             .padding(.horizontal, 16)

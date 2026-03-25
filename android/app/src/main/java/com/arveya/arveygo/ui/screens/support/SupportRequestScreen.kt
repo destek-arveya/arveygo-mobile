@@ -41,7 +41,7 @@ private enum class SupportCategory(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SupportRequestScreen(onBack: () -> Unit) {
+fun SupportRequestScreen(onBack: () -> Unit, showSideMenu: (() -> Unit)? = null) {
     var selectedCategory by remember { mutableStateOf(SupportCategory.CONNECTION) }
     var subject by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -66,10 +66,16 @@ fun SupportRequestScreen(onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.ChevronLeft, null, tint = AppColors.Navy, modifier = Modifier.size(18.dp))
-                            Text("Geri", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
+                    if (showSideMenu != null) {
+                        IconButton(onClick = showSideMenu) {
+                            Icon(Icons.Default.Menu, null, tint = AppColors.Navy)
+                        }
+                    } else {
+                        IconButton(onClick = onBack) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.ChevronLeft, null, tint = AppColors.Navy, modifier = Modifier.size(18.dp))
+                                Text("Geri", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
+                            }
                         }
                     }
                 },
