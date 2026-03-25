@@ -14,6 +14,7 @@ struct ContentView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @State private var selectedPage: AppPage = .dashboard
     @State private var showSideMenu = false
+    @State private var showSupportRequest = false
 
     var body: some View {
         Group {
@@ -68,6 +69,14 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // Reconnect WebSocket when app returns to foreground (global, not just live map)
             WebSocketManager.shared.reconnect()
+        }
+        .onChange(of: WebSocketManager.shared.consecutiveFailures) { _, failures in
+            if failures >= WebSocketManager.maxConsecutiveFailures {
+                showSupportRequest = true
+            }
+        }
+        .fullScreenCover(isPresented: $showSupportRequest) {
+            SupportRequestView()
         }
     }
 }

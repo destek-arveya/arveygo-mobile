@@ -73,6 +73,11 @@ final class WebSocketManager: ObservableObject {
     private var awaitingSnapshot = false
     private var orderList: [String] = []  // maintains insertion order by imei
 
+    /// Consecutive failure count — published so UI can observe
+    @Published private(set) var consecutiveFailures: Int = 0
+    /// Max failures before triggering support redirect
+    static let maxConsecutiveFailures = 5
+
     // MARK: - Singleton
     static let shared = WebSocketManager()
     private init() {}
@@ -129,6 +134,7 @@ final class WebSocketManager: ObservableObject {
         }
         manualClose = false
         authFailed = false
+        consecutiveFailures = 0
         clearAllTimers()
         closeSocket()
         openSocket(isReconnect: true)
@@ -259,6 +265,7 @@ final class WebSocketManager: ObservableObject {
         awaitingSnapshot = false
         clearSnapshotTimer()
         reconnectAttempt = 0
+        consecutiveFailures = 0
 
         guard let vehiclesArray = json["vehicles"] as? [[String: Any]] else {
             print("[WS] Snapshot has no vehicles array")
@@ -334,6 +341,15 @@ final class WebSocketManager: ObservableObject {
 
         if authFailed {
             status = .error("Yetkilendirme hatası")
+            eventSubject.send(.statusChanged(status))
+            return
+        }
+
+        consecutiveFailures += 1
+
+        // After too many consecutive failures, stop reconnecting
+        if consecutiveFailures >= Self.maxConsecutiveFailures {
+            status = .error("Bağlantı kurulamadı")
             eventSubject.send(.statusChanged(status))
             return
         }

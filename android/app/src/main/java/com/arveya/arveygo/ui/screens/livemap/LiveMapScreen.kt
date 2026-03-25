@@ -510,21 +510,23 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
                 }
 
                 // Selected vehicle popup
-                selectedVehicle?.let { v ->
+                selectedVehicle?.let { sel ->
+                    // Look up latest vehicle data for real-time updates
+                    val liveVehicle = vehicles.firstOrNull { it.id == sel.id } ?: sel
                     VehiclePopupCard(
-                        vehicle = v,
+                        vehicle = liveVehicle,
                         onClose = { selectedVehicle = null },
                         onZoomTo = {
                             selectedVehicle = null
-                            mapViewRef.value?.controller?.animateTo(GeoPoint(v.lat, v.lng), 16.0, 600L)
+                            mapViewRef.value?.controller?.animateTo(GeoPoint(liveVehicle.lat, liveVehicle.lng), 16.0, 600L)
                         },
                         onLiveTrack = {
-                            trackingVehicleId = v.id
+                            trackingVehicleId = liveVehicle.id
                             selectedVehicle = null
-                            mapViewRef.value?.controller?.animateTo(GeoPoint(v.lat, v.lng), 16.0, 600L)
+                            mapViewRef.value?.controller?.animateTo(GeoPoint(liveVehicle.lat, liveVehicle.lng), 16.0, 600L)
                         },
                         onDetail = {
-                            val vehicleToOpen = v
+                            val vehicleToOpen = liveVehicle
                             selectedVehicle = null
                             detailVehicle = vehicleToOpen
                         }

@@ -101,6 +101,12 @@ object WebSocketManager {
     private var dnsFailCount = 0
     private var dnsEverFailed = false
 
+    /// Consecutive failure count — observable so UI can react
+    private val _consecutiveFailures = MutableStateFlow(0)
+    val consecutiveFailures: StateFlow<Int> = _consecutiveFailures
+    /// Max failures before triggering support redirect
+    const val MAX_CONSECUTIVE_FAILURES = 5
+
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     // MARK: - Public API
@@ -150,6 +156,7 @@ object WebSocketManager {
         }
         manualClose = false
         authFailed = false
+        _consecutiveFailures.value = 0
         clearAllTimers()
         closeSocket()
         // Keep useFallbackURL/dnsEverFailed state on reconnect
@@ -325,6 +332,7 @@ object WebSocketManager {
         awaitingSnapshot = false
         clearSnapshotTimeout()
         reconnectAttempt = 0
+        _consecutiveFailures.value = 0
 
         val vehiclesArray = json.optJSONArray("vehicles") ?: run {
             Log.d(TAG, "Snapshot has no vehicles array")
@@ -400,6 +408,15 @@ object WebSocketManager {
 
         if (authFailed) {
             _status.value = WSConnectionStatus.Error("Yetkilendirme hatası")
+            _events.tryEmit(WSEvent.StatusChanged(_status.value))
+            return
+        }
+
+        _consecutiveFailures.value++
+
+        // After too many consecutive failures, stop reconnecting
+        if (_consecutiveFailures.value >= MAX_CONSECUTIVE_FAILURES) {
+            _status.value = WSConnectionStatus.Error("Bağlantı kurulamadı")
             _events.tryEmit(WSEvent.StatusChanged(_status.value))
             return
         }

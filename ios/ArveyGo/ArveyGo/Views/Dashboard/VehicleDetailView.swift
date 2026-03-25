@@ -2,17 +2,55 @@ import SwiftUI
 import MapKit
 import Combine
 
-struct VehicleDetailView: View {
-    let initialVehicle: Vehicle
-    @Environment(\.dismiss) private var dismiss
-    @State private var selectedTab: DetailTab = .overview
-    @State private var mapCameraPosition: MapCameraPosition = .automatic
-    @State private var vehicle: Vehicle
-    @State private var cancellables = Set<AnyCancellable>()
+// MARK: - Live Vehicle Observer
+/// Observes WebSocket updates for a specific vehicle and publishes changes.
+@MainActor
+class VehicleDetailObserver: ObservableObject {
+    @Published var vehicle: Vehicle
+    private var cancellables = Set<AnyCancellable>()
 
     init(vehicle: Vehicle) {
-        self.initialVehicle = vehicle
-        _vehicle = State(initialValue: vehicle)
+        self.vehicle = vehicle
+        subscribeToUpdates()
+    }
+
+    private func subscribeToUpdates() {
+        let targetId = vehicle.id
+        let targetImei = vehicle.imei
+
+        WebSocketManager.shared.$vehicleList
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] vehicles in
+                guard let self = self else { return }
+                if let updated = vehicles.first(where: { $0.id == targetId || (!targetImei.isEmpty && $0.imei == targetImei) }) {
+                    self.vehicle = updated
+                }
+            }
+            .store(in: &cancellables)
+
+        WebSocketManager.shared.eventSubject
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                guard let self = self else { return }
+                if case .update(let updatedVehicle, _) = event,
+                   updatedVehicle.id == targetId || (!targetImei.isEmpty && updatedVehicle.imei == targetImei) {
+                    self.vehicle = updatedVehicle
+                }
+            }
+            .store(in: &cancellables)
+    }
+}
+
+struct VehicleDetailView: View {
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var observer: VehicleDetailObserver
+    @State private var selectedTab: DetailTab = .overview
+    @State private var mapCameraPosition: MapCameraPosition = .automatic
+
+    private var vehicle: Vehicle { observer.vehicle }
+
+    init(vehicle: Vehicle) {
+        _observer = StateObject(wrappedValue: VehicleDetailObserver(vehicle: vehicle))
     }
 
     enum DetailTab: String, CaseIterable {
@@ -111,24 +149,6 @@ struct VehicleDetailView: View {
                     center: CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng),
                     span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
                 ))
-                // Subscribe to real-time WebSocket updates
-                WebSocketManager.shared.$vehicleList
-                    .receive(on: DispatchQueue.main)
-                    .sink { vehicles in
-                        if let updated = vehicles.first(where: { $0.id == initialVehicle.id || $0.imei == initialVehicle.imei }) {
-                            vehicle = updated
-                        }
-                    }
-                    .store(in: &cancellables)
-                WebSocketManager.shared.eventSubject
-                    .receive(on: DispatchQueue.main)
-                    .sink { event in
-                        if case .update(let updatedVehicle, _) = event,
-                           updatedVehicle.id == initialVehicle.id || updatedVehicle.imei == initialVehicle.imei {
-                            vehicle = updatedVehicle
-                        }
-                    }
-                    .store(in: &cancellables)
             }
         }
     }

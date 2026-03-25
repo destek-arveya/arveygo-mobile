@@ -61,8 +61,10 @@ struct LiveMapView: View {
                         )
                     }
                 }
-                .sheet(item: $selectedVehicle) { vehicle in
-                    vehiclePopupSheet(vehicle)
+                .sheet(item: $selectedVehicle) { selected in
+                    // Look up latest vehicle data from ViewModel for real-time updates
+                    let liveVehicle = vm.vehicles.first(where: { $0.id == selected.id }) ?? selected
+                    vehiclePopupSheet(liveVehicle)
                         .presentationDetents([.fraction(0.50), .large])
                         .presentationDragIndicator(.visible)
                         .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.50)))

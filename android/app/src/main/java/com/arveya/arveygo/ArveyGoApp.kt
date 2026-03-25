@@ -15,9 +15,11 @@ import com.arveya.arveygo.ui.screens.fleet.RouteHistoryScreen
 import com.arveya.arveygo.ui.screens.fleet.VehiclesListScreen
 import com.arveya.arveygo.ui.screens.livemap.LiveMapScreen
 import com.arveya.arveygo.ui.screens.settings.SettingsScreen
+import com.arveya.arveygo.ui.screens.support.SupportRequestScreen
 import com.arveya.arveygo.ui.components.SideMenu
 import com.arveya.arveygo.ui.theme.AppColors
 import com.arveya.arveygo.viewmodels.AuthViewModel
+import com.arveya.arveygo.services.WebSocketManager
 
 @Composable
 fun ArveyGoApp(authVM: AuthViewModel) {
@@ -48,6 +50,21 @@ fun ArveyGoApp(authVM: AuthViewModel) {
 fun MainContent(authVM: AuthViewModel) {
     var selectedPage by remember { mutableStateOf(AppPage.DASHBOARD) }
     var showSideMenu by remember { mutableStateOf(false) }
+    var showSupportRequest by remember { mutableStateOf(false) }
+
+    // Observe consecutive failures to trigger support request page
+    val consecutiveFailures by WebSocketManager.consecutiveFailures.collectAsState()
+    LaunchedEffect(consecutiveFailures) {
+        if (consecutiveFailures >= WebSocketManager.MAX_CONSECUTIVE_FAILURES) {
+            showSupportRequest = true
+        }
+    }
+
+    // If support request is showing, overlay it
+    if (showSupportRequest) {
+        SupportRequestScreen(onBack = { showSupportRequest = false })
+        return
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Active page
