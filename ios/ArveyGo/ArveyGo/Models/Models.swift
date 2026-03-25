@@ -59,6 +59,11 @@ struct Vehicle: Identifiable, Hashable {
     var deviceTime: String? = nil
     var ts: Int = 0
 
+    // Ignition timestamps (from WebSocket)
+    var firstIgnitionOnAtToday: String? = nil
+    var lastIgnitionOnAt: String? = nil
+    var lastIgnitionOffAt: String? = nil
+
     var formattedTotalKm: String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
@@ -73,6 +78,38 @@ struct Vehicle: Identifiable, Hashable {
     var formattedSpeed: String {
         return "\(Int(speed)) km/h"
     }
+
+    var kontakLabel: String {
+        ignition ? "Kontak Açık" : "Kontak Kapalı"
+    }
+
+    func formatTimestamp(_ raw: String?) -> String {
+        guard let raw = raw, !raw.isEmpty else { return "—" }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        if let date = formatter.date(from: raw) {
+            let outFormatter = DateFormatter()
+            outFormatter.dateFormat = "dd.MM.yyyy HH:mm"
+            outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
+            outFormatter.locale = Locale(identifier: "tr_TR")
+            return outFormatter.string(from: date)
+        }
+        let formatter2 = DateFormatter()
+        formatter2.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        formatter2.timeZone = TimeZone(abbreviation: "UTC")
+        if let date2 = formatter2.date(from: raw) {
+            let outFormatter = DateFormatter()
+            outFormatter.dateFormat = "dd.MM.yyyy HH:mm"
+            outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
+            outFormatter.locale = Locale(identifier: "tr_TR")
+            return outFormatter.string(from: date2)
+        }
+        return raw
+    }
+
+    var formattedFirstIgnitionToday: String { formatTimestamp(firstIgnitionOnAtToday) }
+    var formattedLastIgnitionOn: String { formatTimestamp(lastIgnitionOnAt) }
+    var formattedLastIgnitionOff: String { formatTimestamp(lastIgnitionOffAt) }
 
     var formattedDeviceTime: String {
         guard let raw = deviceTime, !raw.isEmpty else { return "—" }
@@ -123,6 +160,9 @@ struct Vehicle: Identifiable, Hashable {
         let alarmCode = json["alarm_code"] as? String
         let deviceTime = json["device_time"] as? String
         let ts = (json["ts"] as? Int) ?? 0
+        let firstIgnitionOnAtToday = json["first_ignition_on_at_today"] as? String
+        let lastIgnitionOnAt = json["last_ignition_on_at"] as? String
+        let lastIgnitionOffAt = json["last_ignition_off_at"] as? String
         let batteryVoltage = json["battery_voltage"] as? Double
         let externalVoltage = json["external_voltage"] as? Double
 
@@ -212,7 +252,10 @@ struct Vehicle: Identifiable, Hashable {
             driverId: driverId,
             alarmCode: alarmCode,
             deviceTime: deviceTime,
-            ts: ts
+            ts: ts,
+            firstIgnitionOnAtToday: firstIgnitionOnAtToday,
+            lastIgnitionOnAt: lastIgnitionOnAt,
+            lastIgnitionOffAt: lastIgnitionOffAt
         )
     }
 
@@ -243,6 +286,9 @@ struct Vehicle: Identifiable, Hashable {
         if let hp = patch.humidityPct { humidityPct = hp }
         if let di = patch.driverId { driverId = di }
         if let ac = patch.alarmCode { alarmCode = ac }
+        if let fi = patch.firstIgnitionOnAtToday { firstIgnitionOnAtToday = fi }
+        if let li = patch.lastIgnitionOnAt { lastIgnitionOnAt = li }
+        if let lo = patch.lastIgnitionOffAt { lastIgnitionOffAt = lo }
     }
 }
 

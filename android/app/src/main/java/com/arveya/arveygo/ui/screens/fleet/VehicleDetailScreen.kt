@@ -346,10 +346,9 @@ private fun OverviewTab(vehicle: Vehicle) {
         Triple(Icons.Default.Person, "SÜRÜCÜ", vehicle.driver),
         Triple(Icons.Default.Folder, "GRUP", vehicle.group),
         Triple(Icons.Default.Speed, "KİLOMETRE", vehicle.formattedTotalKm + " km"),
-        Triple(Icons.Default.Route, "BUGÜN KM", vehicle.formattedTodayKm),
+        Triple(Icons.Default.Speed, "HIZ", vehicle.formattedSpeed),
         Triple(Icons.Default.LocationOn, "KONUM", vehicle.city),
         Triple(Icons.Default.DirectionsCar, "ARAÇ TİPİ", vehicle.vehicleType),
-        Triple(Icons.Default.Schedule, "SON VERİ", vehicle.formattedDeviceTime),
     )
 
     // Device Time card (matching vehicles list style)
@@ -390,6 +389,26 @@ private fun OverviewTab(vehicle: Vehicle) {
                         Spacer(Modifier.weight(1f))
                     }
                 }
+            }
+        }
+    }
+
+    // Ignition / Kontak Details
+    SectionCard(title = "KONTAK BİLGİLERİ", icon = Icons.Default.VpnKey) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                InfoCell(
+                    Icons.Default.VpnKey,
+                    "KONTAK DURUMU",
+                    vehicle.kontakLabel,
+                    Modifier.weight(1f),
+                    valueColor = if (vehicle.kontakOn) AppColors.Online else AppColors.Offline
+                )
+                InfoCell(Icons.Default.WbSunny, "İLK KONTAK (BUGÜN)", vehicle.formattedFirstIgnitionToday, Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                InfoCell(Icons.Default.VpnKey, "SON KONTAK AÇMA", vehicle.formattedLastIgnitionOn, Modifier.weight(1f))
+                InfoCell(Icons.Default.VpnKey, "SON KONTAK KAPAMA", vehicle.formattedLastIgnitionOff, Modifier.weight(1f))
             }
         }
     }
@@ -579,7 +598,7 @@ private fun SectionCard(title: String, icon: ImageVector, content: @Composable (
 }
 
 @Composable
-private fun InfoCell(icon: ImageVector, label: String, value: String, modifier: Modifier = Modifier) {
+private fun InfoCell(icon: ImageVector, label: String, value: String, modifier: Modifier = Modifier, valueColor: Color? = null) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.background(AppColors.Bg, RoundedCornerShape(10.dp)).padding(10.dp)
@@ -593,7 +612,7 @@ private fun InfoCell(icon: ImageVector, label: String, value: String, modifier: 
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f, fill = false)) {
             Text(label, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = AppColors.TextFaint, letterSpacing = 0.3.sp)
-            Text(value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = valueColor ?: AppColors.Navy, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

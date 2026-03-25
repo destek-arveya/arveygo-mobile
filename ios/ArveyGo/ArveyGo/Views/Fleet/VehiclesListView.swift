@@ -198,27 +198,10 @@ struct VehiclesListView: View {
 
     // MARK: - Vehicle Table
     var vehicleTable: some View {
-        VStack(spacing: 0) {
-            // Table header
-            HStack(spacing: 0) {
-                Text("PLAKA / ARAÇ")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text("DURUM")
-                    .frame(width: 72, alignment: .center)
-                Text("KM")
-                    .frame(width: 64, alignment: .trailing)
-            }
-            .font(.system(size: 10, weight: .bold))
-            .foregroundColor(AppTheme.textMuted)
-            .tracking(0.5)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(AppTheme.bg)
-
-            // Table rows
+        VStack(spacing: 10) {
             ForEach(vm.filteredVehicles) { vehicle in
                 Button(action: { selectedVehicle = vehicle }) {
-                    vehicleTableRow(vehicle)
+                    vehicleCard(vehicle)
                 }
                 .buttonStyle(.plain)
             }
@@ -236,6 +219,109 @@ struct VehiclesListView: View {
                 .padding(.vertical, 40)
             }
         }
+    }
+
+    func vehicleCard(_ vehicle: Vehicle) -> some View {
+        VStack(spacing: 0) {
+            // Top row: Plate + Status badge + Chevron
+            HStack {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(vehicle.status.color)
+                        .frame(width: 10, height: 10)
+                    Text(vehicle.plate)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(AppTheme.navy)
+                }
+
+                Spacer()
+
+                fleetStatusBadge(vehicle.fleetStatus)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppTheme.textFaint)
+                    .padding(.leading, 6)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
+
+            // Info grid: Speed, Kontak, KM, Device Time
+            HStack(spacing: 0) {
+                // Speed
+                vehicleInfoItem(
+                    icon: "speedometer",
+                    label: "Hız",
+                    value: vehicle.formattedSpeed,
+                    color: vehicle.speed > 0 ? AppTheme.online : AppTheme.textMuted
+                )
+
+                dividerVertical
+
+                // Kontak
+                vehicleInfoItem(
+                    icon: vehicle.kontakOn ? "key.fill" : "key",
+                    label: "Kontak",
+                    value: vehicle.kontakOn ? "Açık" : "Kapalı",
+                    color: vehicle.kontakOn ? AppTheme.online : AppTheme.offline
+                )
+
+                dividerVertical
+
+                // Total KM
+                vehicleInfoItem(
+                    icon: "road.lanes",
+                    label: "Toplam Km",
+                    value: vehicle.formattedTotalKm,
+                    color: AppTheme.navy
+                )
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 10)
+
+            // Bottom: Device Time + Temp (if available)
+            HStack(spacing: 6) {
+                if vehicle.deviceTime != nil {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 9))
+                            .foregroundColor(AppTheme.textFaint)
+                        Text(vehicle.formattedDeviceTime)
+                            .font(.system(size: 10))
+                            .foregroundColor(AppTheme.textFaint)
+                    }
+                }
+
+                if let temp = vehicle.temperatureC {
+                    if vehicle.deviceTime != nil {
+                        Text("•")
+                            .font(.system(size: 8))
+                            .foregroundColor(AppTheme.textFaint)
+                    }
+                    Text(String(format: "🌡️%.1f°C", temp))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(temp < 0 ? .blue : temp < 30 ? AppTheme.online : .red)
+                }
+
+                Spacer()
+
+                if !vehicle.driver.isEmpty {
+                    HStack(spacing: 3) {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 9))
+                            .foregroundColor(AppTheme.textFaint)
+                        Text(vehicle.driver)
+                            .font(.system(size: 10))
+                            .foregroundColor(AppTheme.textFaint)
+                            .lineLimit(1)
+                    }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(AppTheme.bg.opacity(0.5))
+        }
         .background(AppTheme.surface)
         .cornerRadius(12)
         .overlay(
@@ -244,81 +330,27 @@ struct VehiclesListView: View {
         )
     }
 
-    func vehicleTableRow(_ vehicle: Vehicle) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                // Status dot + plate/model
-                HStack(spacing: 10) {
-                    Circle()
-                        .fill(vehicle.status.color)
-                        .frame(width: 10, height: 10)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        // Row 1: Plate
-                        Text(vehicle.plate)
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundColor(AppTheme.navy)
-
-                        // Row 2: Model + Driver
-                        HStack(spacing: 5) {
-                            Text(vehicle.model)
-                                .font(.system(size: 12))
-                                .foregroundColor(AppTheme.textMuted)
-                            if !vehicle.driver.isEmpty {
-                                Text("•")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(AppTheme.textFaint)
-                                Text(vehicle.driver)
-                                    .font(.system(size: 12))
-                                    .foregroundColor(AppTheme.textMuted)
-                                    .lineLimit(1)
-                            }
-                        }
-
-                        // Row 3: Temp + Time (if available)
-                        HStack(spacing: 5) {
-                            if let temp = vehicle.temperatureC {
-                                Text(String(format: "🌡️%.1f°C", temp))
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(temp < 0 ? .blue : temp < 30 ? AppTheme.online : .red)
-                            }
-                            if vehicle.deviceTime != nil {
-                                if vehicle.temperatureC != nil {
-                                    Text("•")
-                                        .font(.system(size: 9))
-                                        .foregroundColor(AppTheme.textFaint)
-                                }
-                                Text("⏱ \(vehicle.formattedDeviceTime)")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(AppTheme.textFaint)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                // Status badge
-                fleetStatusBadge(vehicle.fleetStatus)
-                    .frame(width: 72)
-
-                // Km
-                Text(vehicle.formattedTotalKm)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppTheme.navy)
-                    .frame(width: 64, alignment: .trailing)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.textFaint)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(AppTheme.surface)
-            .contentShape(Rectangle())
-
-            Divider().padding(.leading, 44)
+    func vehicleInfoItem(icon: String, label: String, value: String, color: Color) -> some View {
+        VStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 13))
+                .foregroundColor(color)
+            Text(value)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundColor(AppTheme.textMuted)
         }
+        .frame(maxWidth: .infinity)
+    }
+
+    var dividerVertical: some View {
+        Rectangle()
+            .fill(AppTheme.borderSoft)
+            .frame(width: 1, height: 36)
     }
 
     func fleetStatusBadge(_ status: FleetVehicleStatus) -> some View {

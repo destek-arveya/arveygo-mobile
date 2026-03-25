@@ -294,53 +294,13 @@ fun VehiclesListScreen(onMenuClick: () -> Unit) {
 
             Spacer(Modifier.height(14.dp))
 
-            // Vehicle Table
+            // Vehicle Cards
             Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .background(AppColors.Surface, RoundedCornerShape(12.dp))
-                    .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
             ) {
-                // Table header
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(AppColors.Bg, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
-                ) {
-                    Text(
-                        "PLAKA / ARAÇ",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AppColors.TextMuted,
-                        letterSpacing = 0.5.sp,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        "DURUM",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AppColors.TextMuted,
-                        letterSpacing = 0.5.sp,
-                        modifier = Modifier.width(72.dp),
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        "KM",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AppColors.TextMuted,
-                        letterSpacing = 0.5.sp,
-                        modifier = Modifier.width(64.dp),
-                        textAlign = TextAlign.End
-                    )
-                    // Space for chevron
-                    Spacer(Modifier.width(22.dp))
-                }
-
-                // Table rows
                 if (vm.filteredVehicles.isEmpty()) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -354,7 +314,7 @@ fun VehiclesListScreen(onMenuClick: () -> Unit) {
                     }
                 } else {
                     vm.filteredVehicles.forEach { vehicle ->
-                        VehicleTableRow(vehicle = vehicle, onClick = { selectedVehicle = vehicle })
+                        VehicleCard(vehicle = vehicle, onClick = { selectedVehicle = vehicle })
                     }
                 }
             }
@@ -396,111 +356,128 @@ private fun AlertSummaryCard(
 }
 
 @Composable
-private fun VehicleTableRow(vehicle: Vehicle, onClick: () -> Unit) {
+private fun VehicleCard(vehicle: Vehicle, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
+            .background(AppColors.Surface)
             .clickable(onClick = onClick)
     ) {
+        // Top row: Plate + Status badge + Chevron
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 10.dp)
         ) {
-            // Status dot + plate/model
-            Row(
-                verticalAlignment = Alignment.Top,
-                modifier = Modifier.weight(1f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = 5.dp)
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(vehicle.status.color)
-                )
-                Spacer(Modifier.width(10.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    // Row 1: Plate
-                    Text(
-                        vehicle.plate,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AppColors.Navy
-                    )
-                    // Row 2: Model + Driver
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            vehicle.model,
-                            fontSize = 12.sp,
-                            color = AppColors.TextMuted,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (vehicle.driver.isNotEmpty()) {
-                            Text(" • ", fontSize = 9.sp, color = AppColors.TextFaint)
-                            Text(
-                                vehicle.driver,
-                                fontSize = 12.sp,
-                                color = AppColors.TextMuted,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                    // Row 3: Temp + Time (if available)
-                    val hasTemp = vehicle.temperatureC != null
-                    val hasTime = vehicle.deviceTime != null
-                    if (hasTemp || hasTime) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            vehicle.temperatureC?.let { temp ->
-                                Text(
-                                    "\uD83C\uDF21\uFE0F${"%.1f".format(temp)}°C",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (temp < 0) Color.Blue else if (temp < 30) AppColors.Online else Color.Red
-                                )
-                            }
-                            if (hasTemp && hasTime) {
-                                Text(" • ", fontSize = 9.sp, color = AppColors.TextFaint)
-                            }
-                            if (hasTime) {
-                                Text(
-                                    "⏱ ${vehicle.formattedDeviceTime}",
-                                    fontSize = 10.sp,
-                                    color = AppColors.TextFaint,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Fleet status badge
-            FleetStatusBadge(vehicle.fleetStatus, modifier = Modifier.width(72.dp))
-
-            // Km
-            Text(
-                vehicle.formattedTotalKm,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = AppColors.Navy,
-                modifier = Modifier.width(64.dp),
-                textAlign = TextAlign.End
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(vehicle.status.color)
             )
-
-            // Chevron
+            Spacer(Modifier.width(8.dp))
+            Text(
+                vehicle.plate,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.Navy
+            )
+            Spacer(Modifier.weight(1f))
+            FleetStatusBadge(vehicle.fleetStatus, modifier = Modifier)
             Spacer(Modifier.width(6.dp))
             Icon(
                 Icons.Default.ChevronRight, null,
                 tint = AppColors.TextFaint,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(14.dp)
             )
         }
-        HorizontalDivider(modifier = Modifier.padding(start = 44.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+
+        // Info grid: Speed, Kontak, KM
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 0.dp)
+        ) {
+            // Speed
+            VehicleInfoItem(
+                icon = Icons.Default.Speed,
+                label = "Hız",
+                value = vehicle.formattedSpeed,
+                color = if (vehicle.speed > 0) AppColors.Online else AppColors.TextMuted,
+                modifier = Modifier.weight(1f)
+            )
+            Box(Modifier.width(1.dp).height(36.dp).background(AppColors.BorderSoft))
+            // Kontak
+            VehicleInfoItem(
+                icon = Icons.Default.VpnKey,
+                label = "Kontak",
+                value = if (vehicle.kontakOn) "Açık" else "Kapalı",
+                color = if (vehicle.kontakOn) AppColors.Online else AppColors.Offline,
+                modifier = Modifier.weight(1f)
+            )
+            Box(Modifier.width(1.dp).height(36.dp).background(AppColors.BorderSoft))
+            // Total KM
+            VehicleInfoItem(
+                icon = Icons.Default.Route,
+                label = "Toplam Km",
+                value = vehicle.formattedTotalKm,
+                color = AppColors.Navy,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Bottom: Device Time + Temp + Driver
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(AppColors.Bg.copy(alpha = 0.5f))
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+        ) {
+            if (vehicle.deviceTime != null) {
+                Icon(Icons.Default.Schedule, null, tint = AppColors.TextFaint, modifier = Modifier.size(11.dp))
+                Spacer(Modifier.width(3.dp))
+                Text(vehicle.formattedDeviceTime, fontSize = 10.sp, color = AppColors.TextFaint)
+            }
+
+            vehicle.temperatureC?.let { temp ->
+                if (vehicle.deviceTime != null) {
+                    Text(" • ", fontSize = 8.sp, color = AppColors.TextFaint)
+                }
+                Text(
+                    "\uD83C\uDF21\uFE0F${"%.1f".format(temp)}°C",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (temp < 0) Color.Blue else if (temp < 30) AppColors.Online else Color.Red
+                )
+            }
+
+            Spacer(Modifier.weight(1f))
+
+            if (vehicle.driver.isNotEmpty()) {
+                Icon(Icons.Default.Person, null, tint = AppColors.TextFaint, modifier = Modifier.size(11.dp))
+                Spacer(Modifier.width(3.dp))
+                Text(vehicle.driver, fontSize = 10.sp, color = AppColors.TextFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+@Composable
+private fun VehicleInfoItem(icon: ImageVector, label: String, value: String, color: Color, modifier: Modifier = Modifier) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.padding(vertical = 4.dp)
+    ) {
+        Icon(icon, null, tint = color, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.height(3.dp))
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, fontSize = 9.sp, color = AppColors.TextMuted)
     }
 }
 

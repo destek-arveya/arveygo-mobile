@@ -94,7 +94,11 @@ data class Vehicle(
     var driverId: String? = null,
     var alarmCode: String? = null,
     var deviceTime: String? = null,
-    var ts: Int = 0
+    var ts: Int = 0,
+    // Ignition timestamps (from WebSocket)
+    var firstIgnitionOnAtToday: String? = null,
+    var lastIgnitionOnAt: String? = null,
+    var lastIgnitionOffAt: String? = null
 ) {
     val formattedTotalKm: String
         get() {
@@ -105,6 +109,32 @@ data class Vehicle(
     val formattedTodayKm: String get() = "$todayKm km"
 
     val formattedSpeed: String get() = "${speed.toInt()} km/h"
+
+    val kontakLabel: String get() = if (ignition) "Kontak A\u00e7\u0131k" else "Kontak Kapal\u0131"
+
+    private fun formatTimestamp(raw: String?): String {
+        if (raw.isNullOrEmpty()) return "\u2014"
+        return try {
+            val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
+            val outputFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
+            outputFormat.timeZone = TimeZone.getTimeZone("Europe/Istanbul")
+            val date = inputFormat.parse(raw) ?: return raw
+            outputFormat.format(date)
+        } catch (_: Exception) {
+            try {
+                val inputFormat2 = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+                inputFormat2.timeZone = TimeZone.getTimeZone("UTC")
+                val outputFormat2 = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
+                outputFormat2.timeZone = TimeZone.getTimeZone("Europe/Istanbul")
+                val date2 = inputFormat2.parse(raw) ?: return raw
+                outputFormat2.format(date2)
+            } catch (_: Exception) { raw }
+        }
+    }
+
+    val formattedFirstIgnitionToday: String get() = formatTimestamp(firstIgnitionOnAtToday)
+    val formattedLastIgnitionOn: String get() = formatTimestamp(lastIgnitionOnAt)
+    val formattedLastIgnitionOff: String get() = formatTimestamp(lastIgnitionOffAt)
 
     val formattedDeviceTime: String
         get() {
@@ -212,6 +242,9 @@ data class Vehicle(
             val alarmCode = if (json.has("alarm_code")) json.optString("alarm_code") else null
             val deviceTime = if (json.has("device_time")) json.optString("device_time") else null
             val ts = json.optInt("ts", 0)
+            val firstIgnitionOnAtToday = if (json.has("first_ignition_on_at_today")) json.optString("first_ignition_on_at_today") else null
+            val lastIgnitionOnAt = if (json.has("last_ignition_on_at")) json.optString("last_ignition_on_at") else null
+            val lastIgnitionOffAt = if (json.has("last_ignition_off_at")) json.optString("last_ignition_off_at") else null
             val batteryVoltage = if (json.has("battery_voltage")) json.optDouble("battery_voltage") else null
             val externalVoltage = if (json.has("external_voltage")) json.optDouble("external_voltage") else null
 
@@ -284,7 +317,10 @@ data class Vehicle(
                 temperatureC = temperatureC, humidityPct = humidityPct,
                 odometer = odometer, speedLimit = speedLimit,
                 driverId = driverId, alarmCode = alarmCode,
-                deviceTime = deviceTime, ts = ts
+                deviceTime = deviceTime, ts = ts,
+                firstIgnitionOnAtToday = firstIgnitionOnAtToday,
+                lastIgnitionOnAt = lastIgnitionOnAt,
+                lastIgnitionOffAt = lastIgnitionOffAt
             )
         }
     }
@@ -310,7 +346,10 @@ data class Vehicle(
             temperatureC = patch.temperatureC ?: temperatureC,
             humidityPct = patch.humidityPct ?: humidityPct,
             driverId = patch.driverId ?: driverId,
-            alarmCode = patch.alarmCode ?: alarmCode
+            alarmCode = patch.alarmCode ?: alarmCode,
+            firstIgnitionOnAtToday = patch.firstIgnitionOnAtToday ?: firstIgnitionOnAtToday,
+            lastIgnitionOnAt = patch.lastIgnitionOnAt ?: lastIgnitionOnAt,
+            lastIgnitionOffAt = patch.lastIgnitionOffAt ?: lastIgnitionOffAt
         )
     }
 }

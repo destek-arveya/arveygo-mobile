@@ -351,9 +351,24 @@ struct VehicleDetailView: View {
                     infoCell(icon: "person.fill", label: "SÜRÜCÜ", value: vehicle.driver)
                     infoCell(icon: "folder.fill", label: "GRUP", value: vehicle.group)
                     infoCell(icon: "speedometer", label: "KİLOMETRE", value: vehicle.formattedTotalKm + " km")
-                    infoCell(icon: "road.lanes", label: "BUGÜN KM", value: vehicle.formattedTodayKm)
+                    infoCell(icon: "gauge.open.with.lines.needle.33percent", label: "HIZ", value: vehicle.formattedSpeed)
                     infoCell(icon: "mappin.circle.fill", label: "KONUM", value: vehicle.city)
                     infoCell(icon: "car.2.fill", label: "ARAÇ TİPİ", value: vehicle.vehicleType)
+                }
+            }
+
+            // Kontak / Ignition Details
+            sectionCard(title: "KONTAK BİLGİLERİ", icon: "key.fill") {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    infoCell(
+                        icon: vehicle.kontakOn ? "key.fill" : "key",
+                        label: "KONTAK DURUMU",
+                        value: vehicle.kontakLabel,
+                        valueColor: vehicle.kontakOn ? AppTheme.online : AppTheme.offline
+                    )
+                    infoCell(icon: "sunrise.fill", label: "İLK KONTAK (BUGÜN)", value: vehicle.formattedFirstIgnitionToday)
+                    infoCell(icon: "key.fill", label: "SON KONTAK AÇMA", value: vehicle.formattedLastIgnitionOn)
+                    infoCell(icon: "key", label: "SON KONTAK KAPAMA", value: vehicle.formattedLastIgnitionOff)
                 }
             }
 
@@ -570,7 +585,7 @@ struct VehicleDetailView: View {
         )
     }
 
-    func infoCell(icon: String, label: String, value: String) -> some View {
+    func infoCell(icon: String, label: String, value: String, valueColor: Color? = nil) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 12))
@@ -586,7 +601,7 @@ struct VehicleDetailView: View {
                     .tracking(0.3)
                 Text(value)
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(AppTheme.navy)
+                    .foregroundColor(valueColor ?? AppTheme.navy)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
