@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 // MARK: - API Error
 enum APIError: LocalizedError {
@@ -7,24 +8,35 @@ enum APIError: LocalizedError {
     case decodingError(String)
     case networkError(Error)
     case unauthorized
-    case csrfFailed
+    case validationError([String: [String]])
 
     var errorDescription: String? {
         switch self {
-        case .invalidURL:               return "Geçersiz URL"
-        case .httpError(let code, let msg): return "HTTP \(code): \(msg ?? "Bilinmeyen hata")"
-        case .decodingError(let msg):   return "Veri hatası: \(msg)"
-        case .networkError(let err):    return err.localizedDescription
-        case .unauthorized:             return "Oturum süresi doldu"
-        case .csrfFailed:               return "CSRF token alınamadı"
+        case .invalidURL:
+            return "Geçersiz URL"
+        case .httpError(let code, let msg):
+            return msg ?? "HTTP \(code)"
+        case .decodingError(let msg):
+            return "Veri hatası: \(msg)"
+        case .networkError(let err):
+            return err.localizedDescription
+        case .unauthorized:
+            return "Oturum süresi doldu. Lütfen tekrar giriş yapın."
+        case .validationError(let errors):
+            return errors.values.flatMap { $0 }.first ?? "Doğrulama hatası"
         }
     }
 }
 
-// MARK: - Login Response
+// MARK: - Response Models
 struct LoginResponse {
+    let accessToken: String
+    let tokenType: String
     let user: AppUser
-    let wsConfig: WSConfig?
+}
+
+struct MeResponse {
+    let user: AppUser
 }
 
 struct WSConfig {
@@ -34,8 +46,8 @@ struct WSConfig {
 }
 
 // MARK: - API Service
-/// Handles communication with the Laravel backend.
-/// Laravel uses session/cookie-based auth, so we maintain cookies via URLSession.
+/// Handles communication with the Laravel backend via Bearer token auth.
+/// Endpoints: /api/mobile/auth/{login,me,refresh,logout}
 final class APIService {
 
     static let shared = APIService()
@@ -43,192 +55,240 @@ final class APIService {
     private let baseURL: String
     private let session: URLSession
 
-    private init() {
-        baseURL = AppConfig.apiBaseURL
-
-        let config = URLSessionConfiguration.default
-        config.httpCookieAcceptPolicy = .always
-        config.httpShouldSetCookies = true
-        config.httpCookieStorage = HTTPCookieStorage.shared
-        session = URLSession(configuration: config)
-    }
-
-    // MARK: - CSRF Token
-    /// Laravel requires a CSRF token for POST requests.
-    /// Fetch it by hitting `/sanctum/csrf-cookie` or by parsing the cookie.
-    func fetchCSRFToken() async throws -> String {
-        // First, fetch CSRF cookie from the sanctum endpoint
-        let url = URL(string: "\(baseURL)/sanctum/csrf-cookie")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-        let (_, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            // Try alternative: GET the login page to get a cookie
-            return try await fetchCSRFFromLoginPage()
-        }
-
-        // Extract XSRF-TOKEN from cookies
-        if let token = extractXSRFToken() {
-            return token
-        }
-
-        throw APIError.csrfFailed
-    }
-
-    private func fetchCSRFFromLoginPage() async throws -> String {
-        let url = URL(string: "\(baseURL)/login")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("text/html", forHTTPHeaderField: "Accept")
-
-        let (data, _) = try await session.data(for: request)
-
-        // Try to parse CSRF token from HTML meta tag
-        if let html = String(data: data, encoding: .utf8),
-           let range = html.range(of: "name=\"_token\" value=\"") {
-            let start = range.upperBound
-            if let end = html[start...].range(of: "\"") {
-                return String(html[start..<end.lowerBound])
+    /// Current Bearer token — persisted in Keychain
+    private(set) var accessToken: String? {
+        didSet {
+            if let token = accessToken {
+                TokenStore.save(token: token)
+            } else {
+                TokenStore.delete()
             }
         }
-
-        // Fallback to cookie
-        if let token = extractXSRFToken() {
-            return token
-        }
-
-        throw APIError.csrfFailed
     }
 
-    private func extractXSRFToken() -> String? {
-        guard let cookies = HTTPCookieStorage.shared.cookies else { return nil }
-        for cookie in cookies where cookie.name == "XSRF-TOKEN" {
-            // Laravel URL-encodes the cookie value
-            return cookie.value.removingPercentEncoding ?? cookie.value
-        }
-        return nil
+    private init() {
+        baseURL = AppConfig.apiBaseURL
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 60
+        session = URLSession(configuration: config)
+
+        // Restore saved token on launch
+        accessToken = TokenStore.load()
     }
 
-    // MARK: - Login
-    /// Authenticate with the Laravel backend using session-based auth.
-    /// Returns user info needed for WebSocket JWT generation.
+    // MARK: - Auth Endpoints
+
+    /// POST /api/mobile/auth/login
     func login(email: String, password: String) async throws -> LoginResponse {
-        // Step 1: Get CSRF token
-        let csrfToken = try await fetchCSRFToken()
-
-        // Step 2: POST login
-        guard let url = URL(string: "\(baseURL)/login") else {
-            throw APIError.invalidURL
-        }
+        let url = try makeURL("/api/mobile/auth/login")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(csrfToken, forHTTPHeaderField: "X-XSRF-TOKEN")
-        request.setValue(baseURL, forHTTPHeaderField: "Referer")
 
-        let body: [String: String] = [
-            "email": email,
-            "password": password,
-            "_token": csrfToken
-        ]
+        let body: [String: String] = ["email": email, "password": password]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.networkError(NSError(domain: "APIService", code: -1))
-        }
-
-        // Laravel may redirect on success (302) or return JSON
-        if httpResponse.statusCode == 422 {
-            // Validation error
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let errors = json["errors"] as? [String: [String]] {
-                let msg = errors.values.flatMap { $0 }.first ?? "Giriş başarısız"
-                throw APIError.httpError(422, msg)
-            }
-            throw APIError.httpError(422, "E-posta veya şifre hatalı")
-        }
-
-        if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-            throw APIError.unauthorized
-        }
-
-        if !(200...399).contains(httpResponse.statusCode) {
-            throw APIError.httpError(httpResponse.statusCode, nil)
-        }
-
-        // Step 3: Fetch user info & WS config from livemap bootstrap
-        let (user, wsConfig) = try await fetchBootstrapData()
-
-        return LoginResponse(user: user, wsConfig: wsConfig)
-    }
-
-    // MARK: - Bootstrap Data
-    /// Fetch live map bootstrap which includes user info and WS config.
-    func fetchBootstrapData() async throws -> (AppUser, WSConfig?) {
-        guard let url = URL(string: "\(baseURL)/api/livemap-bootstrap") else {
-            throw APIError.invalidURL
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-        if let token = extractXSRFToken() {
-            request.setValue(token, forHTTPHeaderField: "X-XSRF-TOKEN")
-        }
-
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.networkError(NSError(domain: "APIService", code: -1))
-        }
-
-        if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-            throw APIError.unauthorized
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw APIError.httpError(httpResponse.statusCode, nil)
-        }
+        let (data, response) = try await performRequest(request)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw APIError.decodingError("JSON ayrıştırılamadı")
         }
 
-        // Parse user from bootstrap
-        let user = parseUser(from: json)
-
-        // Parse WS config if available
-        var wsConfig: WSConfig?
-        if let wsJson = json["socket_config"] as? [String: Any] ?? json["liveMapSocketConfig"] as? [String: Any] {
-            let wsURL = (wsJson["url"] as? String) ?? ""
-            let wsToken = (wsJson["token"] as? String) ?? ""
-            let pingInterval = (wsJson["ping_interval"] as? Int) ?? 30
-            if !wsURL.isEmpty && !wsToken.isEmpty {
-                wsConfig = WSConfig(url: wsURL, token: wsToken, pingInterval: pingInterval)
+        if let httpResp = response as? HTTPURLResponse {
+            switch httpResp.statusCode {
+            case 200...299: break
+            case 401:
+                throw APIError.httpError(401, json["message"] as? String ?? "E-posta veya şifre hatalı")
+            case 422:
+                if let errors = json["errors"] as? [String: [String]] {
+                    throw APIError.validationError(errors)
+                }
+                throw APIError.httpError(422, json["message"] as? String ?? "E-posta veya şifre hatalı")
+            default:
+                throw APIError.httpError(httpResp.statusCode, json["message"] as? String)
             }
         }
 
-        return (user, wsConfig)
+        guard let token = json["access_token"] as? String else {
+            throw APIError.decodingError("access_token bulunamadı")
+        }
+
+        let tokenType = (json["token_type"] as? String) ?? "bearer"
+        let user = parseUser(from: json)
+
+        // Persist token
+        self.accessToken = token
+
+        print("[API] Login OK — token: \(token.prefix(20))…, user: \(user.name)")
+        return LoginResponse(accessToken: token, tokenType: tokenType, user: user)
+    }
+
+    /// GET /api/mobile/auth/me
+    func fetchMe() async throws -> AppUser {
+        let url = try makeURL("/api/mobile/auth/me")
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        try applyAuth(&request)
+
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw APIError.decodingError("JSON ayrıştırılamadı")
+        }
+        return parseUser(from: json)
+    }
+
+    /// POST /api/mobile/auth/refresh
+    func refreshToken() async throws -> String {
+        let url = try makeURL("/api/mobile/auth/refresh")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        try applyAuth(&request)
+
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let newToken = json["access_token"] as? String else {
+            throw APIError.decodingError("Yeni token alınamadı")
+        }
+
+        self.accessToken = newToken
+        print("[API] Token refreshed")
+        return newToken
+    }
+
+    /// POST /api/mobile/auth/logout
+    func logout() async {
+        guard let url = try? makeURL("/api/mobile/auth/logout") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        try? applyAuth(&request)
+        _ = try? await session.data(for: request)
+        self.accessToken = nil
+        print("[API] Logged out, token cleared")
+    }
+
+    // MARK: - Generic Authenticated Requests
+
+    /// GET any authenticated endpoint — returns JSON dict
+    func get(_ path: String) async throws -> [String: Any] {
+        let url = try makeURL(path)
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        try applyAuth(&request)
+
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw APIError.decodingError("JSON ayrıştırılamadı")
+        }
+        return json
+    }
+
+    /// POST any authenticated endpoint — returns JSON dict
+    func post(_ path: String, body: [String: Any]? = nil) async throws -> [String: Any] {
+        let url = try makeURL(path)
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        try applyAuth(&request)
+
+        if let body = body {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw APIError.decodingError("JSON ayrıştırılamadı")
+        }
+        return json
+    }
+
+    /// PUT any authenticated endpoint
+    func put(_ path: String, body: [String: Any]) async throws -> [String: Any] {
+        let url = try makeURL(path)
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        try applyAuth(&request)
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw APIError.decodingError("JSON ayrıştırılamadı")
+        }
+        return json
+    }
+
+    // MARK: - Helpers
+
+    private func makeURL(_ path: String) throws -> URL {
+        guard let url = URL(string: "\(baseURL)\(path)") else {
+            throw APIError.invalidURL
+        }
+        return url
+    }
+
+    private func applyAuth(_ request: inout URLRequest) throws {
+        guard let token = accessToken else {
+            throw APIError.unauthorized
+        }
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    }
+
+    private func performRequest(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        do {
+            return try await session.data(for: request)
+        } catch {
+            throw APIError.networkError(error)
+        }
+    }
+
+    private func validateResponse(_ response: URLResponse, data: Data) throws {
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.networkError(NSError(domain: "APIService", code: -1))
+        }
+        switch http.statusCode {
+        case 200...299: return
+        case 401:
+            self.accessToken = nil
+            throw APIError.unauthorized
+        case 422:
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let errors = json["errors"] as? [String: [String]] {
+                throw APIError.validationError(errors)
+            }
+            throw APIError.httpError(422, "Doğrulama hatası")
+        default:
+            let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["message"] as? String
+            throw APIError.httpError(http.statusCode, msg)
+        }
     }
 
     private func parseUser(from json: [String: Any]) -> AppUser {
-        let userJson = json["user"] as? [String: Any] ?? json
-
-        let id = "\(userJson["id"] ?? "0")"
-        let name = (userJson["name"] as? String) ?? "Kullanıcı"
-        let email = (userJson["email"] as? String) ?? ""
-        let role = (userJson["role_label"] as? String) ?? (userJson["role"] as? String) ?? ""
-        let roleKey = (userJson["role_key"] as? String) ?? (userJson["role"] as? String) ?? ""
-        let companyId = (userJson["company_id"] as? Int) ?? 1
+        let u = json["user"] as? [String: Any] ?? json
+        let id = "\(u["id"] ?? "0")"
+        let name = (u["name"] as? String) ?? "Kullanıcı"
+        let email = (u["email"] as? String) ?? ""
+        let role = (u["role_label"] as? String) ?? (u["role"] as? String) ?? ""
+        let roleKey = (u["role_key"] as? String) ?? (u["role"] as? String) ?? ""
+        let companyId = (u["company_id"] as? Int) ?? 1
 
         return AppUser(
             id: id,
@@ -241,25 +301,52 @@ final class APIService {
         )
     }
 
-    // MARK: - Logout
-    func logout() async {
-        guard let url = URL(string: "\(baseURL)/logout") else { return }
+    /// Whether a stored token exists (for auto-login check)
+    var hasStoredToken: Bool { accessToken != nil }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+    /// Clear stored token without network call
+    func clearToken() { self.accessToken = nil }
+}
 
-        if let token = extractXSRFToken() {
-            request.setValue(token, forHTTPHeaderField: "X-XSRF-TOKEN")
-        }
+// MARK: - Token Store (Keychain)
+private enum TokenStore {
+    private static let service = "com.arveya.arveygo"
+    private static let account = "access_token"
 
-        _ = try? await session.data(for: request)
+    static func save(token: String) {
+        let data = Data(token.utf8)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        SecItemDelete(query as CFDictionary)
 
-        // Clear cookies
-        if let cookies = HTTPCookieStorage.shared.cookies {
-            for cookie in cookies {
-                HTTPCookieStorage.shared.deleteCookie(cookie)
-            }
-        }
+        var add = query
+        add[kSecValueData as String] = data
+        SecItemAdd(add as CFDictionary, nil)
+    }
+
+    static func load() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func delete() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 }

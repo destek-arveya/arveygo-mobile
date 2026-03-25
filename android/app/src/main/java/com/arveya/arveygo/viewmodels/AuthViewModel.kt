@@ -1,7 +1,8 @@
 package com.arveya.arveygo.viewmodels
 
+import android.app.Application
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.arveya.arveygo.models.AppUser
 import com.arveya.arveygo.models.WSConfig
@@ -11,7 +12,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-class AuthViewModel : ViewModel() {
+class AuthViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val ctx get() = getApplication<Application>().applicationContext
+
     private val _isLoggedIn = MutableStateFlow(false)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn
 
@@ -45,17 +49,40 @@ class AuthViewModel : ViewModel() {
     // WS config
     private var wsConfig: WSConfig? = null
 
-    // Whether to use real API or demo fallback
-    // iOS uses offline/dummy login — keep false until backend is API-ready
-    private val useRealAPI = false
+    // Offline fallback credentials
+    private val offlineAdminEmail = "admin@admin.com"
+    private val offlineAdminPassword = "123"
 
-    // Hardcoded admin credentials (matching Laravel — offline fallback)
-    private val adminEmail = "admin@admin.com"
-    private val adminPassword = "123"
-
-    // Registered users (in-memory for demo)
+    // Registered users (in-memory for offline demo)
     private val registeredUsers = mutableListOf<AppUser>()
     private val userPasswords = mutableMapOf<String, String>()
+
+    // MARK: - Init — restore token & auto-login
+    init {
+        APIService.initialize(ctx)
+        if (APIService.hasStoredToken) {
+            attemptAutoLogin()
+        }
+    }
+
+    private fun attemptAutoLogin() {
+        _isLoading.value = true
+        viewModelScope.launch {
+            try {
+                val user = APIService.fetchMe()
+                _currentUser.value = user
+                _isLoggedIn.value = true
+                _isLoading.value = false
+                generateLocalWSConfig(user)
+                connectWebSocket()
+                Log.d("Auth", "Auto-login OK: ${user.name}")
+            } catch (e: Exception) {
+                Log.d("Auth", "Auto-login failed: ${e.localizedMessage}")
+                APIService.clearToken(ctx)
+                _isLoading.value = false
+            }
+        }
+    }
 
     // MARK: - Login
     fun login() {
@@ -68,49 +95,45 @@ class AuthViewModel : ViewModel() {
         if (password.isEmpty()) { _errorMessage.value = "Şifre gerekli"; return }
 
         _isLoading.value = true
-
-        if (useRealAPI) {
-            loginViaAPI(email, password)
-        } else {
-            loginOffline(email, password)
-        }
+        loginViaAPI(email, password)
     }
 
     private fun loginViaAPI(email: String, password: String) {
         viewModelScope.launch {
             try {
-                val response = APIService.login(email, password)
+                val response = APIService.login(email, password, ctx)
                 _currentUser.value = response.user
                 _isLoggedIn.value = true
                 _isLoading.value = false
 
-                if (response.wsConfig != null) {
-                    wsConfig = response.wsConfig
-                } else {
-                    generateLocalWSConfig(response.user)
-                }
+                generateLocalWSConfig(response.user)
                 connectWebSocket()
+
+                Log.d("Auth", "Login OK: ${response.user.name}")
+
+            } catch (e: APIException.NetworkError) {
+                _isLoading.value = false
+                Log.d("Auth", "Network error, trying offline: ${e.localizedMessage}")
+                loginOffline(email, password)
             } catch (e: APIException) {
                 _isLoading.value = false
                 _errorMessage.value = e.message
-                if (e is APIException.NetworkError) {
-                    _errorMessage.value = "Sunucuya bağlanılamadı. Çevrimdışı mod deneyin."
-                }
             } catch (e: Exception) {
                 _isLoading.value = false
-                // Network failure → fall back to offline login
+                Log.d("Auth", "API login failed: ${e.localizedMessage}")
                 loginOffline(email, password)
             }
         }
     }
 
+    // MARK: - Offline / Demo Login (fallback when server is unreachable)
     private fun loginOffline(email: String, password: String) {
         viewModelScope.launch {
             delay(800)
             _isLoading.value = false
             val em = email.lowercase().trim()
 
-            if (em == adminEmail && password == adminPassword) {
+            if (em == offlineAdminEmail && password == offlineAdminPassword) {
                 _currentUser.value = AppUser.dummy
                 _isLoggedIn.value = true
                 generateLocalWSConfig(AppUser.dummy)
@@ -130,7 +153,22 @@ class AuthViewModel : ViewModel() {
                 }
             }
 
-            _errorMessage.value = "E-posta veya şifre hatalı"
+            _errorMessage.value = "Sunucuya bağlanılamadı. Çevrimdışı giriş: admin@admin.com / 123"
+        }
+    }
+
+    // MARK: - Token Refresh
+    fun refreshTokenIfNeeded() {
+        viewModelScope.launch {
+            try {
+                APIService.refreshToken(ctx)
+                Log.d("Auth", "Token refreshed")
+            } catch (e: Exception) {
+                Log.d("Auth", "Token refresh failed: ${e.localizedMessage}")
+                if (e is APIException.Unauthorized) {
+                    logout()
+                }
+            }
         }
     }
 
@@ -138,15 +176,13 @@ class AuthViewModel : ViewModel() {
     private fun generateLocalWSConfig(user: AppUser) {
         val jwt = JWTHelper.issueLiveMapToken(sub = user.id, companyId = user.companyId)
         wsConfig = WSConfig(url = AppConfig.WS_URL, token = jwt, pingInterval = AppConfig.WS_PING_INTERVAL.toInt())
-        Log.d("WS", "generateLocalWSConfig: url=${AppConfig.WS_URL}, token=${jwt.take(30)}..., userId=${user.id}, companyId=${user.companyId}")
+        Log.d("WS", "generateLocalWSConfig: url=${AppConfig.WS_URL}, userId=${user.id}")
     }
 
     fun connectWebSocket() {
-        Log.d("WS", "connectWebSocket called, wsConfig=${if (wsConfig != null) "SET" else "NULL"}")
         wsConfig?.let {
-            Log.d("WS", "connectWebSocket: calling WebSocketManager.connect(url=${it.url}, token=${it.token.take(30)}...)")
             WebSocketManager.connect(it.url, it.token)
-        } ?: Log.w("WS", "connectWebSocket: wsConfig is NULL — skipping!")
+        }
     }
 
     fun disconnectWebSocket() {
@@ -162,7 +198,6 @@ class AuthViewModel : ViewModel() {
             delay(800)
             _isLoading.value = false
 
-            // Dummy OTP: accept "000000"
             if (otp == "000000") {
                 _currentUser.value = AppUser.dummy
                 _isLoggedIn.value = true
@@ -187,8 +222,6 @@ class AuthViewModel : ViewModel() {
         if (email.isEmpty() || !email.contains("@")) { _errorMessage.value = "Geçerli bir e-posta adresi girin"; return }
         if (password.length < 8) { _errorMessage.value = "Şifre en az 8 karakter olmalı"; return }
         if (password != confirm) { _errorMessage.value = "Şifreler eşleşmiyor"; return }
-        if (email == adminEmail) { _errorMessage.value = "Bu e-posta adresi kullanılamaz"; return }
-        if (registeredUsers.any { it.email == email }) { _errorMessage.value = "Bu e-posta adresi zaten kayıtlı"; return }
 
         _isLoading.value = true
 
@@ -229,9 +262,7 @@ class AuthViewModel : ViewModel() {
         disconnectWebSocket()
         wsConfig = null
 
-        if (useRealAPI) {
-            viewModelScope.launch { APIService.logout() }
-        }
+        viewModelScope.launch { APIService.logout(ctx) }
 
         _isLoggedIn.value = false
         _currentUser.value = null

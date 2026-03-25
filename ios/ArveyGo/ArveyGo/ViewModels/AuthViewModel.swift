@@ -29,16 +29,41 @@ class AuthViewModel: ObservableObject {
     // WebSocket config received from server (or generated locally)
     @Published var wsConfig: WSConfig?
 
-    // Whether to use real API (true) or demo/fallback mode (false)
-    var useRealAPI: Bool = true
+    // Hardcoded admin credentials (offline fallback only)
+    private let offlineAdminEmail = "admin@admin.com"
+    private let offlineAdminPassword = "123"
 
-    // Hardcoded admin credentials (matching Laravel — used as offline fallback)
-    private let adminEmail = "admin@admin.com"
-    private let adminPassword = "123"
-
-    // Registered users storage (in-memory for demo)
+    // Registered users storage (in-memory for offline demo)
     private var registeredUsers: [AppUser] = []
     private var userPasswords: [String: String] = [:]
+
+    // MARK: - Init — auto-login if token exists
+    init() {
+        if APIService.shared.hasStoredToken {
+            attemptAutoLogin()
+        }
+    }
+
+    // MARK: - Auto Login
+    /// Try to restore session using stored Bearer token
+    private func attemptAutoLogin() {
+        isLoading = true
+        Task {
+            do {
+                let user = try await APIService.shared.fetchMe()
+                self.currentUser = user
+                self.isLoggedIn = true
+                self.isLoading = false
+                self.generateLocalWSConfig(for: user)
+                self.connectWebSocket()
+                print("[Auth] Auto-login OK: \(user.name)")
+            } catch {
+                print("[Auth] Auto-login failed: \(error.localizedDescription)")
+                APIService.shared.clearToken()
+                self.isLoading = false
+            }
+        }
+    }
 
     // MARK: - Login
     func login() {
@@ -57,12 +82,7 @@ class AuthViewModel: ObservableObject {
         }
 
         isLoading = true
-
-        if useRealAPI {
-            loginViaAPI()
-        } else {
-            loginOffline()
-        }
+        loginViaAPI()
     }
 
     // MARK: - Real API Login
@@ -78,36 +98,36 @@ class AuthViewModel: ObservableObject {
                 self.isLoggedIn = true
                 self.isLoading = false
 
-                // Use server-provided WS config if available
-                if let serverWS = response.wsConfig {
-                    self.wsConfig = serverWS
-                } else {
-                    // Generate JWT locally (we have the shared secret)
-                    self.generateLocalWSConfig(for: response.user)
-                }
+                // Generate WS config with user info
+                self.generateLocalWSConfig(for: response.user)
 
                 // Auto-connect WebSocket
                 connectWebSocket()
 
+                print("[Auth] Login OK: \(response.user.name)")
+
             } catch let error as APIError {
                 self.isLoading = false
-                self.errorMessage = error.errorDescription
 
-                // If it's a network error, offer fallback to offline mode
-                if case .networkError = error {
-                    self.errorMessage = "Sunucuya bağlanılamadı. Çevrimdışı mod deneyin."
+                switch error {
+                case .networkError:
+                    // Network failure → offer offline fallback
+                    print("[Auth] Network error, trying offline login")
+                    self.loginOffline()
+                default:
+                    self.errorMessage = error.errorDescription
                 }
+
             } catch {
                 self.isLoading = false
-
-                // Network failure → fall back to offline login
-                print("[Auth] API login failed, trying offline: \(error.localizedDescription)")
+                // Unknown error → try offline
+                print("[Auth] API login failed: \(error.localizedDescription)")
                 self.loginOffline()
             }
         }
     }
 
-    // MARK: - Offline / Demo Login
+    // MARK: - Offline / Demo Login (fallback when server is unreachable)
     private func loginOffline() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
             guard let self = self else { return }
@@ -116,7 +136,7 @@ class AuthViewModel: ObservableObject {
             let email = self.loginEmail.lowercased().trimmingCharacters(in: .whitespaces)
 
             // Check admin credentials
-            if email == self.adminEmail && self.loginPassword == self.adminPassword {
+            if email == self.offlineAdminEmail && self.loginPassword == self.offlineAdminPassword {
                 self.currentUser = AppUser.dummy
                 self.isLoggedIn = true
                 self.generateLocalWSConfig(for: AppUser.dummy)
@@ -135,13 +155,27 @@ class AuthViewModel: ObservableObject {
                 return
             }
 
-            self.errorMessage = "E-posta veya şifre hatalı"
+            self.errorMessage = "Sunucuya bağlanılamadı. Çevrimdışı giriş: admin@admin.com / 123"
+        }
+    }
+
+    // MARK: - Token Refresh
+    func refreshTokenIfNeeded() {
+        Task {
+            do {
+                _ = try await APIService.shared.refreshToken()
+                print("[Auth] Token refreshed")
+            } catch {
+                print("[Auth] Token refresh failed: \(error.localizedDescription)")
+                // If refresh fails with 401, force re-login
+                if case APIError.unauthorized = error {
+                    logout()
+                }
+            }
         }
     }
 
     // MARK: - WebSocket Configuration
-
-    /// Generate JWT locally using the shared secret (for offline/fallback mode)
     private func generateLocalWSConfig(for user: AppUser) {
         let jwt = JWTHelper.issueLiveMapToken(
             sub: user.id,
@@ -154,13 +188,11 @@ class AuthViewModel: ObservableObject {
         )
     }
 
-    /// Connect to the WebSocket with current config
     func connectWebSocket() {
         guard let config = wsConfig else { return }
         WebSocketManager.shared.connect(url: config.url, token: config.token)
     }
 
-    /// Disconnect WebSocket
     func disconnectWebSocket() {
         WebSocketManager.shared.disconnect()
     }
@@ -174,7 +206,6 @@ class AuthViewModel: ObservableObject {
             guard let self = self else { return }
             self.isLoading = false
 
-            // Dummy OTP: accept "000000"
             if otp == "000000" {
                 self.currentUser = AppUser.dummy
                 self.isLoggedIn = true
@@ -191,30 +222,10 @@ class AuthViewModel: ObservableObject {
     func register() {
         errorMessage = nil
 
-        guard !registerName.isEmpty else {
-            errorMessage = "Ad Soyad gerekli"
-            return
-        }
-        guard !registerEmail.isEmpty, registerEmail.contains("@") else {
-            errorMessage = "Geçerli bir e-posta adresi girin"
-            return
-        }
-        guard registerPassword.count >= 8 else {
-            errorMessage = "Şifre en az 8 karakter olmalı"
-            return
-        }
-        guard registerPassword == registerPasswordConfirm else {
-            errorMessage = "Şifreler eşleşmiyor"
-            return
-        }
-        guard registerEmail.lowercased() != adminEmail else {
-            errorMessage = "Bu e-posta adresi kullanılamaz"
-            return
-        }
-        guard !registeredUsers.contains(where: { $0.email == registerEmail.lowercased() }) else {
-            errorMessage = "Bu e-posta adresi zaten kayıtlı"
-            return
-        }
+        guard !registerName.isEmpty else { errorMessage = "Ad Soyad gerekli"; return }
+        guard !registerEmail.isEmpty, registerEmail.contains("@") else { errorMessage = "Geçerli bir e-posta adresi girin"; return }
+        guard registerPassword.count >= 8 else { errorMessage = "Şifre en az 8 karakter olmalı"; return }
+        guard registerPassword == registerPasswordConfirm else { errorMessage = "Şifreler eşleşmiyor"; return }
 
         isLoading = true
 
@@ -250,14 +261,12 @@ class AuthViewModel: ObservableObject {
     // MARK: - Forgot Password
     func sendResetLink() {
         errorMessage = nil
-
         guard !forgotEmail.isEmpty, forgotEmail.contains("@") else {
             errorMessage = "Geçerli bir e-posta adresi girin"
             return
         }
 
         isLoading = true
-
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             guard let self = self else { return }
             self.isLoading = false
@@ -267,14 +276,11 @@ class AuthViewModel: ObservableObject {
 
     // MARK: - Logout
     func logout() {
-        // Disconnect WebSocket
         disconnectWebSocket()
         wsConfig = nil
 
-        // Logout from API
-        if useRealAPI {
-            Task { await APIService.shared.logout() }
-        }
+        // Logout from API (clears token)
+        Task { await APIService.shared.logout() }
 
         withAnimation {
             isLoggedIn = false
