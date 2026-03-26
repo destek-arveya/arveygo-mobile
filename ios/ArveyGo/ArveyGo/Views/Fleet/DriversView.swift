@@ -386,7 +386,7 @@ struct DriverDetailSheet: View {
     }
 }
 
-// MARK: - Driver Form Sheet (Create + Edit)
+// MARK: - Driver Form Sheet (Create + Edit) — Redesigned
 struct DriverFormSheet: View {
     let editDriver: Driver?
     let onSave: ([String: Any]) -> Void
@@ -420,96 +420,217 @@ struct DriverFormSheet: View {
         isPhoneValid
     }
 
+    var statusLabel: String {
+        switch status {
+        case "active": return "Aktif"
+        case "inactive": return "Pasif"
+        case "on_leave": return "İzinli"
+        default: return status
+        }
+    }
+
+    var statusColor: Color {
+        switch status {
+        case "active": return AppTheme.online
+        case "inactive": return AppTheme.offline
+        case "on_leave": return AppTheme.idle
+        default: return AppTheme.textMuted
+        }
+    }
+
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Temel Bilgiler") {
-                    TextField("Ad Soyad *", text: $fullName)
-                    TextField("Sürücü Kodu *", text: $driverCode)
-                        .textInputAutocapitalization(.characters)
-                    Picker("Durum", selection: $status) {
-                        Text("Aktif").tag("active")
-                        Text("Pasif").tag("inactive")
-                        Text("İzinli").tag("on_leave")
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Header avatar
+                    VStack(spacing: 8) {
+                        ZStack {
+                            Circle()
+                                .fill(AppTheme.indigo.opacity(0.1))
+                                .frame(width: 72, height: 72)
+                            Text(fullName.isEmpty ? "?" : String(fullName.prefix(1)).uppercased())
+                                .font(.system(size: 28, weight: .bold))
+                                .foregroundColor(AppTheme.indigo)
+                        }
+                        if isEditing {
+                            Text(editDriver?.driverCode ?? "")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(AppTheme.textMuted)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(AppTheme.bgAlt, in: Capsule())
+                        }
                     }
-                }
+                    .padding(.top, 8)
 
-                Section {
-                    VStack(alignment: .leading, spacing: 4) {
-                        TextField("Telefon (05XXXXXXXXX)", text: $phone)
-                            .keyboardType(.numberPad)
-                            .onChange(of: phone) { newValue in
-                                let digits = newValue.filter { $0.isNumber }
-                                if digits.count > 11 {
-                                    phone = String(digits.prefix(11))
-                                } else if digits != newValue {
-                                    phone = digits
-                                }
-                                if !phone.isEmpty {
-                                    let d = phone.filter { $0.isNumber }
-                                    if d.count != 11 {
-                                        phoneError = "Telefon numarası 11 haneli olmalıdır (ör: 05XXXXXXXXX)"
-                                    } else if !d.hasPrefix("0") {
-                                        phoneError = "Telefon numarası 0 ile başlamalıdır"
+                    // Basic info section
+                    formSection(title: "Temel Bilgiler", icon: "person.fill") {
+                        formField(label: "Ad Soyad", placeholder: "Ad Soyad *", text: $fullName, required: true)
+                        formField(label: "Sürücü Kodu", placeholder: "Sürücü Kodu *", text: $driverCode, required: true, capitalize: true)
+
+                        // Status picker
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Durum")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(AppTheme.textMuted)
+                            HStack(spacing: 8) {
+                                statusButton("Aktif", value: "active", color: AppTheme.online)
+                                statusButton("Pasif", value: "inactive", color: AppTheme.offline)
+                                statusButton("İzinli", value: "on_leave", color: AppTheme.idle)
+                            }
+                        }
+                    }
+
+                    // Contact section
+                    formSection(title: "İletişim", icon: "phone.fill") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            formField(label: "Telefon", placeholder: "05XXXXXXXXX", text: $phone, keyboard: .numberPad)
+                                .onChange(of: phone) { newValue in
+                                    let digits = newValue.filter { $0.isNumber }
+                                    if digits.count > 11 {
+                                        phone = String(digits.prefix(11))
+                                    } else if digits != newValue {
+                                        phone = digits
+                                    }
+                                    if !phone.isEmpty {
+                                        let d = phone.filter { $0.isNumber }
+                                        if d.count != 11 {
+                                            phoneError = "Telefon numarası 11 haneli olmalıdır"
+                                        } else if !d.hasPrefix("0") {
+                                            phoneError = "Telefon numarası 0 ile başlamalıdır"
+                                        } else {
+                                            phoneError = nil
+                                        }
                                     } else {
                                         phoneError = nil
                                     }
-                                } else {
-                                    phoneError = nil
+                                }
+                            if let err = phoneError {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "exclamationmark.circle.fill")
+                                        .font(.system(size: 10))
+                                    Text(err)
+                                        .font(.system(size: 11))
+                                }
+                                .foregroundColor(.red)
+                                .padding(.leading, 4)
+                            }
+                        }
+                        formField(label: "E-posta", placeholder: "ornek@email.com", text: $email, keyboard: .emailAddress, capitalize: false)
+                    }
+
+                    // License section
+                    formSection(title: "Ehliyet Bilgileri", icon: "creditcard.fill") {
+                        HStack(spacing: 12) {
+                            formField(label: "Ehliyet Sınıfı", placeholder: "B, C, D...", text: $licenseClass)
+                            formField(label: "Ehliyet No", placeholder: "Ehliyet No", text: $licenseNo)
+                        }
+                    }
+
+                    // Other section
+                    formSection(title: "Diğer", icon: "doc.text.fill") {
+                        formField(label: "Sicil No", placeholder: "Sicil numarası", text: $employeeNo)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Notlar")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(AppTheme.textMuted)
+                            TextEditor(text: $notes)
+                                .frame(minHeight: 60, maxHeight: 100)
+                                .font(.system(size: 14))
+                                .padding(8)
+                                .background(AppTheme.bgAlt)
+                                .cornerRadius(10)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(AppTheme.borderSoft, lineWidth: 1)
+                                )
+                        }
+                    }
+
+                    // Vehicle assignment section
+                    formSection(title: "Araç Ataması", icon: "car.fill") {
+                        if isLoadingCatalog {
+                            HStack(spacing: 8) {
+                                ProgressView().scaleEffect(0.8)
+                                Text("Araçlar yükleniyor...")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(AppTheme.textMuted)
+                            }
+                            .padding(.vertical, 4)
+                        } else {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Araç Seç")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(AppTheme.textMuted)
+                                Menu {
+                                    Button("Araç atanmamış") { selectedVehicleId = nil }
+                                    ForEach(vehicles) { v in
+                                        Button("\(v.plate) — \(v.name)") { selectedVehicleId = v.id }
+                                    }
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "car.fill")
+                                            .font(.system(size: 13))
+                                            .foregroundColor(AppTheme.indigo)
+                                        Text(selectedVehicleId.flatMap { id in vehicles.first(where: { $0.id == id }).map { "\($0.plate) — \($0.name)" } } ?? "Araç atanmamış")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(selectedVehicleId != nil ? AppTheme.navy : AppTheme.textMuted)
+                                        Spacer()
+                                        Image(systemName: "chevron.up.chevron.down")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(AppTheme.textFaint)
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 10)
+                                    .background(AppTheme.bgAlt)
+                                    .cornerRadius(10)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(AppTheme.borderSoft, lineWidth: 1)
+                                    )
                                 }
                             }
-                        if let err = phoneError {
-                            Text(err).font(.system(size: 11)).foregroundColor(.red)
                         }
                     }
-                    TextField("E-posta", text: $email)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                } header: {
-                    Text("İletişim")
-                }
 
-                Section("Ehliyet") {
-                    TextField("Ehliyet Sınıfı", text: $licenseClass)
-                    TextField("Ehliyet No", text: $licenseNo)
-                }
-
-                Section("Diğer") {
-                    TextField("Sicil No", text: $employeeNo)
-                    TextField("Notlar", text: $notes, axis: .vertical)
-                        .lineLimit(3...6)
-                }
-
-                Section("Araç Ataması") {
-                    if isLoadingCatalog {
+                    // Save button
+                    Button(action: saveDriver) {
                         HStack {
-                            ProgressView().scaleEffect(0.8)
-                            Text("Araçlar yükleniyor...").font(.system(size: 13)).foregroundColor(AppTheme.textMuted)
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 16))
+                            Text("Kaydet")
+                                .font(.system(size: 15, weight: .semibold))
                         }
-                    } else {
-                        Picker("Araç Seç", selection: $selectedVehicleId) {
-                            Text("Araç atanmamış").tag(nil as Int?)
-                            ForEach(vehicles) { v in
-                                Text("\(v.plate) — \(v.name)").tag(v.id as Int?)
-                            }
-                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(canSave ? AppTheme.indigo : AppTheme.textFaint.opacity(0.3))
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
                     }
+                    .disabled(!canSave)
+                    .padding(.top, 4)
                 }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 30)
             }
+            .background(AppTheme.bg)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("İptal") { dismiss() }.foregroundColor(AppTheme.textMuted)
+                    Button { dismiss() } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundColor(AppTheme.textMuted)
+                        .padding(8)
+                        .background(AppTheme.bgAlt, in: Circle())
+                    }
                 }
                 ToolbarItem(placement: .principal) {
                     Text(isEditing ? "Sürücü Düzenle" : "Yeni Sürücü")
-                        .font(.system(size: 15, weight: .semibold)).foregroundColor(AppTheme.navy)
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Kaydet") { saveDriver() }
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(canSave ? AppTheme.indigo : AppTheme.textFaint)
-                        .disabled(!canSave)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(AppTheme.navy)
                 }
             }
             .onAppear {
@@ -527,6 +648,85 @@ struct DriverFormSheet: View {
                 }
             }
         }
+    }
+
+    // MARK: - Section builder
+    @ViewBuilder
+    private func formSection(title: String, icon: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.indigo)
+                    .frame(width: 24, height: 24)
+                    .background(AppTheme.indigo.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.navy)
+            }
+            content()
+        }
+        .padding(16)
+        .background(Color.white)
+        .cornerRadius(14)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(AppTheme.borderSoft, lineWidth: 1)
+        )
+    }
+
+    // MARK: - Field builder
+    @ViewBuilder
+    private func formField(label: String, placeholder: String, text: Binding<String>, required: Bool = false, keyboard: UIKeyboardType = .default, capitalize: Bool? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 2) {
+                Text(label)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(AppTheme.textMuted)
+                if required {
+                    Text("*")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.red)
+                }
+            }
+            TextField(placeholder, text: text)
+                .font(.system(size: 14))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(AppTheme.bgAlt)
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(AppTheme.borderSoft, lineWidth: 1)
+                )
+                .keyboardType(keyboard)
+                .textInputAutocapitalization(capitalize == true ? .characters : capitalize == false ? .never : .words)
+        }
+    }
+
+    // MARK: - Status button
+    @ViewBuilder
+    private func statusButton(_ label: String, value: String, color: Color) -> some View {
+        let isSelected = status == value
+        Button { status = value } label: {
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 8, height: 8)
+                Text(label)
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(isSelected ? color.opacity(0.12) : AppTheme.bgAlt)
+            .foregroundColor(isSelected ? color : AppTheme.textSecondary)
+            .cornerRadius(20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(isSelected ? color.opacity(0.4) : AppTheme.borderSoft, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private func loadCatalog() {

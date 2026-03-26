@@ -83,7 +83,8 @@ class DashboardViewModel: ObservableObject {
 
     init() {
         subscribeToWebSocket()
-        loadDummyDriversAndAlerts()
+        loadDriversFromAPI()
+        loadDummyAlerts()
     }
 
     // MARK: - WebSocket Subscription
@@ -146,19 +147,41 @@ class DashboardViewModel: ObservableObject {
         ]
     }
 
-    /// Load dummy drivers & alerts (these don't come from WS)
-    func loadDummyDriversAndAlerts() {
-        drivers = [
-            DriverScore(id: "1", name: "Ahmet Yılmaz", plate: "34 ABC 123", score: 94, totalKm: 48320, color: AppTheme.navy),
-            DriverScore(id: "2", name: "Zeynep Şahin", plate: "41 JKL 654", score: 91, totalKm: 22430, color: AppTheme.indigo),
-            DriverScore(id: "3", name: "Fatma Arslan", plate: "34 PRS 111", score: 88, totalKm: 14220, color: AppTheme.online),
-            DriverScore(id: "4", name: "Ayşe Kaya", plate: "35 DEF 456", score: 82, totalKm: 31540, color: .blue),
-            DriverScore(id: "5", name: "Can Öztürk", plate: "16 GHI 321", score: 76, totalKm: 67890, color: AppTheme.idle),
-            DriverScore(id: "6", name: "Mehmet Demir", plate: "06 XYZ 789", score: 71, totalKm: 92100, color: AppTheme.lavender),
-            DriverScore(id: "7", name: "Ali Çelik", plate: "07 MNO 987", score: 65, totalKm: 55670, color: AppTheme.offline),
-            DriverScore(id: "8", name: "Hasan Koç", plate: "06 TUV 222", score: 58, totalKm: 38900, color: Color.gray),
-        ]
+    /// Load drivers from API and convert to DriverScore for dashboard display
+    func loadDriversFromAPI() {
+        Task {
+            do {
+                let response = try await APIService.shared.fetchDrivers()
+                let avatarColors: [SwiftUI.Color] = [
+                    AppTheme.navy, AppTheme.indigo, AppTheme.online, .blue,
+                    AppTheme.idle, AppTheme.lavender, AppTheme.offline, .gray,
+                    .purple, .orange, .teal, .pink
+                ]
+                let scores: [DriverScore] = response.drivers
+                    .sorted { $0.scoreGeneral > $1.scoreGeneral }
+                    .enumerated()
+                    .map { (index, driver) in
+                        DriverScore(
+                            id: driver.id,
+                            name: driver.name,
+                            plate: driver.vehicle.isEmpty ? driver.lastVehicle : driver.vehicle,
+                            score: driver.scoreGeneral,
+                            totalKm: Int(driver.totalDistanceKm),
+                            color: avatarColors[index % avatarColors.count]
+                        )
+                    }
+                await MainActor.run {
+                    self.drivers = scores
+                }
+            } catch {
+                print("[DashboardVM] fetchDrivers error: \(error)")
+                // Fallback: keep empty (no dummy data)
+            }
+        }
+    }
 
+    /// Load dummy alerts (alerts API not yet available)
+    func loadDummyAlerts() {
         alerts = [
             FleetAlert(id: "1", title: "Hız İhlali", description: "34 ABC 123 — 142 km/h, E-5 Karayolu", time: "3 dk", severity: .red),
             FleetAlert(id: "2", title: "Geofence Çıkış", description: "35 DEF 456 — İzmir bölge dışına çıktı", time: "18 dk", severity: .amber),
@@ -178,6 +201,7 @@ class DashboardViewModel: ObservableObject {
     func refreshData() {
         isRefreshing = true
         wsManager.reconnect()
+        loadDriversFromAPI()
         // 2 saniye sonra refreshing durumunu kapat
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
             self?.isRefreshing = false

@@ -280,6 +280,7 @@ struct DashboardView: View {
     // MARK: - Driver Scores Card
     var driverScoresCard: some View {
         CardView(title: DL.driverScores, count: "\(DL.avgPrefix): \(dashVM.avgScore)", actionLabel: DL.detailLabel) {
+            selectedPage = .drivers
         } content: {
             VStack(spacing: 0) {
                 ForEach(Array(dashVM.drivers.enumerated()), id: \.element.id) { index, driver in

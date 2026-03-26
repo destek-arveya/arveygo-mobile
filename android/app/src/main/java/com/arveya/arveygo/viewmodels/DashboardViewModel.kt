@@ -3,6 +3,7 @@ package com.arveya.arveygo.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arveya.arveygo.models.*
+import com.arveya.arveygo.services.APIService
 import com.arveya.arveygo.services.WebSocketManager
 import com.arveya.arveygo.ui.theme.AppColors
 import kotlinx.coroutines.delay
@@ -47,6 +48,7 @@ class DashboardViewModel : ViewModel() {
         viewModelScope.launch {
             _isRefreshing.value = true
             WebSocketManager.reconnect()
+            loadDriversFromAPI()
             delay(2000)
             _isRefreshing.value = false
         }
@@ -66,7 +68,8 @@ class DashboardViewModel : ViewModel() {
 
     init {
         subscribeToWebSocket()
-        loadDummyDriversAndAlerts()
+        loadDriversFromAPI()
+        loadDummyAlerts()
     }
 
     private fun subscribeToWebSocket() {
@@ -87,17 +90,35 @@ class DashboardViewModel : ViewModel() {
         }
     }
 
-    private fun loadDummyDriversAndAlerts() {
-        _drivers.value = listOf(
-            DriverScore("1","Ahmet Yılmaz","34 ABC 123",94,48320,AppColors.Navy),
-            DriverScore("2","Zeynep Şahin","41 JKL 654",91,22430,AppColors.Indigo),
-            DriverScore("3","Fatma Arslan","34 PRS 111",88,14220,AppColors.Online),
-            DriverScore("4","Ayşe Kaya","35 DEF 456",82,31540,androidx.compose.ui.graphics.Color.Blue),
-            DriverScore("5","Can Öztürk","16 GHI 321",76,67890,AppColors.Idle),
-            DriverScore("6","Mehmet Demir","06 XYZ 789",71,92100,AppColors.Lavender),
-            DriverScore("7","Ali Çelik","07 MNO 987",65,55670,AppColors.Offline),
-            DriverScore("8","Hasan Koç","06 TUV 222",58,38900,androidx.compose.ui.graphics.Color.Gray),
-        )
+    private fun loadDriversFromAPI() {
+        viewModelScope.launch {
+            try {
+                val response = APIService.fetchDrivers()
+                val avatarColors = listOf(
+                    AppColors.Navy, AppColors.Indigo, AppColors.Online, androidx.compose.ui.graphics.Color.Blue,
+                    AppColors.Idle, AppColors.Lavender, AppColors.Offline, androidx.compose.ui.graphics.Color.Gray,
+                    androidx.compose.ui.graphics.Color(0xFF9C27B0), androidx.compose.ui.graphics.Color(0xFFFF9800),
+                    androidx.compose.ui.graphics.Color(0xFF009688), androidx.compose.ui.graphics.Color(0xFFE91E63)
+                )
+                _drivers.value = response.drivers
+                    .sortedByDescending { it.scoreGeneral }
+                    .mapIndexed { index, driver ->
+                        DriverScore(
+                            id = driver.id,
+                            name = driver.name,
+                            plate = driver.vehicle.ifEmpty { driver.lastVehicle },
+                            score = driver.scoreGeneral,
+                            totalKm = driver.totalDistanceKm.toInt(),
+                            color = avatarColors[index % avatarColors.size]
+                        )
+                    }
+            } catch (e: Exception) {
+                android.util.Log.e("DashboardVM", "fetchDrivers error", e)
+            }
+        }
+    }
+
+    private fun loadDummyAlerts() {
         _alerts.value = listOf(
             FleetAlert("1","Hız İhlali","34 ABC 123 — 142 km/h, E-5 Karayolu","3 dk",AlertSeverity.RED),
             FleetAlert("2","Geofence Çıkış","35 DEF 456 — İzmir bölge dışına çıktı","18 dk",AlertSeverity.AMBER),

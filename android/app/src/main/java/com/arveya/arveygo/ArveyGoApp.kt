@@ -76,6 +76,7 @@ fun MainContent(authVM: AuthViewModel) {
                 onMenuClick = { showSideMenu = true },
                 onNavigateToMap = { selectedPage = AppPage.LIVE_MAP },
                 onNavigateToVehicles = { selectedPage = AppPage.VEHICLES },
+                onNavigateToDrivers = { selectedPage = AppPage.DRIVERS },
                 onNavigateToAlarms = { selectedPage = AppPage.ALARMS },
                 onNavigateToRouteHistory = { selectedPage = AppPage.ROUTE_HISTORY }
             )

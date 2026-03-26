@@ -417,6 +417,7 @@ private fun ScoreBar(label: String, score: Int) {
 }
 
 // MARK: - Driver Form Dialog (Create + Edit)
+// MARK: - Driver Form Dialog (Create + Edit) — Redesigned
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DriverFormDialog(editDriver: Driver?, onDismiss: () -> Unit, onSave: (Map<String, Any>) -> Unit) {
@@ -434,13 +435,11 @@ fun DriverFormDialog(editDriver: Driver?, onDismiss: () -> Unit, onSave: (Map<St
     var vehicles by remember { mutableStateOf<List<CatalogVehicle>>(emptyList()) }
     var isLoadingCatalog by remember { mutableStateOf(true) }
     var phoneError by remember { mutableStateOf<String?>(null) }
-    var statusExpanded by remember { mutableStateOf(false) }
     var vehicleExpanded by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val isEditing = editDriver != null
 
-    // Phone validation
     val isPhoneValid = phone.isEmpty() || phone.filter { it.isDigit() }.length == 11
     val canSave = fullName.isNotBlank() && driverCode.isNotBlank() && isPhoneValid
 
@@ -458,90 +457,182 @@ fun DriverFormDialog(editDriver: Driver?, onDismiss: () -> Unit, onSave: (Map<St
         isLoadingCatalog = false
     }
 
+    // Full-screen dialog
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (isEditing) "Sürücü Düzenle" else "Yeni Sürücü", fontWeight = FontWeight.Bold, color = AppColors.Navy) },
+        modifier = Modifier.fillMaxWidth(),
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        title = null,
         text = {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                OutlinedTextField(value = fullName, onValueChange = { fullName = it }, label = { Text("Ad Soyad *") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp))
-                OutlinedTextField(value = driverCode, onValueChange = { driverCode = it.uppercase() }, label = { Text("Sürücü Kodu *") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp))
-
-                // Status dropdown
-                ExposedDropdownMenuBox(expanded = statusExpanded, onExpandedChange = { statusExpanded = it }) {
-                    OutlinedTextField(
-                        value = when (status) { "active" -> "Aktif"; "inactive" -> "Pasif"; "on_leave" -> "İzinli"; else -> status },
-                        onValueChange = {}, readOnly = true, label = { Text("Durum") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = statusExpanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(8.dp)
-                    )
-                    ExposedDropdownMenu(expanded = statusExpanded, onDismissRequest = { statusExpanded = false }) {
-                        DropdownMenuItem(text = { Text("Aktif") }, onClick = { status = "active"; statusExpanded = false })
-                        DropdownMenuItem(text = { Text("Pasif") }, onClick = { status = "inactive"; statusExpanded = false })
-                        DropdownMenuItem(text = { Text("İzinli") }, onClick = { status = "on_leave"; statusExpanded = false })
-                    }
-                }
-
-                // Phone with validation
-                Column {
-                    OutlinedTextField(
-                        value = phone, onValueChange = { newValue ->
-                            val digits = newValue.filter { it.isDigit() }
-                            phone = if (digits.length > 11) digits.take(11) else digits
-                            phoneError = if (phone.isNotEmpty()) {
-                                val d = phone.filter { it.isDigit() }
-                                when {
-                                    d.length != 11 -> "Telefon numarası 11 haneli olmalıdır (ör: 05XXXXXXXXX)"
-                                    !d.startsWith("0") -> "Telefon numarası 0 ile başlamalıdır"
-                                    else -> null
-                                }
-                            } else null
-                        },
-                        label = { Text("Telefon (05XXXXXXXXX)") }, singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        isError = phoneError != null,
-                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp)
-                    )
-                    if (phoneError != null) {
-                        Text(phoneError!!, fontSize = 11.sp, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 4.dp, top = 2.dp))
-                    }
-                }
-
-                OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("E-posta") },
-                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp))
-                OutlinedTextField(value = licenseClass, onValueChange = { licenseClass = it }, label = { Text("Ehliyet Sınıfı") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp))
-                OutlinedTextField(value = licenseNo, onValueChange = { licenseNo = it }, label = { Text("Ehliyet No") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp))
-                OutlinedTextField(value = employeeNo, onValueChange = { employeeNo = it }, label = { Text("Sicil No") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp))
-                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notlar") },
-                    maxLines = 3, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp))
-
-                // Vehicle picker
-                if (isLoadingCatalog) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Araçlar yükleniyor...", fontSize = 12.sp, color = AppColors.TextMuted)
-                    }
-                } else {
-                    ExposedDropdownMenuBox(expanded = vehicleExpanded, onExpandedChange = { vehicleExpanded = it }) {
-                        OutlinedTextField(
-                            value = selectedVehicleId?.let { id -> vehicles.find { it.id == id }?.let { "${it.plate} — ${it.name}" } } ?: "Araç atanmamış",
-                            onValueChange = {}, readOnly = true, label = { Text("Araç Ataması") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = vehicleExpanded) },
-                            modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(8.dp)
+                // Header avatar
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(CircleShape)
+                            .background(AppColors.Indigo.copy(alpha = 0.1f))
+                    ) {
+                        Text(
+                            text = if (fullName.isEmpty()) "?" else fullName.take(1).uppercase(),
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AppColors.Indigo
                         )
-                        ExposedDropdownMenu(expanded = vehicleExpanded, onDismissRequest = { vehicleExpanded = false }) {
-                            DropdownMenuItem(text = { Text("Araç atanmamış") }, onClick = { selectedVehicleId = null; vehicleExpanded = false })
-                            vehicles.forEach { v ->
-                                DropdownMenuItem(text = { Text("${v.plate} — ${v.name}") }, onClick = { selectedVehicleId = v.id; vehicleExpanded = false })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = if (isEditing) "Sürücü Düzenle" else "Yeni Sürücü",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AppColors.Navy
+                    )
+                    if (isEditing && editDriver?.driverCode?.isNotEmpty() == true) {
+                        Text(
+                            text = editDriver.driverCode,
+                            fontSize = 12.sp,
+                            color = AppColors.TextMuted,
+                            modifier = Modifier
+                                .padding(top = 4.dp)
+                                .background(AppColors.Bg, RoundedCornerShape(12.dp))
+                                .padding(horizontal = 10.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+
+                // Basic Info Section
+                FormSection(title = "Temel Bilgiler", icon = Icons.Default.Person) {
+                    FormField(value = fullName, onValueChange = { fullName = it }, label = "Ad Soyad", required = true)
+                    FormField(value = driverCode, onValueChange = { driverCode = it.uppercase() }, label = "Sürücü Kodu", required = true)
+
+                    // Status selector
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Durum", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatusSelectButton("Aktif", "active", AppColors.Online, status) { status = it }
+                            StatusSelectButton("Pasif", "inactive", AppColors.Offline, status) { status = it }
+                            StatusSelectButton("İzinli", "on_leave", AppColors.Idle, status) { status = it }
+                        }
+                    }
+                }
+
+                // Contact Section
+                FormSection(title = "İletişim", icon = Icons.Default.Phone) {
+                    Column {
+                        FormField(
+                            value = phone,
+                            onValueChange = { newValue ->
+                                val digits = newValue.filter { it.isDigit() }
+                                phone = if (digits.length > 11) digits.take(11) else digits
+                                phoneError = if (phone.isNotEmpty()) {
+                                    val d = phone.filter { it.isDigit() }
+                                    when {
+                                        d.length != 11 -> "Telefon numarası 11 haneli olmalıdır"
+                                        !d.startsWith("0") -> "Telefon numarası 0 ile başlamalıdır"
+                                        else -> null
+                                    }
+                                } else null
+                            },
+                            label = "Telefon",
+                            placeholder = "05XXXXXXXXX",
+                            keyboardType = KeyboardType.Number,
+                            isError = phoneError != null
+                        )
+                        if (phoneError != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                            ) {
+                                Icon(Icons.Default.ErrorOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(12.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(phoneError!!, fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                    FormField(value = email, onValueChange = { email = it }, label = "E-posta", placeholder = "ornek@email.com", keyboardType = KeyboardType.Email)
+                }
+
+                // License Section
+                FormSection(title = "Ehliyet Bilgileri", icon = Icons.Default.CreditCard) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            FormField(value = licenseClass, onValueChange = { licenseClass = it }, label = "Ehliyet Sınıfı", placeholder = "B, C, D...")
+                        }
+                        Box(modifier = Modifier.weight(1f)) {
+                            FormField(value = licenseNo, onValueChange = { licenseNo = it }, label = "Ehliyet No")
+                        }
+                    }
+                }
+
+                // Other Section
+                FormSection(title = "Diğer", icon = Icons.Default.Description) {
+                    FormField(value = employeeNo, onValueChange = { employeeNo = it }, label = "Sicil No", placeholder = "Sicil numarası")
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Notlar", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted)
+                        OutlinedTextField(
+                            value = notes,
+                            onValueChange = { notes = it },
+                            placeholder = { Text("Notlar...", fontSize = 14.sp, color = AppColors.TextFaint) },
+                            minLines = 2,
+                            maxLines = 4,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = AppColors.Indigo,
+                                unfocusedBorderColor = AppColors.BorderSoft,
+                                focusedContainerColor = AppColors.Bg,
+                                unfocusedContainerColor = AppColors.Bg
+                            )
+                        )
+                    }
+                }
+
+                // Vehicle Assignment Section
+                FormSection(title = "Araç Ataması", icon = Icons.Default.DirectionsCar) {
+                    if (isLoadingCatalog) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = AppColors.Indigo)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Araçlar yükleniyor...", fontSize = 12.sp, color = AppColors.TextMuted)
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Araç Seç", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted)
+                            ExposedDropdownMenuBox(expanded = vehicleExpanded, onExpandedChange = { vehicleExpanded = it }) {
+                                OutlinedTextField(
+                                    value = selectedVehicleId?.let { id -> vehicles.find { it.id == id }?.let { "${it.plate} — ${it.name}" } } ?: "Araç atanmamış",
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    leadingIcon = { Icon(Icons.Default.DirectionsCar, null, tint = AppColors.Indigo, modifier = Modifier.size(16.dp)) },
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = vehicleExpanded) },
+                                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = AppColors.Indigo,
+                                        unfocusedBorderColor = AppColors.BorderSoft,
+                                        focusedContainerColor = AppColors.Bg,
+                                        unfocusedContainerColor = AppColors.Bg
+                                    )
+                                )
+                                ExposedDropdownMenu(expanded = vehicleExpanded, onDismissRequest = { vehicleExpanded = false }) {
+                                    DropdownMenuItem(text = { Text("Araç atanmamış") }, onClick = { selectedVehicleId = null; vehicleExpanded = false })
+                                    vehicles.forEach { v ->
+                                        DropdownMenuItem(
+                                            text = { Text("${v.plate} — ${v.name}", fontSize = 13.sp) },
+                                            onClick = { selectedVehicleId = v.id; vehicleExpanded = false }
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -549,7 +640,7 @@ fun DriverFormDialog(editDriver: Driver?, onDismiss: () -> Unit, onSave: (Map<St
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = {
                     val data = mutableMapOf<String, Any>("full_name" to fullName.trim(), "driver_code" to driverCode.trim(), "status" to status)
                     if (phone.isNotEmpty()) data["phone"] = phone
@@ -559,7 +650,6 @@ fun DriverFormDialog(editDriver: Driver?, onDismiss: () -> Unit, onSave: (Map<St
                     if (employeeNo.isNotEmpty()) data["employee_no"] = employeeNo
                     if (notes.isNotEmpty()) data["notes"] = notes
                     onSave(data)
-                    // Assign vehicle if selected
                     selectedVehicleId?.let { vehicleId ->
                         scope.launch {
                             try {
@@ -568,11 +658,117 @@ fun DriverFormDialog(editDriver: Driver?, onDismiss: () -> Unit, onSave: (Map<St
                         }
                     }
                 },
-                enabled = canSave
-            ) { Text("Kaydet", fontWeight = FontWeight.SemiBold, color = if (canSave) AppColors.Indigo else AppColors.TextFaint) }
+                enabled = canSave,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AppColors.Indigo,
+                    disabledContainerColor = AppColors.TextFaint.copy(alpha = 0.3f)
+                ),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.height(44.dp)
+            ) {
+                Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Kaydet", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("İptal", color = AppColors.TextMuted) } }
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, AppColors.BorderSoft),
+                modifier = Modifier.height(44.dp)
+            ) {
+                Text("İptal", color = AppColors.TextMuted, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+            }
+        },
+        shape = RoundedCornerShape(20.dp),
+        containerColor = Color.White
     )
+}
+
+@Composable
+private fun FormSection(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White, RoundedCornerShape(14.dp))
+            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(14.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(AppColors.Indigo.copy(alpha = 0.1f))
+            ) {
+                Icon(icon, null, tint = AppColors.Indigo, modifier = Modifier.size(13.dp))
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+        }
+        content()
+    }
+}
+
+@Composable
+private fun FormField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    placeholder: String = label,
+    required: Boolean = false,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    isError: Boolean = false
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row {
+            Text(label, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted)
+            if (required) {
+                Text(" *", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Red)
+            }
+        }
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = { Text(placeholder, fontSize = 14.sp, color = AppColors.TextFaint) },
+            singleLine = true,
+            isError = isError,
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(10.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = AppColors.Indigo,
+                unfocusedBorderColor = AppColors.BorderSoft,
+                focusedContainerColor = AppColors.Bg,
+                unfocusedContainerColor = AppColors.Bg
+            )
+        )
+    }
+}
+
+@Composable
+private fun StatusSelectButton(label: String, value: String, color: Color, currentStatus: String, onSelect: (String) -> Unit) {
+    val isSelected = currentStatus == value
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (isSelected) color.copy(alpha = 0.12f) else AppColors.Bg)
+            .border(1.dp, if (isSelected) color.copy(alpha = 0.4f) else AppColors.BorderSoft, RoundedCornerShape(20.dp))
+            .clickable { onSelect(value) }
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    ) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(5.dp))
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = if (isSelected) color else AppColors.TextSecondary)
+    }
 }
 
 // MARK: - Vehicle Driver Assign Dialog (used from VehicleDetailScreen)
