@@ -61,6 +61,7 @@ struct Vehicle: Identifiable, Hashable {
     var alarmCode: String? = nil
     var deviceTime: String? = nil
     var ts: Int = 0
+    var deviceId: Int = 0
 
     // Ignition timestamps (from WebSocket)
     var firstIgnitionOnAtToday: String? = nil
@@ -203,6 +204,7 @@ struct Vehicle: Identifiable, Hashable {
         let alarmCode = json["alarm_code"] as? String
         let deviceTime = json["device_time"] as? String
         let ts = (json["ts"] as? Int) ?? 0
+        let deviceIdValue = (json["id"] as? Int) ?? (json["deviceId"] as? Int) ?? 0
         let firstIgnitionOnAtToday = json["first_ignition_on_at_today"] as? String
         let lastIgnitionOnAt = json["last_ignition_on_at"] as? String
         let lastIgnitionOffAt = json["last_ignition_off_at"] as? String
@@ -297,6 +299,7 @@ struct Vehicle: Identifiable, Hashable {
             alarmCode: alarmCode,
             deviceTime: deviceTime,
             ts: ts,
+            deviceId: deviceIdValue,
             firstIgnitionOnAtToday: firstIgnitionOnAtToday,
             lastIgnitionOnAt: lastIgnitionOnAt,
             lastIgnitionOffAt: lastIgnitionOffAt
@@ -334,6 +337,7 @@ struct Vehicle: Identifiable, Hashable {
         if let fi = patch.firstIgnitionOnAtToday { firstIgnitionOnAtToday = fi }
         if let li = patch.lastIgnitionOnAt { lastIgnitionOnAt = li }
         if let lo = patch.lastIgnitionOffAt { lastIgnitionOffAt = lo }
+        if patch.deviceId > 0 { deviceId = patch.deviceId }
     }
 }
 

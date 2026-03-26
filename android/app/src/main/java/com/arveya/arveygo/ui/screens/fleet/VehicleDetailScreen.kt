@@ -471,7 +471,7 @@ private fun OverviewTab(
 
     if (showDriverAssign) {
         VehicleDriverAssignDialog(
-            vehicleId = vehicle.id.toIntOrNull() ?: 0,
+            vehicleId = vehicle.deviceId,
             currentDriverName = vehicle.driver,
             onDismiss = { showDriverAssign = false },
             onAssigned = { showDriverAssign = false }

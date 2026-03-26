@@ -420,7 +420,7 @@ struct VehicleDetailView: View {
             }
             .sheet(isPresented: $showDriverAssign) {
                 VehicleDriverAssignSheet(
-                    vehicleId: Int(vehicle.id) ?? 0,
+                    vehicleId: vehicle.deviceId,
                     currentDriverName: vehicle.driver,
                     onAssigned: {
                         // Vehicle will update via WebSocket

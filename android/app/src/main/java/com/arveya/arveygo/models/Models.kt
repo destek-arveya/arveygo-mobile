@@ -97,6 +97,7 @@ data class Vehicle(
     var alarmCode: String? = null,
     var deviceTime: String? = null,
     var ts: Int = 0,
+    var deviceId: Int = 0,
     // Ignition timestamps (from WebSocket)
     var firstIgnitionOnAtToday: String? = null,
     var lastIgnitionOnAt: String? = null,
@@ -266,6 +267,7 @@ data class Vehicle(
             val alarmCode = if (json.has("alarm_code")) json.optString("alarm_code") else null
             val deviceTime = if (json.has("device_time")) json.optString("device_time") else null
             val ts = json.optInt("ts", 0)
+            val deviceIdValue = if (json.has("id") && !json.isNull("id")) json.optInt("id", 0) else json.optInt("deviceId", 0)
             val firstIgnitionOnAtToday = if (json.has("first_ignition_on_at_today")) json.optString("first_ignition_on_at_today") else null
             val lastIgnitionOnAt = if (json.has("last_ignition_on_at")) json.optString("last_ignition_on_at") else null
             val lastIgnitionOffAt = if (json.has("last_ignition_off_at")) json.optString("last_ignition_off_at") else null
@@ -346,7 +348,8 @@ data class Vehicle(
                 deviceTime = deviceTime, ts = ts,
                 firstIgnitionOnAtToday = firstIgnitionOnAtToday,
                 lastIgnitionOnAt = lastIgnitionOnAt,
-                lastIgnitionOffAt = lastIgnitionOffAt
+                lastIgnitionOffAt = lastIgnitionOffAt,
+                deviceId = deviceIdValue
             )
         }
     }
@@ -376,7 +379,8 @@ data class Vehicle(
             firstIgnitionOnAtToday = patch.firstIgnitionOnAtToday ?: firstIgnitionOnAtToday,
             lastIgnitionOnAt = patch.lastIgnitionOnAt ?: lastIgnitionOnAt,
             lastIgnitionOffAt = patch.lastIgnitionOffAt ?: lastIgnitionOffAt,
-            vehicleCategory = if (patch.vehicleCategory != "car") patch.vehicleCategory else vehicleCategory
+            vehicleCategory = if (patch.vehicleCategory != "car") patch.vehicleCategory else vehicleCategory,
+            deviceId = if (patch.deviceId > 0) patch.deviceId else deviceId
         )
     }
 }
