@@ -12,6 +12,7 @@ import com.arveya.arveygo.ui.navigation.AppPage
 import com.arveya.arveygo.ui.screens.auth.LoginScreen
 import com.arveya.arveygo.ui.screens.dashboard.DashboardScreen
 import com.arveya.arveygo.ui.screens.fleet.AlarmsScreen
+import com.arveya.arveygo.ui.screens.fleet.DriversScreen
 import com.arveya.arveygo.ui.screens.fleet.GeofencesScreen
 import com.arveya.arveygo.ui.screens.fleet.RouteHistoryScreen
 import com.arveya.arveygo.ui.screens.fleet.VehiclesListScreen
@@ -87,6 +88,9 @@ fun MainContent(authVM: AuthViewModel) {
                 onMenuClick = { showSideMenu = true },
                 onNavigateToRouteHistory = { _ -> selectedPage = AppPage.ROUTE_HISTORY },
                 onNavigateToAlarms = { selectedPage = AppPage.ALARMS }
+            )
+            AppPage.DRIVERS -> DriversScreen(
+                onMenuClick = { showSideMenu = true }
             )
             AppPage.ROUTE_HISTORY -> RouteHistoryScreen(
                 onMenuClick = { showSideMenu = true }

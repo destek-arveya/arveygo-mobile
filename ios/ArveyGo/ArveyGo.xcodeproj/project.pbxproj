@@ -28,6 +28,7 @@
 		AA000032 /* AlarmsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000032 /* AlarmsView.swift */; };
 		AA000033 /* MotorcycleSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000033 /* MotorcycleSettingsView.swift */; };
 		AA000034 /* GeofencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000034 /* GeofencesView.swift */; };
+		AA000035 /* DriversView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000035 /* DriversView.swift */; };
 		AA000021 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000021 /* AppConfig.swift */; };
 		AA000022 /* JWTHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000022 /* JWTHelper.swift */; };
 		AA000023 /* WebSocketManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000023 /* WebSocketManager.swift */; };
@@ -63,6 +64,7 @@
 		BB000032 /* AlarmsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlarmsView.swift; sourceTree = "<group>"; };
 		BB000033 /* MotorcycleSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotorcycleSettingsView.swift; sourceTree = "<group>"; };
 		BB000034 /* GeofencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeofencesView.swift; sourceTree = "<group>"; };
+		BB000035 /* DriversView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriversView.swift; sourceTree = "<group>"; };
 		BB000021 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		BB000022 /* JWTHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JWTHelper.swift; sourceTree = "<group>"; };
 		BB000023 /* WebSocketManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketManager.swift; sourceTree = "<group>"; };
@@ -158,6 +160,7 @@
 				BB000032 /* AlarmsView.swift */,
 				BB000033 /* MotorcycleSettingsView.swift */,
 				BB000034 /* GeofencesView.swift */,
+				BB000035 /* DriversView.swift */,
 			);
 			path = Fleet;
 			sourceTree = "<group>";
@@ -351,6 +354,7 @@
 				AA000032 /* AlarmsView.swift in Sources */,
 				AA000033 /* MotorcycleSettingsView.swift in Sources */,
 				AA000034 /* GeofencesView.swift in Sources */,
+				AA000035 /* DriversView.swift in Sources */,
 				AA000021 /* AppConfig.swift in Sources */,
 				AA000022 /* JWTHelper.swift in Sources */,
 				AA000023 /* WebSocketManager.swift in Sources */,

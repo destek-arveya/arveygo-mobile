@@ -19,12 +19,6 @@ struct DashboardView: View {
                             // Greeting Section
                             greetingSection
 
-                            // Period Filter
-                            periodFilter
-
-                            // Metrics Strip
-                            metricsStrip
-
                             // Main Grid
                             VStack(spacing: 14) {
                                 // Vehicle List Card

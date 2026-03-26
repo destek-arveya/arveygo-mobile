@@ -103,7 +103,7 @@ fun SideMenu(
                     }
                     MenuSection("FİLO YÖNETİMİ") {
                         MenuItem(Icons.Default.DirectionsCar, "Araçlar", AppPage.VEHICLES, selectedPage, onPageSelected)
-                        MenuItem(Icons.Default.People, "Sürücüler", null, selectedPage) { onClose() }
+                        MenuItem(Icons.Default.People, "Sürücüler", AppPage.DRIVERS, selectedPage, onPageSelected)
                         MenuItem(Icons.Default.Build, "Bakım", null, selectedPage) { onClose() }
                         MenuItem(Icons.Default.Description, "Belgeler", null, selectedPage) { onClose() }
                         MenuItem(Icons.Default.AttachMoney, "Masraflar", null, selectedPage) { onClose() }

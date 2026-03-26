@@ -109,27 +109,6 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}, o
                 }
             }
 
-            // Period filter
-            PeriodFilter(selected = selectedPeriod, onSelect = { vm.setPeriod(it) })
-
-            // Metric cards
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(vertical = 8.dp)
-            ) {
-                items(vm.getMetrics()) { metric ->
-                    Card(
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, AppColors.BorderSoft),
-                        colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
-                        modifier = Modifier.width(150.dp)
-                    ) {
-                        MetricCard(metric = metric)
-                    }
-                }
-            }
-
             Spacer(Modifier.height(8.dp))
 
             // Active Vehicles

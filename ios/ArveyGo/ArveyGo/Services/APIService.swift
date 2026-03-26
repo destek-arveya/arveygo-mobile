@@ -307,6 +307,135 @@ final class APIService {
     /// Clear stored token without network call
     func clearToken() { self.accessToken = nil }
 
+    // MARK: - Drivers
+
+    /// GET /api/mobile/drivers
+    func fetchDrivers() async throws -> DriversResponse {
+        let json = try await get("/api/mobile/drivers")
+        let driversArray = json["drivers"] as? [[String: Any]] ?? []
+        let statsJson = json["stats"] as? [String: Any] ?? [:]
+
+        let drivers = driversArray.compactMap { dict -> Driver? in
+            guard let id = dict["id"] as? String,
+                  let name = dict["name"] as? String else { return nil }
+            let metrics = dict["metrics"] as? [String: Any] ?? [:]
+            return Driver(
+                id: id,
+                driverCode: dict["driverCode"] as? String ?? "",
+                name: name,
+                avatar: dict["avatar"] as? String ?? "",
+                color: dict["color"] as? String ?? "#3b82f6",
+                role: dict["role"] as? String ?? "Sürücü",
+                phone: dict["phone"] as? String ?? "",
+                email: dict["email"] as? String ?? "",
+                license: dict["license"] as? String ?? "",
+                licenseNo: dict["licenseNo"] as? String ?? "",
+                employeeNo: dict["employeeNo"] as? String ?? "",
+                vehicle: dict["vehicle"] as? String ?? "",
+                lastVehicle: dict["lastVehicle"] as? String ?? "",
+                model: dict["model"] as? String ?? "",
+                city: dict["city"] as? String ?? "",
+                vehicleCount: dict["vehicleCount"] as? Int ?? 0,
+                status: dict["status"] as? String ?? "offline",
+                profileStatus: dict["profileStatus"] as? String ?? "no_profile",
+                hasProfile: dict["hasProfile"] as? Bool ?? false,
+                profileId: dict["profileId"] as? Int,
+                notes: dict["notes"] as? String ?? "",
+                hiredAt: dict["hiredAt"] as? String,
+                scoreGeneral: dict["scoreGeneral"] as? Int ?? 0,
+                scoreSpeed: dict["scoreSpeed"] as? Int ?? 0,
+                scoreBrake: dict["scoreBrake"] as? Int ?? 0,
+                scoreFuel: dict["scoreFuel"] as? Int ?? 0,
+                scoreSafety: dict["scoreSafety"] as? Int ?? 0,
+                totalDistanceKm: (dict["totalDistanceKm"] as? Double) ?? Double(dict["totalDistanceKm"] as? Int ?? 0),
+                tripCount: dict["tripCount"] as? Int ?? 0,
+                overspeedCount: dict["overspeedCount"] as? Int ?? 0,
+                alarmCount: dict["alarmCount"] as? Int ?? 0,
+                hasTelemetry: dict["hasTelemetry"] as? Bool ?? false,
+                createdAt: dict["created_at"] as? String
+            )
+        }
+
+        let stats = DriverStats(
+            total: statsJson["total"] as? Int ?? 0,
+            active: statsJson["active"] as? Int ?? 0,
+            tracked: statsJson["tracked"] as? Int ?? 0,
+            good: statsJson["good"] as? Int ?? 0,
+            mid: statsJson["mid"] as? Int ?? 0,
+            low: statsJson["low"] as? Int ?? 0
+        )
+
+        return DriversResponse(drivers: drivers, stats: stats)
+    }
+
+    /// GET /api/mobile/drivers/{id}
+    func fetchDriver(id: String) async throws -> Driver? {
+        let json = try await get("/api/mobile/drivers/\(id)")
+        guard let dict = json["data"] as? [String: Any],
+              let dId = dict["id"] as? String,
+              let name = dict["name"] as? String else { return nil }
+        let metrics = dict["metrics"] as? [String: Any] ?? [:]
+        return Driver(
+            id: dId,
+            driverCode: dict["driverCode"] as? String ?? "",
+            name: name,
+            avatar: dict["avatar"] as? String ?? "",
+            color: dict["color"] as? String ?? "#3b82f6",
+            role: dict["role"] as? String ?? "Sürücü",
+            phone: dict["phone"] as? String ?? "",
+            email: dict["email"] as? String ?? "",
+            license: dict["license"] as? String ?? "",
+            licenseNo: dict["licenseNo"] as? String ?? "",
+            employeeNo: dict["employeeNo"] as? String ?? "",
+            vehicle: dict["vehicle"] as? String ?? "",
+            lastVehicle: dict["lastVehicle"] as? String ?? "",
+            model: dict["model"] as? String ?? "",
+            city: dict["city"] as? String ?? "",
+            vehicleCount: dict["vehicleCount"] as? Int ?? 0,
+            status: dict["status"] as? String ?? "offline",
+            profileStatus: dict["profileStatus"] as? String ?? "no_profile",
+            hasProfile: dict["hasProfile"] as? Bool ?? false,
+            profileId: dict["profileId"] as? Int,
+            notes: dict["notes"] as? String ?? "",
+            hiredAt: dict["hiredAt"] as? String,
+            scoreGeneral: dict["scoreGeneral"] as? Int ?? 0,
+            scoreSpeed: dict["scoreSpeed"] as? Int ?? 0,
+            scoreBrake: dict["scoreBrake"] as? Int ?? 0,
+            scoreFuel: dict["scoreFuel"] as? Int ?? 0,
+            scoreSafety: dict["scoreSafety"] as? Int ?? 0,
+            totalDistanceKm: (dict["totalDistanceKm"] as? Double) ?? Double(dict["totalDistanceKm"] as? Int ?? 0),
+            tripCount: dict["tripCount"] as? Int ?? 0,
+            overspeedCount: dict["overspeedCount"] as? Int ?? 0,
+            alarmCount: dict["alarmCount"] as? Int ?? 0,
+            hasTelemetry: dict["hasTelemetry"] as? Bool ?? false,
+            createdAt: dict["created_at"] as? String
+        )
+    }
+
+    /// POST /api/mobile/drivers
+    func createDriver(data: [String: Any]) async throws -> Driver? {
+        let json = try await post("/api/mobile/drivers", body: data)
+        guard let dict = json["data"] as? [String: Any] else { return nil }
+        let id = dict["id"] as? String ?? ""
+        let name = dict["name"] as? String ?? ""
+        return Driver(
+            id: id, driverCode: dict["driverCode"] as? String ?? "", name: name,
+            avatar: dict["avatar"] as? String ?? "", color: dict["color"] as? String ?? "#3b82f6",
+            role: dict["role"] as? String ?? "Sürücü", phone: dict["phone"] as? String ?? "",
+            email: dict["email"] as? String ?? "", license: dict["license"] as? String ?? "",
+            licenseNo: dict["licenseNo"] as? String ?? "", employeeNo: dict["employeeNo"] as? String ?? "",
+            vehicle: dict["vehicle"] as? String ?? "", lastVehicle: dict["lastVehicle"] as? String ?? "",
+            model: dict["model"] as? String ?? "", city: dict["city"] as? String ?? "",
+            vehicleCount: dict["vehicleCount"] as? Int ?? 0, status: dict["status"] as? String ?? "offline",
+            profileStatus: dict["profileStatus"] as? String ?? "no_profile",
+            hasProfile: dict["hasProfile"] as? Bool ?? false, profileId: dict["profileId"] as? Int,
+            notes: dict["notes"] as? String ?? "", hiredAt: dict["hiredAt"] as? String,
+            scoreGeneral: 0, scoreSpeed: 0, scoreBrake: 0, scoreFuel: 0, scoreSafety: 0,
+            totalDistanceKm: 0, tripCount: 0, overspeedCount: 0, alarmCount: 0,
+            hasTelemetry: false, createdAt: nil
+        )
+    }
+
     // MARK: - Geofences
 
     /// GET /api/mobile/geofences

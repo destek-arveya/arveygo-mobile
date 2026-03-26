@@ -6,6 +6,7 @@ enum AppPage: String, CaseIterable {
     case dashboard = "Dashboard"
     case liveMap = "Canlı Harita"
     case vehicles = "Araçlar"
+    case drivers = "Sürücüler"
     case routeHistory = "Rota Geçmişi"
     case alarms = "Alarmlar"
     case geofences = "Geofence"
@@ -45,6 +46,8 @@ struct ContentView: View {
                     LiveMapView(showSideMenu: $showSideMenu, selectedPage: $selectedPage)
                 case .vehicles:
                     VehiclesListView(showSideMenu: $showSideMenu, selectedPage: $selectedPage)
+                case .drivers:
+                    DriversView(showSideMenu: $showSideMenu)
                 case .routeHistory:
                     RouteHistoryView(showSideMenu: $showSideMenu)
                 case .alarms:

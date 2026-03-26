@@ -257,6 +257,37 @@ object APIService {
         }
     }
 
+    // MARK: - Drivers
+    suspend fun fetchDrivers(): com.arveya.arveygo.models.DriversResponse = withContext(Dispatchers.IO) {
+        val json = get("/api/mobile/drivers")
+        val driversArray = json.optJSONArray("drivers") ?: org.json.JSONArray()
+        val statsJson = json.optJSONObject("stats") ?: org.json.JSONObject()
+        val drivers = (0 until driversArray.length()).map { i ->
+            com.arveya.arveygo.models.Driver.fromJson(driversArray.getJSONObject(i))
+        }
+        val stats = com.arveya.arveygo.models.DriverStats(
+            total = statsJson.optInt("total", 0),
+            active = statsJson.optInt("active", 0),
+            tracked = statsJson.optInt("tracked", 0),
+            good = statsJson.optInt("good", 0),
+            mid = statsJson.optInt("mid", 0),
+            low = statsJson.optInt("low", 0)
+        )
+        com.arveya.arveygo.models.DriversResponse(drivers, stats)
+    }
+
+    suspend fun fetchDriver(id: String): com.arveya.arveygo.models.Driver? = withContext(Dispatchers.IO) {
+        val json = get("/api/mobile/drivers/$id")
+        val data = json.optJSONObject("data") ?: return@withContext null
+        com.arveya.arveygo.models.Driver.fromJson(data)
+    }
+
+    suspend fun createDriver(body: Map<String, Any>): com.arveya.arveygo.models.Driver? = withContext(Dispatchers.IO) {
+        val json = post("/api/mobile/drivers", org.json.JSONObject(body))
+        val data = json.optJSONObject("data") ?: return@withContext null
+        com.arveya.arveygo.models.Driver.fromJson(data)
+    }
+
     // MARK: - Helpers
 
     private fun validateResponse(code: Int, body: String) {

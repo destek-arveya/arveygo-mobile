@@ -62,7 +62,7 @@ struct SideMenuView: View {
 
                         menuSection(title: "FİLO YÖNETİMİ") {
                             menuItem(icon: "car.2.fill", label: "Araçlar", page: .vehicles)
-                            menuItem(icon: "person.2.fill", label: "Sürücüler")
+                            menuItem(icon: "person.2.fill", label: "Sürücüler", page: .drivers)
                             menuItem(icon: "wrench.and.screwdriver.fill", label: "Bakım")
                             menuItem(icon: "doc.text.fill", label: "Belgeler")
                             menuItem(icon: "turkishlirasign.circle.fill", label: "Masraflar")

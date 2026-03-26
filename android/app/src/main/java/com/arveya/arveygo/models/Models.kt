@@ -557,3 +557,121 @@ data class Geofence(
         }
     }
 }
+
+// MARK: - Driver Model
+data class Driver(
+    val id: String,
+    val driverCode: String = "",
+    val name: String,
+    val avatar: String = "",
+    val color: String = "#3b82f6",
+    val role: String = "Sürücü",
+    val phone: String = "",
+    val email: String = "",
+    val license: String = "",
+    val licenseNo: String = "",
+    val employeeNo: String = "",
+    val vehicle: String = "",
+    val lastVehicle: String = "",
+    val model: String = "",
+    val city: String = "",
+    val vehicleCount: Int = 0,
+    val status: String = "offline",
+    val profileStatus: String = "no_profile",
+    val hasProfile: Boolean = false,
+    val profileId: Int? = null,
+    val notes: String = "",
+    val hiredAt: String? = null,
+    val scoreGeneral: Int = 0,
+    val scoreSpeed: Int = 0,
+    val scoreBrake: Int = 0,
+    val scoreFuel: Int = 0,
+    val scoreSafety: Int = 0,
+    val totalDistanceKm: Double = 0.0,
+    val tripCount: Int = 0,
+    val overspeedCount: Int = 0,
+    val alarmCount: Int = 0,
+    val hasTelemetry: Boolean = false,
+    val createdAt: String? = null
+) {
+    val initials: String get() {
+        val parts = name.split(" ")
+        return if (parts.size >= 2) "${parts[0].take(1)}${parts[1].take(1)}".uppercase()
+        else name.take(2).uppercase()
+    }
+
+    val statusColor: Color get() = when (status) {
+        "online" -> AppColors.Online
+        "idle" -> AppColors.Idle
+        else -> AppColors.Offline
+    }
+
+    val scoreColor: Color get() = when {
+        scoreGeneral >= 85 -> AppColors.Online
+        scoreGeneral >= 70 -> AppColors.Idle
+        else -> AppColors.Offline
+    }
+
+    val avatarColor: Color get() {
+        return try {
+            val hex = color.removePrefix("#")
+            val int = hex.toLong(16)
+            Color(red = ((int shr 16) and 0xFF) / 255f, green = ((int shr 8) and 0xFF) / 255f, blue = (int and 0xFF) / 255f)
+        } catch (_: Exception) { Color.Blue }
+    }
+
+    companion object {
+        fun fromJson(json: JSONObject): Driver {
+            val metrics = json.optJSONObject("metrics")
+            return Driver(
+                id = json.optString("id", ""),
+                driverCode = json.optString("driverCode", ""),
+                name = json.optString("name", ""),
+                avatar = json.optString("avatar", ""),
+                color = json.optString("color", "#3b82f6"),
+                role = json.optString("role", "Sürücü"),
+                phone = json.optString("phone", ""),
+                email = json.optString("email", ""),
+                license = json.optString("license", ""),
+                licenseNo = json.optString("licenseNo", ""),
+                employeeNo = json.optString("employeeNo", ""),
+                vehicle = json.optString("vehicle", ""),
+                lastVehicle = json.optString("lastVehicle", ""),
+                model = json.optString("model", ""),
+                city = json.optString("city", ""),
+                vehicleCount = json.optInt("vehicleCount", 0),
+                status = json.optString("status", "offline"),
+                profileStatus = json.optString("profileStatus", "no_profile"),
+                hasProfile = json.optBoolean("hasProfile", false),
+                profileId = if (json.has("profileId") && !json.isNull("profileId")) json.optInt("profileId") else null,
+                notes = json.optString("notes", ""),
+                hiredAt = if (json.has("hiredAt") && !json.isNull("hiredAt")) json.optString("hiredAt") else null,
+                scoreGeneral = json.optInt("scoreGeneral", 0),
+                scoreSpeed = json.optInt("scoreSpeed", 0),
+                scoreBrake = json.optInt("scoreBrake", 0),
+                scoreFuel = json.optInt("scoreFuel", 0),
+                scoreSafety = json.optInt("scoreSafety", 0),
+                totalDistanceKm = json.optDouble("totalDistanceKm", 0.0),
+                tripCount = json.optInt("tripCount", 0),
+                overspeedCount = json.optInt("overspeedCount", 0),
+                alarmCount = json.optInt("alarmCount", 0),
+                hasTelemetry = json.optBoolean("hasTelemetry", false),
+                createdAt = json.optString("created_at", null)
+            )
+        }
+    }
+}
+
+data class DriverStats(
+    val total: Int = 0,
+    val active: Int = 0,
+    val tracked: Int = 0,
+    val good: Int = 0,
+    val mid: Int = 0,
+    val low: Int = 0
+)
+
+data class DriversResponse(
+    val drivers: List<Driver> = emptyList(),
+    val stats: DriverStats = DriverStats()
+)

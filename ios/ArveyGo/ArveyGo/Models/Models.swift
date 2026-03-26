@@ -469,3 +469,84 @@ struct Geofence: Identifiable, Hashable {
 
     var isCircle: Bool { type == "circle" }
 }
+
+// MARK: - Driver Model
+struct Driver: Identifiable, Hashable {
+    let id: String
+    let driverCode: String
+    let name: String
+    let avatar: String
+    let color: String
+    let role: String
+    let phone: String
+    let email: String
+    let license: String
+    let licenseNo: String
+    let employeeNo: String
+    let vehicle: String
+    let lastVehicle: String
+    let model: String
+    let city: String
+    let vehicleCount: Int
+    let status: String          // online / offline / idle
+    let profileStatus: String   // active / inactive / no_profile
+    let hasProfile: Bool
+    let profileId: Int?
+    let notes: String
+    let hiredAt: String?
+    let scoreGeneral: Int
+    let scoreSpeed: Int
+    let scoreBrake: Int
+    let scoreFuel: Int
+    let scoreSafety: Int
+    let totalDistanceKm: Double
+    let tripCount: Int
+    let overspeedCount: Int
+    let alarmCount: Int
+    let hasTelemetry: Bool
+    let createdAt: String?
+
+    var initials: String {
+        let parts = name.split(separator: " ")
+        if parts.count >= 2 { return String(parts[0].prefix(1) + parts[1].prefix(1)).uppercased() }
+        return String(name.prefix(2)).uppercased()
+    }
+
+    var statusColor: SwiftUI.Color {
+        switch status {
+        case "online": return AppTheme.online
+        case "idle": return AppTheme.idle
+        default: return AppTheme.offline
+        }
+    }
+
+    var scoreColor: SwiftUI.Color {
+        if scoreGeneral >= 85 { return AppTheme.online }
+        if scoreGeneral >= 70 { return AppTheme.idle }
+        return AppTheme.offline
+    }
+
+    var avatarColor: SwiftUI.Color {
+        let h = color.trimmingCharacters(in: .init(charactersIn: "#"))
+        guard h.count == 6, let rgb = UInt64(h, radix: 16) else { return .blue }
+        return SwiftUI.Color(
+            red: Double((rgb >> 16) & 0xFF) / 255,
+            green: Double((rgb >> 8) & 0xFF) / 255,
+            blue: Double(rgb & 0xFF) / 255
+        )
+    }
+}
+
+struct DriverStats {
+    let total: Int
+    let active: Int
+    let tracked: Int
+    let good: Int
+    let mid: Int
+    let low: Int
+}
+
+struct DriversResponse {
+    let drivers: [Driver]
+    let stats: DriverStats
+}
