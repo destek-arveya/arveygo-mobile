@@ -149,6 +149,11 @@ object WebSocketManager {
         _events.tryEmit(WSEvent.StatusChanged(WSConnectionStatus.Disconnected))
     }
 
+    // Background/foreground tracking
+    private var backgroundTimestamp: Long = 0L
+    private val backgroundGracePeriod: Long = 30_000L // 30 seconds
+    private var healthCheckJob: Job? = null
+
     fun reconnect() {
         if (wsURL.isEmpty() || token.isEmpty()) {
             Log.d(TAG, "Reconnect skipped — no URL/token configured yet")
@@ -161,6 +166,50 @@ object WebSocketManager {
         closeSocket()
         // Keep useFallbackURL/dnsEverFailed state on reconnect
         openSocket(isReconnect = true)
+    }
+
+    /** Called when app enters background */
+    fun onBackground() {
+        backgroundTimestamp = System.currentTimeMillis()
+        clearPingLoop()
+        clearSnapshotTimeout()
+        stopHealthCheck()
+        Log.d(TAG, "App entered background, stopped ping")
+    }
+
+    /** Called when app enters foreground */
+    fun onForeground() {
+        val elapsed = System.currentTimeMillis() - backgroundTimestamp
+        Log.d(TAG, "App entering foreground after ${elapsed / 1000}s")
+
+        if (elapsed > backgroundGracePeriod || _status.value != WSConnectionStatus.Connected) {
+            Log.d(TAG, "Background exceeded grace period or disconnected, forcing reconnect")
+            reconnect()
+        } else {
+            startPingLoop()
+            startHealthCheck()
+        }
+    }
+
+    /** Periodically check if connection is still alive */
+    private fun startHealthCheck() {
+        stopHealthCheck()
+        healthCheckJob = scope.launch {
+            while (isActive) {
+                delay(15_000)
+                if (!manualClose && wsURL.isNotEmpty() && token.isNotEmpty()) {
+                    if (_status.value == WSConnectionStatus.Connected && webSocket == null) {
+                        Log.d(TAG, "Health check: no socket but status connected, reconnecting")
+                        reconnect()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun stopHealthCheck() {
+        healthCheckJob?.cancel()
+        healthCheckJob = null
     }
 
     // MARK: - Socket Lifecycle
@@ -361,6 +410,7 @@ object WebSocketManager {
         rebuildVehicleList()
 
         _status.value = WSConnectionStatus.Connected
+        startHealthCheck()
         _events.tryEmit(WSEvent.StatusChanged(WSConnectionStatus.Connected))
         _events.tryEmit(WSEvent.Snapshot(_vehicleList.value, _vehicleList.value.size, ts))
     }
@@ -486,5 +536,5 @@ object WebSocketManager {
     private fun clearPingLoop() { pingJob?.cancel(); pingJob = null }
     private fun clearSnapshotTimeout() { snapshotTimeoutJob?.cancel(); snapshotTimeoutJob = null }
     private fun clearReconnect() { reconnectJob?.cancel(); reconnectJob = null }
-    private fun clearAllTimers() { clearPingLoop(); clearSnapshotTimeout(); clearReconnect() }
+    private fun clearAllTimers() { clearPingLoop(); clearSnapshotTimeout(); clearReconnect(); stopHealthCheck() }
 }

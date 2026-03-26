@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import Combine
 
 // MARK: - WebSocket Connection Status
@@ -78,9 +79,95 @@ final class WebSocketManager: ObservableObject {
     /// Max failures before triggering support redirect
     static let maxConsecutiveFailures = 5
 
+    // Background/foreground tracking
+    private var backgroundDate: Date?
+    private var healthCheckTimer: Timer?
+    /// How long the app can be in background before we force a full reconnect (seconds)
+    private let backgroundGracePeriod: TimeInterval = 30
+
     // MARK: - Singleton
     static let shared = WebSocketManager()
-    private init() {}
+    private init() {
+        setupLifecycleObservers()
+    }
+
+    // MARK: - Lifecycle Observers
+    private func setupLifecycleObservers() {
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.handleDidEnterBackground()
+        }
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.handleWillEnterForeground()
+        }
+    }
+
+    private func handleDidEnterBackground() {
+        backgroundDate = Date()
+        // Stop ping timer to save battery — the connection may silently die
+        clearPingTimer()
+        clearSnapshotTimer()
+        stopHealthCheckTimer()
+        print("[WS] App entered background, stopped ping")
+    }
+
+    private func handleWillEnterForeground() {
+        let elapsed = -(backgroundDate ?? Date()).timeIntervalSinceNow
+        backgroundDate = nil
+        print("[WS] App entering foreground after \(Int(elapsed))s")
+
+        if elapsed > backgroundGracePeriod || status != .connected {
+            // Connection likely dead — force full reconnect
+            print("[WS] Background exceeded \(Int(backgroundGracePeriod))s or status=\(status.label), forcing reconnect")
+            reconnect()
+        } else {
+            // Short background — just restart ping and verify health
+            startPingLoop()
+            startHealthCheckTimer()
+        }
+    }
+
+    // MARK: - Health Check Timer
+    /// Periodically verifies the connection is alive by checking task state
+    private func startHealthCheckTimer() {
+        stopHealthCheckTimer()
+        healthCheckTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.checkConnectionHealth()
+            }
+        }
+    }
+
+    private func stopHealthCheckTimer() {
+        healthCheckTimer?.invalidate()
+        healthCheckTimer = nil
+    }
+
+    private func checkConnectionHealth() {
+        guard !manualClose, !wsURL.isEmpty, !token.isEmpty else { return }
+        guard status == .connected || status == .connecting else { return }
+
+        // Check if URLSessionWebSocketTask is still in a good state
+        if let task = webSocketTask {
+            switch task.state {
+            case .running:
+                break // healthy
+            case .canceling, .completed, .suspended:
+                print("[WS] Health check: task state is \(task.state.rawValue), reconnecting")
+                reconnect()
+            @unknown default:
+                break
+            }
+        } else if status == .connected {
+            print("[WS] Health check: no task but status is connected, reconnecting")
+            reconnect()
+        }
+    }
 
     // MARK: - Public API
 
@@ -296,6 +383,7 @@ final class WebSocketManager: ObservableObject {
         rebuildVehicleList()
 
         status = .connected
+        startHealthCheckTimer()
         eventSubject.send(.statusChanged(.connected))
         eventSubject.send(.snapshot(vehicles: vehicleList, count: vehicleList.count, ts: ts))
     }
@@ -440,5 +528,6 @@ final class WebSocketManager: ObservableObject {
         clearPingTimer()
         clearSnapshotTimer()
         clearReconnectTimer()
+        stopHealthCheckTimer()
     }
 }

@@ -30,7 +30,10 @@ import com.arveya.arveygo.services.APIService
 import com.arveya.arveygo.services.WebSocketManager
 import com.arveya.arveygo.ui.theme.AppColors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -58,9 +61,12 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
     var showDatePicker by remember { mutableStateOf(false) }
     var dateRange by remember { mutableStateOf("Bug\u00fcn") }
     var isPlaying by remember { mutableStateOf(false) }
+    var playbackIndex by remember { mutableStateOf(0) }
+    var playbackSpeed by remember { mutableStateOf(1f) }
     var trips by remember { mutableStateOf<List<RouteTrip>>(emptyList()) }
     var isLoadingRoutes by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var loadJob by remember { mutableStateOf<Job?>(null) }
 
     // Date range state
     var startDate by remember {
@@ -136,9 +142,15 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
 
     // Load routes from API
     fun loadRoutes(vehicle: Vehicle, from: Date, to: Date) {
-        scope.launch {
+        // Cancel any in-flight load
+        loadJob?.cancel()
+        loadJob = scope.launch {
             isLoadingRoutes = true
             errorMessage = null
+            trips = emptyList()
+            selectedTrip = null
+            isPlaying = false
+            playbackIndex = 0
             try {
                 val startStr = dateFormat.format(from)
                 val endStr = dateFormat.format(to)
@@ -549,11 +561,24 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
                             .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
                             .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
-                        IconButton(onClick = {}, modifier = Modifier.size(28.dp)) {
+                        // Reset button
+                        IconButton(onClick = {
+                            isPlaying = false
+                            playbackIndex = 0
+                        }, modifier = Modifier.size(28.dp)) {
                             Icon(Icons.Default.SkipPrevious, null, tint = AppColors.Navy, modifier = Modifier.size(16.dp))
                         }
+                        // Play/Pause
                         IconButton(
-                            onClick = { isPlaying = !isPlaying },
+                            onClick = {
+                                if (isPlaying) {
+                                    isPlaying = false
+                                } else {
+                                    val pts = selectedTrip?.points ?: emptyList()
+                                    if (playbackIndex >= pts.size - 1) playbackIndex = 0
+                                    isPlaying = true
+                                }
+                            },
                             modifier = Modifier
                                 .size(34.dp)
                                 .clip(CircleShape)
@@ -564,10 +589,60 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
                                 null, tint = Color.White, modifier = Modifier.size(18.dp)
                             )
                         }
-                        IconButton(onClick = {}, modifier = Modifier.size(28.dp)) {
+                        // Skip to end
+                        IconButton(onClick = {
+                            isPlaying = false
+                            val pts = selectedTrip?.points ?: emptyList()
+                            if (pts.isNotEmpty()) playbackIndex = pts.size - 1
+                        }, modifier = Modifier.size(28.dp)) {
                             Icon(Icons.Default.SkipNext, null, tint = AppColors.Navy, modifier = Modifier.size(16.dp))
                         }
-                        Text("1x", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = AppColors.Indigo)
+                        // Speed selector
+                        var speedExpanded by remember { mutableStateOf(false) }
+                        Box {
+                            Text(
+                                "${playbackSpeed.toInt()}x",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AppColors.Indigo,
+                                modifier = Modifier.clickable { speedExpanded = true }
+                            )
+                            DropdownMenu(expanded = speedExpanded, onDismissRequest = { speedExpanded = false }) {
+                                listOf(1f, 2f, 4f, 8f).forEach { spd ->
+                                    DropdownMenuItem(
+                                        text = { Text("${spd.toInt()}x") },
+                                        onClick = { playbackSpeed = spd; speedExpanded = false }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Playback animation: move vehicle marker along route
+                LaunchedEffect(isPlaying, playbackSpeed) {
+                    if (!isPlaying) return@LaunchedEffect
+                    val trip = selectedTrip ?: return@LaunchedEffect
+                    while (isActive && playbackIndex < trip.points.size - 1) {
+                        delay((500L / playbackSpeed).toLong())
+                        playbackIndex++
+                        // Move animated marker on map
+                        val pt = trip.points[playbackIndex]
+                        mapViewRef.value?.let { mv ->
+                            // Remove old vehicle marker (last overlay if it's our playback marker)
+                            mv.overlays.removeAll { it is Marker && (it as Marker).title == "__playback__" }
+                            val marker = Marker(mv).apply {
+                                position = GeoPoint(pt.lat, pt.lng)
+                                title = "__playback__"
+                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                            }
+                            mv.overlays.add(marker)
+                            mv.controller.animateTo(GeoPoint(pt.lat, pt.lng))
+                            mv.invalidate()
+                        }
+                    }
+                    if (playbackIndex >= (selectedTrip?.points?.size ?: 1) - 1) {
+                        isPlaying = false
                     }
                 }
             }

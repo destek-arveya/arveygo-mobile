@@ -70,8 +70,9 @@ struct ContentView: View {
         }
         .animation(.spring(response: 0.3), value: showSideMenu)
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            // Reconnect WebSocket when app returns to foreground (global, not just live map)
-            WebSocketManager.shared.reconnect()
+            // WebSocketManager handles foreground reconnection internally now
+            // This is a backup in case the internal observer missed it
+            print("[ContentView] App returning to foreground")
         }
         .onChange(of: WebSocketManager.shared.consecutiveFailures) { _, failures in
             if failures >= WebSocketManager.maxConsecutiveFailures {

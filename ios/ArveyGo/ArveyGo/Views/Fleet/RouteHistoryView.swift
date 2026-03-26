@@ -10,6 +10,9 @@ struct RouteHistoryView: View {
     @State private var endDate = Date()
     @State private var isPlaying = false
     @State private var playbackProgress: Double = 0.0
+    @State private var playbackIndex: Int = 0
+    @State private var playbackSpeed: Double = 1.0
+    @State private var playbackTimer: Timer?
     @State private var selectedRouteIndex: Int? = nil
     @State private var showVehiclePicker = false
     @State private var vehicleSearchText = ""
@@ -71,15 +74,21 @@ struct RouteHistoryView: View {
                     .presentationCornerRadius(20)
             }
             .onAppear {
-                // Auto-select first vehicle and load routes when vehicles arrive from WS
+                // Auto-select first vehicle and load routes
                 if selectedVehicle == nil, let first = vm.vehicles.first {
                     selectedVehicle = first
                     vm.selectVehicle(first)
+                }
+                // Always trigger a load on appear (fixes 2nd visit not loading)
+                if vm.selectedVehicleId != nil {
                     vm.loadRoutes(from: startDate, to: endDate)
                 }
             }
+            .onDisappear {
+                stopPlayback()
+            }
             .onChange(of: vm.vehicles) { _, vehicles in
-                // When WS vehicles first arrive, auto-select and load
+                // When WS vehicles arrive, auto-select if needed and load
                 if selectedVehicle == nil, let first = vehicles.first {
                     selectedVehicle = first
                     vm.selectVehicle(first)
@@ -87,6 +96,7 @@ struct RouteHistoryView: View {
                 }
             }
             .onChange(of: vm.selectedRoute?.id) { _, _ in
+                stopPlayback()
                 zoomToSelectedRoute()
             }
             .onChange(of: vm.routes.count) { _, _ in
@@ -425,6 +435,22 @@ struct RouteHistoryView: View {
                             }
                         }
                     }
+
+                    // Animated vehicle marker during playback
+                    if isPlaying || playbackIndex > 0, playbackIndex < route.points.count {
+                        let pt = route.points[playbackIndex]
+                        Annotation("", coordinate: CLLocationCoordinate2D(latitude: pt.lat, longitude: pt.lng)) {
+                            ZStack {
+                                Circle()
+                                    .fill(AppTheme.indigo)
+                                    .frame(width: 28, height: 28)
+                                    .shadow(color: AppTheme.indigo.opacity(0.4), radius: 6)
+                                Image(systemName: "car.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    }
                 }
             }
             .mapStyle(.standard(elevation: .flat))
@@ -439,13 +465,13 @@ struct RouteHistoryView: View {
                 }
             }
         }
-        .frame(maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Playback Bar
     var playbackBar: some View {
         HStack(spacing: 12) {
-            Button(action: { isPlaying.toggle() }) {
+            Button(action: { togglePlayback() }) {
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 14))
                     .foregroundColor(.white)
@@ -455,13 +481,24 @@ struct RouteHistoryView: View {
             }
 
             VStack(spacing: 4) {
-                Slider(value: $playbackProgress, in: 0...1)
-                    .tint(AppTheme.indigo)
+                Slider(value: $playbackProgress, in: 0...1) { editing in
+                    if !editing, let route = vm.selectedRoute {
+                        let idx = Int(playbackProgress * Double(route.points.count - 1))
+                        playbackIndex = max(0, min(idx, route.points.count - 1))
+                    }
+                }
+                .tint(AppTheme.indigo)
 
                 HStack {
-                    Text(vm.selectedRoute?.startTime ?? "—")
-                        .font(.system(size: 9))
-                        .foregroundColor(AppTheme.textMuted)
+                    if let route = vm.selectedRoute, playbackIndex < route.points.count, !route.points[playbackIndex].time.isEmpty {
+                        Text(route.points[playbackIndex].time)
+                            .font(.system(size: 9))
+                            .foregroundColor(AppTheme.textMuted)
+                    } else {
+                        Text(vm.selectedRoute?.startTime ?? "—")
+                            .font(.system(size: 9))
+                            .foregroundColor(AppTheme.textMuted)
+                    }
                     Spacer()
                     Text(vm.selectedRoute?.endTime ?? "—")
                         .font(.system(size: 9))
@@ -471,12 +508,12 @@ struct RouteHistoryView: View {
 
             // Speed selector
             Menu {
-                Button("1x") {}
-                Button("2x") {}
-                Button("4x") {}
-                Button("8x") {}
+                Button("1x") { playbackSpeed = 1.0 }
+                Button("2x") { playbackSpeed = 2.0 }
+                Button("4x") { playbackSpeed = 4.0 }
+                Button("8x") { playbackSpeed = 8.0 }
             } label: {
-                Text("1x")
+                Text("\(playbackSpeed == 1.0 ? "1" : playbackSpeed == 2.0 ? "2" : playbackSpeed == 4.0 ? "4" : "8")x")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(AppTheme.navy)
                     .frame(width: 36, height: 36)
@@ -487,6 +524,42 @@ struct RouteHistoryView: View {
         .padding(12)
         .background(.ultraThinMaterial)
         .cornerRadius(16)
+    }
+
+    // MARK: - Playback Control
+    private func togglePlayback() {
+        if isPlaying {
+            stopPlayback()
+        } else {
+            startPlayback()
+        }
+    }
+
+    private func startPlayback() {
+        guard let route = vm.selectedRoute, route.points.count > 1 else { return }
+        if playbackIndex >= route.points.count - 1 {
+            playbackIndex = 0
+            playbackProgress = 0
+        }
+        isPlaying = true
+        let interval = 0.5 / playbackSpeed
+        playbackTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [self] timer in
+            Task { @MainActor in
+                guard let route = vm.selectedRoute else { stopPlayback(); return }
+                if playbackIndex < route.points.count - 1 {
+                    playbackIndex += 1
+                    playbackProgress = Double(playbackIndex) / Double(route.points.count - 1)
+                } else {
+                    stopPlayback()
+                }
+            }
+        }
+    }
+
+    private func stopPlayback() {
+        isPlaying = false
+        playbackTimer?.invalidate()
+        playbackTimer = nil
     }
 
     // MARK: - Bottom Panel
@@ -684,6 +757,7 @@ class RouteHistoryViewModel: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private let wsManager = WebSocketManager.shared
+    private var loadTask: Task<Void, Never>?
 
     init() {
         subscribeToWebSocket()
@@ -735,7 +809,13 @@ class RouteHistoryViewModel: ObservableObject {
 
     // MARK: - Load routes from API
     func loadRoutes(from startDate: Date, to endDate: Date) {
-        guard let vehicleId = selectedVehicleId else { return }
+        guard let vehicleId = selectedVehicleId else {
+            print("[RouteHistory] loadRoutes: no vehicle selected")
+            return
+        }
+
+        // Cancel any in-flight load
+        loadTask?.cancel()
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -745,8 +825,10 @@ class RouteHistoryViewModel: ObservableObject {
 
         isLoadingRoutes = true
         errorMessage = nil
+        routes = []
+        selectedRoute = nil
 
-        Task {
+        loadTask = Task {
             do {
                 // Resolve IMEI to backend device_id
                 let deviceId = try await resolveDeviceId(for: vehicleId)
@@ -854,6 +936,9 @@ class RouteHistoryViewModel: ObservableObject {
 
                 self.routes = parsedRoutes
                 self.isLoadingRoutes = false
+                
+                guard !Task.isCancelled else { return }
+                
                 print("[RouteHistory] Loaded \(parsedRoutes.count) trips")
                 for r in parsedRoutes {
                     print("[RouteHistory]   Trip \(r.id): \(r.points.count) points, start=(\(r.points.first?.lat ?? 0),\(r.points.first?.lng ?? 0))")
@@ -865,6 +950,7 @@ class RouteHistoryViewModel: ObservableObject {
                     self.selectedRoute = nil
                 }
             } catch {
+                guard !Task.isCancelled else { return }
                 self.isLoadingRoutes = false
                 self.errorMessage = error.localizedDescription
                 self.routes = []

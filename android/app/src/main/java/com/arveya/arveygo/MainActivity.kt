@@ -33,15 +33,15 @@ class MainActivity : ComponentActivity() {
         // Lifecycle observer for WebSocket reconnection
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
-                // App coming to foreground — reconnect WebSocket
+                // App coming to foreground — smart reconnect
                 Log.d("WS", "App entering foreground — triggering reconnect")
-                WebSocketManager.reconnect()
+                WebSocketManager.onForeground()
             }
 
             override fun onStop(owner: LifecycleOwner) {
-                // App going to background — optionally disconnect to save battery
-                // WebSocketManager.disconnect()
+                // App going to background — stop pings, track timestamp
                 Log.d("WS", "App entering background")
+                WebSocketManager.onBackground()
             }
         })
 
