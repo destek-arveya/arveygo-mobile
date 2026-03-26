@@ -248,6 +248,15 @@ object APIService {
         }
     }
 
+    // MARK: - Geofences
+    suspend fun fetchGeofences(): List<com.arveya.arveygo.models.Geofence> = withContext(Dispatchers.IO) {
+        val json = get("/api/mobile/geofences")
+        val dataArray = json.optJSONArray("data") ?: return@withContext emptyList()
+        (0 until dataArray.length()).map { i ->
+            com.arveya.arveygo.models.Geofence.fromJson(dataArray.getJSONObject(i))
+        }
+    }
+
     // MARK: - Helpers
 
     private fun validateResponse(code: Int, body: String) {

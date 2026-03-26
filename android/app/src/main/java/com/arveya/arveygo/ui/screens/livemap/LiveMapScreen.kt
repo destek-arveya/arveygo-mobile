@@ -278,6 +278,47 @@ fun LiveMapScreen(
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
     val animatedMarkers = remember { mutableMapOf<String, AnimatedMarker>() }
 
+    // Geofences: fetch and draw on map
+    var geofences by remember { mutableStateOf<List<com.arveya.arveygo.models.Geofence>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        try {
+            geofences = com.arveya.arveygo.services.APIService.fetchGeofences()
+        } catch (e: Exception) {
+            android.util.Log.e("LiveMap", "Geofence fetch error", e)
+        }
+    }
+    LaunchedEffect(geofences, mapViewRef.value) {
+        val mv = mapViewRef.value ?: return@LaunchedEffect
+        mv.overlays.removeAll { it is org.osmdroid.views.overlay.Polygon }
+        for (g in geofences) {
+            val color = g.composeColor
+            val argbColor = color.toArgb()
+            val fillColor = color.copy(alpha = 0.15f).toArgb()
+            if (g.isCircle && g.centerLat != null && g.centerLng != null && g.radius != null) {
+                val circle = org.osmdroid.views.overlay.Polygon(mv)
+                circle.points = org.osmdroid.views.overlay.Polygon.pointsAsCircle(
+                    GeoPoint(g.centerLat, g.centerLng), g.radius
+                )
+                circle.fillPaint.color = fillColor
+                circle.outlinePaint.color = argbColor
+                circle.outlinePaint.strokeWidth = 2f
+                circle.title = g.name
+                mv.overlays.add(0, circle)
+            } else if (g.points.isNotEmpty()) {
+                val polygon = org.osmdroid.views.overlay.Polygon(mv)
+                val pts = g.points.map { GeoPoint(it.lat, it.lng) }.toMutableList()
+                if (pts.isNotEmpty() && pts.first() != pts.last()) pts.add(pts.first())
+                polygon.points = pts
+                polygon.fillPaint.color = fillColor
+                polygon.outlinePaint.color = argbColor
+                polygon.outlinePaint.strokeWidth = 2f
+                polygon.title = g.name
+                mv.overlays.add(0, polygon)
+            }
+        }
+        mv.invalidate()
+    }
+
     // Update markers when vehicle data changes (SMOOTH animation)
     LaunchedEffect(vehicleVersion, selectedVehicle, statusFilter) {
         val mapView = mapViewRef.value ?: return@LaunchedEffect

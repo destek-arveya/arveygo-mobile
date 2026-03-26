@@ -473,3 +473,56 @@ data class RouteTrip(
 
 // MARK: - WS Config
 data class WSConfig(val url: String, val token: String, val pingInterval: Int)
+
+// MARK: - Geofence Model
+data class GeofencePoint(val lat: Double, val lng: Double)
+
+data class Geofence(
+    val id: Int,
+    val name: String,
+    val type: String = "polygon",     // "polygon" or "circle"
+    val color: String = "#3b82f6",    // hex
+    val points: List<GeofencePoint> = emptyList(),
+    val radius: Double? = null,
+    val centerLat: Double? = null,
+    val centerLng: Double? = null,
+    val createdAt: String? = null
+) {
+    val isCircle: Boolean get() = type == "circle"
+
+    val composeColor: Color
+        get() {
+            return try {
+                val hex = color.removePrefix("#")
+                val int = hex.toLong(16)
+                Color(
+                    red = ((int shr 16) and 0xFF) / 255f,
+                    green = ((int shr 8) and 0xFF) / 255f,
+                    blue = (int and 0xFF) / 255f
+                )
+            } catch (_: Exception) {
+                Color.Blue
+            }
+        }
+
+    companion object {
+        fun fromJson(json: JSONObject): Geofence {
+            val pointsArray = json.optJSONArray("points") ?: org.json.JSONArray()
+            val pts = (0 until pointsArray.length()).map { i ->
+                val p = pointsArray.getJSONObject(i)
+                GeofencePoint(p.optDouble("lat", 0.0), p.optDouble("lng", 0.0))
+            }
+            return Geofence(
+                id = json.optInt("id", 0),
+                name = json.optString("name", ""),
+                type = json.optString("type", "polygon"),
+                color = json.optString("color", "#3b82f6"),
+                points = pts,
+                radius = if (json.has("radius") && !json.isNull("radius")) json.optDouble("radius") else null,
+                centerLat = if (json.has("center_lat") && !json.isNull("center_lat")) json.optDouble("center_lat") else null,
+                centerLng = if (json.has("center_lng") && !json.isNull("center_lng")) json.optDouble("center_lng") else null,
+                createdAt = json.optString("created_at", null)
+            )
+        }
+    }
+}

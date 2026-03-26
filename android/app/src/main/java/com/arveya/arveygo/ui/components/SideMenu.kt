@@ -110,7 +110,7 @@ fun SideMenu(
                     }
                     MenuSection("İZLEME") {
                         MenuItem(Icons.Default.Notifications, "Alarmlar", AppPage.ALARMS, selectedPage, onPageSelected)
-                        MenuItem(Icons.Default.Hexagon, "Geofence", null, selectedPage) { onClose() }
+                        MenuItem(Icons.Default.Hexagon, "Geofence", AppPage.GEOFENCES, selectedPage, onPageSelected)
                         MenuItem(Icons.Default.BarChart, "Raporlar", null, selectedPage) { onClose() }
                     }
                     MenuSection("AYARLAR") {

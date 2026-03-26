@@ -6,6 +6,7 @@ enum class AppPage(val label: String) {
     VEHICLES("Araçlar"),
     ROUTE_HISTORY("Rota Geçmişi"),
     ALARMS("Alarmlar"),
+    GEOFENCES("Geofence"),
     SETTINGS("Ayarlar"),
     SUPPORT("Destek Talebi")
 }

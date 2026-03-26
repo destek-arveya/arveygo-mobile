@@ -438,3 +438,34 @@ enum ChangeType {
 }
 
 import SwiftUI
+
+// MARK: - Geofence Model
+struct GeofencePoint: Codable, Hashable {
+    let lat: Double
+    let lng: Double
+}
+
+struct Geofence: Identifiable, Hashable {
+    let id: Int
+    let name: String
+    let type: String          // "polygon" or "circle"
+    let color: String         // hex e.g. "#3b82f6"
+    let points: [GeofencePoint]
+    let radius: Double?
+    let centerLat: Double?
+    let centerLng: Double?
+    let createdAt: String?
+
+    var swiftUIColor: Color {
+        let h = color.trimmingCharacters(in: .init(charactersIn: "#"))
+        let scanner = Scanner(string: h)
+        var rgb: UInt64 = 0
+        scanner.scanHexInt64(&rgb)
+        let r = Double((rgb >> 16) & 0xFF) / 255
+        let g = Double((rgb >> 8)  & 0xFF) / 255
+        let b = Double(rgb         & 0xFF) / 255
+        return Color(red: r, green: g, blue: b)
+    }
+
+    var isCircle: Bool { type == "circle" }
+}

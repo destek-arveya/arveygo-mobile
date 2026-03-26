@@ -183,6 +183,23 @@ struct LiveMapView: View {
                     }
                 }
             }
+
+            // Geofence overlays
+            if vm.showGeofences {
+                ForEach(vm.geofences) { geofence in
+                    if geofence.isCircle, let cLat = geofence.centerLat, let cLng = geofence.centerLng, let r = geofence.radius {
+                        MapCircle(center: CLLocationCoordinate2D(latitude: cLat, longitude: cLng), radius: r)
+                            .foregroundStyle(geofence.swiftUIColor.opacity(0.15))
+                            .stroke(geofence.swiftUIColor.opacity(0.6), lineWidth: 1.5)
+                    } else if !geofence.points.isEmpty {
+                        MapPolygon(coordinates: geofence.points.map {
+                            CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng)
+                        })
+                        .foregroundStyle(geofence.swiftUIColor.opacity(0.15))
+                        .stroke(geofence.swiftUIColor.opacity(0.6), lineWidth: 1.5)
+                    }
+                }
+            }
         }
         .mapStyle(.standard(elevation: .flat))
         .ignoresSafeArea(edges: .bottom)
@@ -663,6 +680,8 @@ class LiveMapViewModel: ObservableObject {
     @Published var statusFilter: VehicleStatus? = nil
     @Published var searchText = ""
     @Published var wsStatus: WSConnectionStatus = .idle
+    @Published var geofences: [Geofence] = []
+    @Published var showGeofences = true
 
     /// Animated positions: maps vehicle ID → animated CLLocationCoordinate2D
     @Published var animatedPositions: [String: CLLocationCoordinate2D] = [:]
@@ -708,6 +727,18 @@ class LiveMapViewModel: ObservableObject {
 
     init() {
         subscribeToWebSocket()
+        loadGeofences()
+    }
+
+    func loadGeofences() {
+        Task {
+            do {
+                let result = try await APIService.shared.fetchGeofences()
+                await MainActor.run { self.geofences = result }
+            } catch {
+                print("[LiveMap] Geofence fetch error: \(error)")
+            }
+        }
     }
 
     // MARK: - Smooth Animation

@@ -306,6 +306,46 @@ final class APIService {
 
     /// Clear stored token without network call
     func clearToken() { self.accessToken = nil }
+
+    // MARK: - Geofences
+
+    /// GET /api/mobile/geofences
+    func fetchGeofences() async throws -> [Geofence] {
+        let json = try await get("/api/mobile/geofences")
+
+        guard let dataArray = json["data"] as? [[String: Any]] else {
+            return []
+        }
+
+        return dataArray.compactMap { dict -> Geofence? in
+            guard let id = dict["id"] as? Int,
+                  let name = dict["name"] as? String else { return nil }
+
+            let type = (dict["type"] as? String) ?? "polygon"
+            let color = (dict["color"] as? String) ?? "#3b82f6"
+
+            var points: [GeofencePoint] = []
+            if let pArr = dict["points"] as? [[String: Any]] {
+                points = pArr.compactMap { p in
+                    guard let lat = p["lat"] as? Double,
+                          let lng = p["lng"] as? Double else { return nil }
+                    return GeofencePoint(lat: lat, lng: lng)
+                }
+            }
+
+            let radius = dict["radius"] as? Double
+            let centerLat = dict["center_lat"] as? Double
+            let centerLng = dict["center_lng"] as? Double
+            let createdAt = dict["created_at"] as? String
+
+            return Geofence(
+                id: id, name: name, type: type, color: color,
+                points: points, radius: radius,
+                centerLat: centerLat, centerLng: centerLng,
+                createdAt: createdAt
+            )
+        }
+    }
 }
 
 // MARK: - Token Store (Keychain)
