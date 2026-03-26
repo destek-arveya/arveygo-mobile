@@ -437,6 +437,8 @@ private fun OverviewTab(
         }
     }
 
+    var showDriverAssign by remember { mutableStateOf(false) }
+
     SectionCard(title = "SÜRÜCÜ BİLGİLERİ", icon = Icons.Default.Person) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -446,22 +448,34 @@ private fun OverviewTab(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.size(50.dp).clip(CircleShape).background(AppColors.Indigo.copy(alpha = 0.1f))
             ) {
-                Text(vehicle.driver.take(1), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Indigo)
+                Text(
+                    if (vehicle.driver.isEmpty()) "?" else vehicle.driver.take(1),
+                    fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Indigo
+                )
             }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(vehicle.driver, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                Text(
+                    if (vehicle.driver.isEmpty()) "Sürücü Atanmamış" else vehicle.driver,
+                    fontSize = 15.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy
+                )
                 Text("Atanmış Sürücü", fontSize = 11.sp, color = AppColors.TextMuted)
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Star, null, tint = Color(0xFFFF9800), modifier = Modifier.size(10.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("92", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
-                }
-                Text("Sürüş Puanı", fontSize = 9.sp, color = AppColors.TextMuted)
+            TextButton(onClick = { showDriverAssign = true }) {
+                Icon(Icons.Default.Edit, null, modifier = Modifier.size(14.dp), tint = AppColors.Indigo)
+                Spacer(Modifier.width(4.dp))
+                Text("Değiştir", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.Indigo)
             }
         }
+    }
+
+    if (showDriverAssign) {
+        VehicleDriverAssignDialog(
+            vehicleId = vehicle.id.toIntOrNull() ?: 0,
+            currentDriverName = vehicle.driver,
+            onDismiss = { showDriverAssign = false },
+            onAssigned = { showDriverAssign = false }
+        )
     }
 
     SectionCard(title = "HIZLI İŞLEMLER", icon = Icons.Default.FlashOn) {

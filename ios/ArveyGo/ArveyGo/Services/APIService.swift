@@ -236,6 +236,23 @@ final class APIService {
         return json
     }
 
+    /// DELETE any authenticated endpoint
+    func httpDelete(_ path: String) async throws -> [String: Any] {
+        let url = try makeURL(path)
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        try applyAuth(&request)
+
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw APIError.decodingError("JSON ayrıştırılamadı")
+        }
+        return json
+    }
+
     // MARK: - Helpers
 
     private func makeURL(_ path: String) throws -> URL {
@@ -434,6 +451,49 @@ final class APIService {
             totalDistanceKm: 0, tripCount: 0, overspeedCount: 0, alarmCount: 0,
             hasTelemetry: false, createdAt: nil
         )
+    }
+
+    /// PUT /api/mobile/drivers/{id}
+    func updateDriver(id: String, data: [String: Any]) async throws -> Driver? {
+        let json = try await put("/api/mobile/drivers/\(id)", body: data)
+        guard let dict = json["data"] as? [String: Any] else { return nil }
+        let dId = dict["id"] as? String ?? ""
+        let name = dict["name"] as? String ?? ""
+        return Driver(
+            id: dId, driverCode: dict["driverCode"] as? String ?? "", name: name,
+            avatar: dict["avatar"] as? String ?? "", color: dict["color"] as? String ?? "#3b82f6",
+            role: dict["role"] as? String ?? "Sürücü", phone: dict["phone"] as? String ?? "",
+            email: dict["email"] as? String ?? "", license: dict["license"] as? String ?? "",
+            licenseNo: dict["licenseNo"] as? String ?? "", employeeNo: dict["employeeNo"] as? String ?? "",
+            vehicle: dict["vehicle"] as? String ?? "", lastVehicle: dict["lastVehicle"] as? String ?? "",
+            model: dict["model"] as? String ?? "", city: dict["city"] as? String ?? "",
+            vehicleCount: dict["vehicleCount"] as? Int ?? 0, status: dict["status"] as? String ?? "offline",
+            profileStatus: dict["profileStatus"] as? String ?? "no_profile",
+            hasProfile: dict["hasProfile"] as? Bool ?? false, profileId: dict["profileId"] as? Int,
+            notes: dict["notes"] as? String ?? "", hiredAt: dict["hiredAt"] as? String,
+            scoreGeneral: 0, scoreSpeed: 0, scoreBrake: 0, scoreFuel: 0, scoreSafety: 0,
+            totalDistanceKm: 0, tripCount: 0, overspeedCount: 0, alarmCount: 0,
+            hasTelemetry: false, createdAt: nil
+        )
+    }
+
+    /// GET /api/mobile/drivers/catalog  — returns form data + vehicles list
+    func fetchDriverCatalog() async throws -> [[String: Any]] {
+        let json = try await get("/api/mobile/drivers/catalog")
+        return json["vehicles"] as? [[String: Any]] ?? []
+    }
+
+    /// POST /api/mobile/vehicles/{id}/assign-driver
+    func assignDriverToVehicle(vehicleId: Int, driverProfileId: Int?, driverCode: String?) async throws {
+        var body: [String: Any] = [:]
+        if let pid = driverProfileId { body["driver_profile_id"] = pid }
+        if let code = driverCode { body["driver_code"] = code }
+        _ = try await post("/api/mobile/vehicles/\(vehicleId)/assign-driver", body: body)
+    }
+
+    /// DELETE /api/mobile/vehicles/{id}/assign-driver
+    func clearDriverFromVehicle(vehicleId: Int) async throws {
+        _ = try await httpDelete("/api/mobile/vehicles/\(vehicleId)/assign-driver")
     }
 
     // MARK: - Geofences

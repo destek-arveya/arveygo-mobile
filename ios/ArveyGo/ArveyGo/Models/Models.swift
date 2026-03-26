@@ -550,3 +550,10 @@ struct DriversResponse {
     let drivers: [Driver]
     let stats: DriverStats
 }
+
+struct CatalogVehicle: Identifiable, Hashable {
+    let id: Int
+    let imei: String
+    let plate: String
+    let name: String
+}

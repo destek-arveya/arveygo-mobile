@@ -38,16 +38,10 @@ struct DriversView: View {
                 } else {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 12) {
-                            // Stats strip
                             statsStrip
-
-                            // Search + filter
                             searchBar
-
-                            // Status filter chips
                             statusChips
 
-                            // Driver list
                             if filteredDrivers.isEmpty {
                                 emptyState
                             } else {
@@ -57,7 +51,6 @@ struct DriversView: View {
                                     }
                                 }
                             }
-
                             Spacer().frame(height: 16)
                         }
                         .padding(.horizontal, 16)
@@ -106,10 +99,10 @@ struct DriversView: View {
             }
             .onAppear { vm.loadDrivers() }
             .sheet(item: $selectedDriver) { driver in
-                DriverDetailSheet(driver: driver)
+                DriverDetailSheet(driver: driver, onRefresh: { vm.loadDrivers() })
             }
             .sheet(isPresented: $showAddDriver) {
-                AddDriverSheet(onSave: { data in
+                DriverFormSheet(editDriver: nil, onSave: { data in
                     vm.createDriver(data: data)
                     showAddDriver = false
                 })
@@ -132,51 +125,29 @@ struct DriversView: View {
 
     func statChip(icon: String, label: String, value: String, color: Color) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 10))
-                .foregroundColor(color)
-            Text(value)
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(AppTheme.navy)
-            Text(label)
-                .font(.system(size: 10))
-                .foregroundColor(AppTheme.textMuted)
+            Image(systemName: icon).font(.system(size: 10)).foregroundColor(color)
+            Text(value).font(.system(size: 13, weight: .bold)).foregroundColor(AppTheme.navy)
+            Text(label).font(.system(size: 10)).foregroundColor(AppTheme.textMuted)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(AppTheme.surface)
-        .cornerRadius(20)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
-        )
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(AppTheme.surface).cornerRadius(20)
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(AppTheme.borderSoft, lineWidth: 1))
     }
 
     // MARK: - Search Bar
     var searchBar: some View {
         HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 14))
-                .foregroundColor(AppTheme.textMuted)
-            TextField("Sürücü ara...", text: $searchText)
-                .font(.system(size: 13))
-                .foregroundColor(AppTheme.navy)
+            Image(systemName: "magnifyingglass").font(.system(size: 14)).foregroundColor(AppTheme.textMuted)
+            TextField("Sürücü ara...", text: $searchText).font(.system(size: 13)).foregroundColor(AppTheme.navy)
             if !searchText.isEmpty {
                 Button(action: { searchText = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(AppTheme.textFaint)
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 14)).foregroundColor(AppTheme.textFaint)
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(AppTheme.surface)
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
-        )
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .background(AppTheme.surface).cornerRadius(10)
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
     }
 
     // MARK: - Status Chips
@@ -195,35 +166,21 @@ struct DriversView: View {
         let isActive = filterStatus == key
         return Button(action: { filterStatus = key }) {
             HStack(spacing: 4) {
-                if let dot = dotColor {
-                    Circle().fill(dot).frame(width: 6, height: 6)
-                }
-                Text(label)
-                    .font(.system(size: 11, weight: .semibold))
+                if let dot = dotColor { Circle().fill(dot).frame(width: 6, height: 6) }
+                Text(label).font(.system(size: 11, weight: .semibold))
             }
             .foregroundColor(isActive ? .white : AppTheme.textMuted)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(isActive ? AppTheme.navy : Color.clear)
-            .cornerRadius(20)
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(isActive ? AppTheme.navy : AppTheme.borderSoft, lineWidth: 1)
-            )
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(isActive ? AppTheme.navy : Color.clear).cornerRadius(20)
+            .overlay(RoundedRectangle(cornerRadius: 20).stroke(isActive ? AppTheme.navy : AppTheme.borderSoft, lineWidth: 1))
         }
     }
 
-    // MARK: - Empty State
     var emptyState: some View {
         VStack(spacing: 8) {
-            Image(systemName: "person.2")
-                .font(.system(size: 32))
-                .foregroundColor(AppTheme.textFaint)
-            Text("Sürücü bulunamadı")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(AppTheme.textMuted)
-        }
-        .padding(.vertical, 40)
+            Image(systemName: "person.2").font(.system(size: 32)).foregroundColor(AppTheme.textFaint)
+            Text("Sürücü bulunamadı").font(.system(size: 14, weight: .medium)).foregroundColor(AppTheme.textMuted)
+        }.padding(.vertical, 40)
     }
 
     // MARK: - Driver Card
@@ -232,155 +189,90 @@ struct DriversView: View {
         return Button(action: { selectedDriver = driver }) {
             VStack(spacing: 0) {
                 HStack(spacing: 12) {
-                    // Avatar
                     ZStack {
-                        Circle()
-                            .fill(driver.avatarColor.opacity(0.15))
-                            .frame(width: 44, height: 44)
-                        Text(driver.initials)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(driver.avatarColor)
-                        // Status dot
-                        Circle()
-                            .fill(driver.statusColor)
-                            .frame(width: 10, height: 10)
-                            .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
-                            .offset(x: 15, y: 15)
+                        Circle().fill(driver.avatarColor.opacity(0.15)).frame(width: 44, height: 44)
+                        Text(driver.initials).font(.system(size: 14, weight: .bold)).foregroundColor(driver.avatarColor)
+                        Circle().fill(driver.statusColor).frame(width: 10, height: 10)
+                            .overlay(Circle().stroke(Color.white, lineWidth: 1.5)).offset(x: 15, y: 15)
                     }
-
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
-                            Text(driver.name)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(AppTheme.navy)
-                                .lineLimit(1)
+                            Text(driver.name).font(.system(size: 13, weight: .semibold)).foregroundColor(AppTheme.navy).lineLimit(1)
                             if !driver.driverCode.isEmpty {
-                                Text(driver.driverCode)
-                                    .font(.system(size: 9, weight: .medium))
-                                    .foregroundColor(AppTheme.textFaint)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 1)
-                                    .background(AppTheme.bg)
-                                    .cornerRadius(4)
+                                Text(driver.driverCode).font(.system(size: 9, weight: .medium)).foregroundColor(AppTheme.textFaint)
+                                    .padding(.horizontal, 5).padding(.vertical, 1).background(AppTheme.bg).cornerRadius(4)
                             }
                         }
-
                         HStack(spacing: 4) {
-                            Image(systemName: "car.fill")
-                                .font(.system(size: 9))
-                                .foregroundColor(AppTheme.textFaint)
-                            Text(driver.vehicle)
-                                .font(.system(size: 11))
-                                .foregroundColor(AppTheme.textMuted)
-                                .lineLimit(1)
+                            Image(systemName: "car.fill").font(.system(size: 9)).foregroundColor(AppTheme.textFaint)
+                            Text(driver.vehicle.isEmpty ? "Araç atanmamış" : driver.vehicle)
+                                .font(.system(size: 11)).foregroundColor(driver.vehicle.isEmpty ? AppTheme.textFaint : AppTheme.textMuted).lineLimit(1)
                         }
-
                         if !driver.phone.isEmpty {
                             HStack(spacing: 4) {
-                                Image(systemName: "phone.fill")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(AppTheme.textFaint)
-                                Text(driver.phone)
-                                    .font(.system(size: 10))
-                                    .foregroundColor(AppTheme.textMuted)
+                                Image(systemName: "phone.fill").font(.system(size: 9)).foregroundColor(AppTheme.textFaint)
+                                Text(driver.phone).font(.system(size: 10)).foregroundColor(AppTheme.textMuted)
                             }
                         }
                     }
-
                     Spacer()
-
-                    // Score badge
                     VStack(spacing: 2) {
                         ZStack {
-                            Circle()
-                                .stroke(driver.scoreColor.opacity(0.2), lineWidth: 3)
-                                .frame(width: 38, height: 38)
-                            Circle()
-                                .trim(from: 0, to: CGFloat(driver.scoreGeneral) / 100.0)
+                            Circle().stroke(driver.scoreColor.opacity(0.2), lineWidth: 3).frame(width: 38, height: 38)
+                            Circle().trim(from: 0, to: CGFloat(driver.scoreGeneral) / 100.0)
                                 .stroke(driver.scoreColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                                .frame(width: 38, height: 38)
-                                .rotationEffect(.degrees(-90))
-                            Text("\(driver.scoreGeneral)")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(driver.scoreColor)
+                                .frame(width: 38, height: 38).rotationEffect(.degrees(-90))
+                            Text("\(driver.scoreGeneral)").font(.system(size: 12, weight: .bold)).foregroundColor(driver.scoreColor)
                         }
-                        Text("Skor")
-                            .font(.system(size: 8))
-                            .foregroundColor(AppTheme.textFaint)
+                        Text("Skor").font(.system(size: 8)).foregroundColor(AppTheme.textFaint)
                     }
-                }
-                .padding(14)
-
-                // Bottom stats row
+                }.padding(14)
                 HStack(spacing: 0) {
                     miniStat(icon: "road.lanes", value: String(format: "%.0f km", driver.totalDistanceKm))
                     miniStat(icon: "arrow.triangle.swap", value: "\(driver.tripCount) sefer")
                     miniStat(icon: "speedometer", value: "\(driver.overspeedCount) hız")
                     miniStat(icon: "bell.fill", value: "\(driver.alarmCount) alarm")
-                }
-                .padding(.horizontal, 14)
-                .padding(.bottom, 10)
+                }.padding(.horizontal, 14).padding(.bottom, 10)
             }
-            .background(AppTheme.surface)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? AppTheme.indigo : AppTheme.borderSoft, lineWidth: isSelected ? 1.5 : 1)
-            )
-        }
-        .buttonStyle(.plain)
+            .background(AppTheme.surface).cornerRadius(12)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSelected ? AppTheme.indigo : AppTheme.borderSoft, lineWidth: isSelected ? 1.5 : 1))
+        }.buttonStyle(.plain)
     }
 
     func miniStat(icon: String, value: String) -> some View {
         HStack(spacing: 3) {
-            Image(systemName: icon)
-                .font(.system(size: 8))
-                .foregroundColor(AppTheme.textFaint)
-            Text(value)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundColor(AppTheme.textMuted)
-        }
-        .frame(maxWidth: .infinity)
+            Image(systemName: icon).font(.system(size: 8)).foregroundColor(AppTheme.textFaint)
+            Text(value).font(.system(size: 9, weight: .medium)).foregroundColor(AppTheme.textMuted)
+        }.frame(maxWidth: .infinity)
     }
 }
 
 // MARK: - Driver Detail Sheet
 struct DriverDetailSheet: View {
     let driver: Driver
+    var onRefresh: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
+    @State private var showEditSheet = false
 
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
-                    // Header
                     VStack(spacing: 8) {
                         ZStack {
-                            Circle()
-                                .fill(driver.avatarColor.opacity(0.15))
-                                .frame(width: 64, height: 64)
-                            Text(driver.initials)
-                                .font(.system(size: 22, weight: .bold))
-                                .foregroundColor(driver.avatarColor)
+                            Circle().fill(driver.avatarColor.opacity(0.15)).frame(width: 64, height: 64)
+                            Text(driver.initials).font(.system(size: 22, weight: .bold)).foregroundColor(driver.avatarColor)
                         }
-                        Text(driver.name)
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(AppTheme.navy)
+                        Text(driver.name).font(.system(size: 18, weight: .bold)).foregroundColor(AppTheme.navy)
                         HStack(spacing: 6) {
                             Circle().fill(driver.statusColor).frame(width: 8, height: 8)
                             Text(driver.status == "online" ? "Çevrimiçi" : driver.status == "idle" ? "Boşta" : "Çevrimdışı")
-                                .font(.system(size: 12))
-                                .foregroundColor(AppTheme.textMuted)
-                            Text("·")
-                                .foregroundColor(AppTheme.textFaint)
-                            Text(driver.role)
-                                .font(.system(size: 12))
-                                .foregroundColor(AppTheme.textMuted)
+                                .font(.system(size: 12)).foregroundColor(AppTheme.textMuted)
+                            Text("·").foregroundColor(AppTheme.textFaint)
+                            Text(driver.role).font(.system(size: 12)).foregroundColor(AppTheme.textMuted)
                         }
-                    }
-                    .padding(.top, 8)
+                    }.padding(.top, 8)
 
-                    // Contact Info
                     infoSection(title: "İletişim") {
                         if !driver.phone.isEmpty { infoRow(icon: "phone.fill", label: "Telefon", value: driver.phone) }
                         if !driver.email.isEmpty { infoRow(icon: "envelope.fill", label: "E-posta", value: driver.email) }
@@ -388,20 +280,17 @@ struct DriverDetailSheet: View {
                         if !driver.driverCode.isEmpty { infoRow(icon: "barcode", label: "Sürücü Kodu", value: driver.driverCode) }
                     }
 
-                    // Vehicle Info
                     infoSection(title: "Araç Bilgisi") {
-                        infoRow(icon: "car.fill", label: "Mevcut Araç", value: driver.vehicle)
+                        infoRow(icon: "car.fill", label: "Mevcut Araç", value: driver.vehicle.isEmpty ? "Atanmamış" : driver.vehicle)
                         if !driver.model.isEmpty { infoRow(icon: "car.2.fill", label: "Model", value: driver.model) }
                         if !driver.city.isEmpty { infoRow(icon: "mappin.circle.fill", label: "Şehir", value: driver.city) }
                     }
 
-                    // License Info
                     infoSection(title: "Ehliyet") {
                         infoRow(icon: "creditcard.fill", label: "Sınıf", value: driver.license)
                         if !driver.licenseNo.isEmpty { infoRow(icon: "number.circle.fill", label: "Ehliyet No", value: driver.licenseNo) }
                     }
 
-                    // Performance Scores
                     infoSection(title: "Performans Skorları") {
                         scoreRow(label: "Genel", score: driver.scoreGeneral)
                         scoreRow(label: "Hız", score: driver.scoreSpeed)
@@ -410,7 +299,6 @@ struct DriverDetailSheet: View {
                         scoreRow(label: "Güvenlik", score: driver.scoreSafety)
                     }
 
-                    // Stats
                     infoSection(title: "İstatistikler") {
                         infoRow(icon: "road.lanes", label: "Toplam Mesafe", value: String(format: "%.1f km", driver.totalDistanceKm))
                         infoRow(icon: "arrow.triangle.swap", label: "Sefer Sayısı", value: "\(driver.tripCount)")
@@ -420,31 +308,45 @@ struct DriverDetailSheet: View {
 
                     if !driver.notes.isEmpty {
                         infoSection(title: "Notlar") {
-                            Text(driver.notes)
-                                .font(.system(size: 12))
-                                .foregroundColor(AppTheme.textSecondary)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
+                            Text(driver.notes).font(.system(size: 12)).foregroundColor(AppTheme.textSecondary)
+                                .padding(.horizontal, 16).padding(.vertical, 8)
                         }
                     }
-
                     Spacer().frame(height: 30)
-                }
-                .padding(.horizontal, 16)
+                }.padding(.horizontal, 16)
             }
             .background(AppTheme.bg)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Kapat") { dismiss() }
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(AppTheme.indigo)
+                        .font(.system(size: 14, weight: .medium)).foregroundColor(AppTheme.indigo)
                 }
                 ToolbarItem(placement: .principal) {
-                    Text("Sürücü Detayı")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(AppTheme.navy)
+                    Text("Sürücü Detayı").font(.system(size: 15, weight: .semibold)).foregroundColor(AppTheme.navy)
                 }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { showEditSheet = true }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "pencil").font(.system(size: 13))
+                            Text("Düzenle").font(.system(size: 13, weight: .medium))
+                        }.foregroundColor(AppTheme.indigo)
+                    }
+                }
+            }
+            .sheet(isPresented: $showEditSheet) {
+                DriverFormSheet(editDriver: driver, onSave: { data in
+                    Task {
+                        do {
+                            _ = try await APIService.shared.updateDriver(id: driver.id, data: data)
+                            onRefresh?()
+                            showEditSheet = false
+                            dismiss()
+                        } catch {
+                            print("[Driver] Update error: \(error)")
+                        }
+                    }
+                })
             }
         }
     }
@@ -452,125 +354,230 @@ struct DriverDetailSheet: View {
     @ViewBuilder
     func infoSection(title: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(AppTheme.textFaint)
-                .tracking(0.5)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
-            VStack(spacing: 0) {
-                content()
-            }
-            .background(AppTheme.surface)
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(AppTheme.borderSoft, lineWidth: 1)
-            )
+            Text(title).font(.system(size: 11, weight: .semibold)).foregroundColor(AppTheme.textFaint)
+                .tracking(0.5).padding(.horizontal, 16).padding(.bottom, 8)
+            VStack(spacing: 0) { content() }
+                .background(AppTheme.surface).cornerRadius(10)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
         }
     }
 
     func infoRow(icon: String, label: String, value: String) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.indigo)
-                .frame(width: 20)
-            Text(label)
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.textMuted)
+            Image(systemName: icon).font(.system(size: 12)).foregroundColor(AppTheme.indigo).frame(width: 20)
+            Text(label).font(.system(size: 12)).foregroundColor(AppTheme.textMuted)
             Spacer()
-            Text(value)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(AppTheme.navy)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+            Text(value).font(.system(size: 12, weight: .medium)).foregroundColor(AppTheme.navy).lineLimit(1)
+        }.padding(.horizontal, 16).padding(.vertical, 10)
     }
 
     func scoreRow(label: String, score: Int) -> some View {
         let color: Color = score >= 85 ? AppTheme.online : score >= 70 ? AppTheme.idle : AppTheme.offline
         return HStack(spacing: 10) {
-            Text(label)
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.textMuted)
-                .frame(width: 60, alignment: .leading)
+            Text(label).font(.system(size: 12)).foregroundColor(AppTheme.textMuted).frame(width: 60, alignment: .leading)
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(AppTheme.bg)
-                        .frame(height: 6)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(color)
-                        .frame(width: geo.size.width * CGFloat(score) / 100, height: 6)
+                    RoundedRectangle(cornerRadius: 2).fill(AppTheme.bg).frame(height: 6)
+                    RoundedRectangle(cornerRadius: 2).fill(color).frame(width: geo.size.width * CGFloat(score) / 100, height: 6)
                 }
-            }
-            .frame(height: 6)
-            Text("\(score)")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundColor(color)
-                .frame(width: 28, alignment: .trailing)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+            }.frame(height: 6)
+            Text("\(score)").font(.system(size: 12, weight: .bold)).foregroundColor(color).frame(width: 28, alignment: .trailing)
+        }.padding(.horizontal, 16).padding(.vertical, 8)
     }
 }
 
-// MARK: - Add Driver Sheet
-struct AddDriverSheet: View {
+// MARK: - Driver Form Sheet (Create + Edit)
+struct DriverFormSheet: View {
+    let editDriver: Driver?
     let onSave: ([String: Any]) -> Void
     @Environment(\.dismiss) private var dismiss
+
     @State private var fullName = ""
     @State private var driverCode = ""
     @State private var phone = ""
     @State private var email = ""
+    @State private var licenseClass = ""
+    @State private var licenseNo = ""
+    @State private var employeeNo = ""
     @State private var status = "active"
+    @State private var notes = ""
+    @State private var selectedVehicleId: Int?
+
+    @State private var vehicles: [CatalogVehicle] = []
+    @State private var isLoadingCatalog = false
+    @State private var phoneError: String?
+
+    var isEditing: Bool { editDriver != nil }
+
+    var isPhoneValid: Bool {
+        let digits = phone.filter { $0.isNumber }
+        return phone.isEmpty || digits.count == 11
+    }
+
+    var canSave: Bool {
+        !fullName.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !driverCode.trimmingCharacters(in: .whitespaces).isEmpty &&
+        isPhoneValid
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Temel Bilgiler") {
                     TextField("Ad Soyad *", text: $fullName)
-                    TextField("Sürücü Kodu", text: $driverCode)
+                    TextField("Sürücü Kodu *", text: $driverCode)
+                        .textInputAutocapitalization(.characters)
                     Picker("Durum", selection: $status) {
                         Text("Aktif").tag("active")
                         Text("Pasif").tag("inactive")
+                        Text("İzinli").tag("on_leave")
                     }
                 }
-                Section("İletişim") {
-                    TextField("Telefon", text: $phone)
-                        .keyboardType(.phonePad)
+
+                Section {
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Telefon (05XXXXXXXXX)", text: $phone)
+                            .keyboardType(.numberPad)
+                            .onChange(of: phone) { newValue in
+                                let digits = newValue.filter { $0.isNumber }
+                                if digits.count > 11 {
+                                    phone = String(digits.prefix(11))
+                                } else if digits != newValue {
+                                    phone = digits
+                                }
+                                if !phone.isEmpty {
+                                    let d = phone.filter { $0.isNumber }
+                                    if d.count != 11 {
+                                        phoneError = "Telefon numarası 11 haneli olmalıdır (ör: 05XXXXXXXXX)"
+                                    } else if !d.hasPrefix("0") {
+                                        phoneError = "Telefon numarası 0 ile başlamalıdır"
+                                    } else {
+                                        phoneError = nil
+                                    }
+                                } else {
+                                    phoneError = nil
+                                }
+                            }
+                        if let err = phoneError {
+                            Text(err).font(.system(size: 11)).foregroundColor(.red)
+                        }
+                    }
                     TextField("E-posta", text: $email)
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
+                } header: {
+                    Text("İletişim")
+                }
+
+                Section("Ehliyet") {
+                    TextField("Ehliyet Sınıfı", text: $licenseClass)
+                    TextField("Ehliyet No", text: $licenseNo)
+                }
+
+                Section("Diğer") {
+                    TextField("Sicil No", text: $employeeNo)
+                    TextField("Notlar", text: $notes, axis: .vertical)
+                        .lineLimit(3...6)
+                }
+
+                Section("Araç Ataması") {
+                    if isLoadingCatalog {
+                        HStack {
+                            ProgressView().scaleEffect(0.8)
+                            Text("Araçlar yükleniyor...").font(.system(size: 13)).foregroundColor(AppTheme.textMuted)
+                        }
+                    } else {
+                        Picker("Araç Seç", selection: $selectedVehicleId) {
+                            Text("Araç atanmamış").tag(nil as Int?)
+                            ForEach(vehicles) { v in
+                                Text("\(v.plate) — \(v.name)").tag(v.id as Int?)
+                            }
+                        }
+                    }
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("İptal") { dismiss() }
-                        .foregroundColor(AppTheme.textMuted)
+                    Button("İptal") { dismiss() }.foregroundColor(AppTheme.textMuted)
                 }
                 ToolbarItem(placement: .principal) {
-                    Text("Yeni Sürücü")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(AppTheme.navy)
+                    Text(isEditing ? "Sürücü Düzenle" : "Yeni Sürücü")
+                        .font(.system(size: 15, weight: .semibold)).foregroundColor(AppTheme.navy)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Kaydet") {
-                        var data: [String: Any] = [
-                            "full_name": fullName,
-                            "status": status
-                        ]
-                        if !driverCode.isEmpty { data["driver_code"] = driverCode }
-                        if !phone.isEmpty { data["phone"] = phone }
-                        if !email.isEmpty { data["email"] = email }
-                        onSave(data)
+                    Button("Kaydet") { saveDriver() }
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(canSave ? AppTheme.indigo : AppTheme.textFaint)
+                        .disabled(!canSave)
+                }
+            }
+            .onAppear {
+                loadCatalog()
+                if let d = editDriver {
+                    fullName = d.name
+                    driverCode = d.driverCode
+                    phone = d.phone
+                    email = d.email
+                    licenseClass = d.license
+                    licenseNo = d.licenseNo
+                    employeeNo = d.employeeNo
+                    status = (d.profileStatus == "no_profile" || d.profileStatus.isEmpty) ? "active" : d.profileStatus
+                    notes = d.notes
+                }
+            }
+        }
+    }
+
+    private func loadCatalog() {
+        isLoadingCatalog = true
+        Task {
+            do {
+                let raw = try await APIService.shared.fetchDriverCatalog()
+                await MainActor.run {
+                    vehicles = raw.compactMap { dict -> CatalogVehicle? in
+                        guard let id = dict["id"] as? Int,
+                              let plate = dict["plate"] as? String else { return nil }
+                        return CatalogVehicle(id: id, imei: dict["imei"] as? String ?? "",
+                                              plate: plate, name: dict["name"] as? String ?? "")
                     }
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(fullName.isEmpty ? AppTheme.textFaint : AppTheme.indigo)
-                    .disabled(fullName.isEmpty)
+                    isLoadingCatalog = false
+                }
+            } catch {
+                await MainActor.run { isLoadingCatalog = false }
+                print("[DriverForm] Catalog error: \(error)")
+            }
+        }
+    }
+
+    private func saveDriver() {
+        var data: [String: Any] = [
+            "full_name": fullName.trimmingCharacters(in: .whitespaces),
+            "driver_code": driverCode.trimmingCharacters(in: .whitespaces),
+            "status": status
+        ]
+        if !phone.isEmpty { data["phone"] = phone }
+        if !email.isEmpty { data["email"] = email }
+        if !licenseClass.isEmpty { data["license_class"] = licenseClass }
+        if !licenseNo.isEmpty { data["license_no"] = licenseNo }
+        if !employeeNo.isEmpty { data["employee_no"] = employeeNo }
+        if !notes.isEmpty { data["notes"] = notes }
+
+        onSave(data)
+
+        // Assign vehicle if selected
+        if let vehicleId = selectedVehicleId {
+            let dc = driverCode.trimmingCharacters(in: .whitespaces)
+            let pid = editDriver?.profileId
+            Task {
+                do {
+                    try await APIService.shared.assignDriverToVehicle(
+                        vehicleId: vehicleId,
+                        driverProfileId: pid,
+                        driverCode: dc.isEmpty ? nil : dc
+                    )
+                } catch {
+                    print("[DriverForm] Assign vehicle error: \(error)")
                 }
             }
         }
@@ -586,22 +593,13 @@ class DriversViewModel: ObservableObject {
 
     func loadDrivers() {
         guard !isLoading else { return }
-        isLoading = true
-        error = nil
-
+        isLoading = true; error = nil
         Task {
             do {
                 let response = try await APIService.shared.fetchDrivers()
-                await MainActor.run {
-                    self.drivers = response.drivers
-                    self.stats = response.stats
-                    self.isLoading = false
-                }
+                await MainActor.run { self.drivers = response.drivers; self.stats = response.stats; self.isLoading = false }
             } catch {
-                await MainActor.run {
-                    self.error = error.localizedDescription
-                    self.isLoading = false
-                }
+                await MainActor.run { self.error = error.localizedDescription; self.isLoading = false }
                 print("[Drivers] Error: \(error)")
             }
         }
@@ -609,11 +607,158 @@ class DriversViewModel: ObservableObject {
 
     func createDriver(data: [String: Any]) {
         Task {
+            do { let _ = try await APIService.shared.createDriver(data: data); loadDrivers() }
+            catch { print("[Drivers] Create error: \(error)") }
+        }
+    }
+
+    func updateDriver(id: String, data: [String: Any]) {
+        Task {
+            do { let _ = try await APIService.shared.updateDriver(id: id, data: data); loadDrivers() }
+            catch { print("[Drivers] Update error: \(error)") }
+        }
+    }
+}
+
+// MARK: - Vehicle Driver Assign Sheet (used from Vehicle Detail)
+struct VehicleDriverAssignSheet: View {
+    let vehicleId: Int
+    let currentDriverName: String
+    var onAssigned: (() -> Void)?
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var drivers: [Driver] = []
+    @State private var isLoading = true
+    @State private var searchText = ""
+    @State private var isAssigning = false
+
+    var filteredDrivers: [Driver] {
+        if searchText.isEmpty { return drivers }
+        return drivers.filter {
+            $0.name.localizedCaseInsensitiveContains(searchText) ||
+            $0.driverCode.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                AppTheme.bg.ignoresSafeArea()
+                if isLoading {
+                    ProgressView()
+                } else {
+                    VStack(spacing: 0) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "magnifyingglass").font(.system(size: 14)).foregroundColor(AppTheme.textMuted)
+                            TextField("Sürücü ara...", text: $searchText).font(.system(size: 13))
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 10)
+                        .background(AppTheme.surface).cornerRadius(10)
+                        .padding(.horizontal, 16).padding(.top, 8)
+
+                        if !currentDriverName.isEmpty {
+                            HStack(spacing: 8) {
+                                Image(systemName: "person.fill.checkmark").font(.system(size: 12)).foregroundColor(AppTheme.online)
+                                Text("Mevcut: \(currentDriverName)").font(.system(size: 12, weight: .medium)).foregroundColor(AppTheme.navy)
+                                Spacer()
+                                Button(action: { clearDriver() }) {
+                                    Text("Kaldır").font(.system(size: 11, weight: .semibold)).foregroundColor(.red)
+                                        .padding(.horizontal, 10).padding(.vertical, 4)
+                                        .background(Color.red.opacity(0.1)).cornerRadius(6)
+                                }
+                            }
+                            .padding(.horizontal, 16).padding(.vertical, 10)
+                            .background(AppTheme.online.opacity(0.05))
+                        }
+
+                        ScrollView {
+                            LazyVStack(spacing: 6) {
+                                ForEach(filteredDrivers, id: \.id) { driver in
+                                    Button(action: { assignDriver(driver) }) {
+                                        HStack(spacing: 12) {
+                                            ZStack {
+                                                Circle().fill(driver.avatarColor.opacity(0.15)).frame(width: 40, height: 40)
+                                                Text(driver.initials).font(.system(size: 13, weight: .bold)).foregroundColor(driver.avatarColor)
+                                            }
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(driver.name).font(.system(size: 13, weight: .semibold)).foregroundColor(AppTheme.navy)
+                                                HStack(spacing: 8) {
+                                                    if !driver.driverCode.isEmpty {
+                                                        Text(driver.driverCode).font(.system(size: 10)).foregroundColor(AppTheme.textFaint)
+                                                    }
+                                                    if !driver.phone.isEmpty {
+                                                        Text(driver.phone).font(.system(size: 10)).foregroundColor(AppTheme.textMuted)
+                                                    }
+                                                }
+                                            }
+                                            Spacer()
+                                            if !driver.vehicle.isEmpty {
+                                                Text(driver.vehicle).font(.system(size: 10)).foregroundColor(AppTheme.textFaint)
+                                            }
+                                            Image(systemName: "chevron.right").font(.system(size: 10)).foregroundColor(AppTheme.textFaint)
+                                        }
+                                        .padding(.horizontal, 16).padding(.vertical, 10)
+                                        .background(AppTheme.surface).cornerRadius(10)
+                                    }
+                                    .buttonStyle(.plain).disabled(isAssigning)
+                                }
+                            }.padding(.horizontal, 16).padding(.top, 8)
+                        }
+                    }
+                }
+                if isAssigning {
+                    Color.black.opacity(0.2).ignoresSafeArea()
+                    ProgressView().scaleEffect(1.2).tint(.white)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Kapat") { dismiss() }.font(.system(size: 14, weight: .medium)).foregroundColor(AppTheme.indigo)
+                }
+                ToolbarItem(placement: .principal) {
+                    Text("Sürücü Ata").font(.system(size: 15, weight: .semibold)).foregroundColor(AppTheme.navy)
+                }
+            }
+            .onAppear { loadDrivers() }
+        }
+    }
+
+    private func loadDrivers() {
+        Task {
             do {
-                let _ = try await APIService.shared.createDriver(data: data)
-                loadDrivers() // Refresh list
+                let response = try await APIService.shared.fetchDrivers()
+                await MainActor.run { drivers = response.drivers; isLoading = false }
+            } catch { await MainActor.run { isLoading = false } }
+        }
+    }
+
+    private func assignDriver(_ driver: Driver) {
+        isAssigning = true
+        Task {
+            do {
+                try await APIService.shared.assignDriverToVehicle(
+                    vehicleId: vehicleId,
+                    driverProfileId: driver.profileId,
+                    driverCode: driver.driverCode.isEmpty ? nil : driver.driverCode
+                )
+                await MainActor.run { isAssigning = false; onAssigned?(); dismiss() }
             } catch {
-                print("[Drivers] Create error: \(error)")
+                await MainActor.run { isAssigning = false }
+                print("[VehicleDriverAssign] Error: \(error)")
+            }
+        }
+    }
+
+    private func clearDriver() {
+        isAssigning = true
+        Task {
+            do {
+                try await APIService.shared.clearDriverFromVehicle(vehicleId: vehicleId)
+                await MainActor.run { isAssigning = false; onAssigned?(); dismiss() }
+            } catch {
+                await MainActor.run { isAssigning = false }
+                print("[VehicleDriverAssign] Clear error: \(error)")
             }
         }
     }

@@ -675,3 +675,10 @@ data class DriversResponse(
     val drivers: List<Driver> = emptyList(),
     val stats: DriverStats = DriverStats()
 )
+
+data class CatalogVehicle(
+    val id: Int,
+    val imei: String,
+    val plate: String,
+    val name: String
+)

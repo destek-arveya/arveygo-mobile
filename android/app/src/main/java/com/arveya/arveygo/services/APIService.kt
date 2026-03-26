@@ -248,6 +248,29 @@ object APIService {
         }
     }
 
+    // MARK: - Generic Authenticated DELETE
+    suspend fun httpDelete(path: String): JSONObject = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url("$baseURL$path")
+            .delete()
+            .addHeader("Accept", "application/json")
+            .addHeader("Authorization", "Bearer $accessToken")
+            .build()
+
+        val response = try {
+            client.newCall(request).execute()
+        } catch (e: Exception) {
+            throw APIException.NetworkError(e)
+        }
+
+        val body = response.body?.string() ?: ""
+        validateResponse(response.code, body)
+
+        return@withContext try { JSONObject(body) } catch (_: Exception) {
+            throw APIException.DecodingError("JSON ayrıştırılamadı")
+        }
+    }
+
     // MARK: - Geofences
     suspend fun fetchGeofences(): List<com.arveya.arveygo.models.Geofence> = withContext(Dispatchers.IO) {
         val json = get("/api/mobile/geofences")
@@ -286,6 +309,29 @@ object APIService {
         val json = post("/api/mobile/drivers", org.json.JSONObject(body))
         val data = json.optJSONObject("data") ?: return@withContext null
         com.arveya.arveygo.models.Driver.fromJson(data)
+    }
+
+    suspend fun updateDriver(id: String, body: Map<String, Any>): com.arveya.arveygo.models.Driver? = withContext(Dispatchers.IO) {
+        val json = put("/api/mobile/drivers/$id", org.json.JSONObject(body))
+        val data = json.optJSONObject("data") ?: return@withContext null
+        com.arveya.arveygo.models.Driver.fromJson(data)
+    }
+
+    suspend fun fetchDriverCatalog(): List<org.json.JSONObject> = withContext(Dispatchers.IO) {
+        val json = get("/api/mobile/drivers/catalog")
+        val arr = json.optJSONArray("vehicles") ?: return@withContext emptyList()
+        (0 until arr.length()).map { arr.getJSONObject(it) }
+    }
+
+    suspend fun assignDriverToVehicle(vehicleId: Int, driverProfileId: Int?, driverCode: String?): Unit = withContext(Dispatchers.IO) {
+        val body = org.json.JSONObject()
+        if (driverProfileId != null) body.put("driver_profile_id", driverProfileId)
+        if (driverCode != null) body.put("driver_code", driverCode)
+        post("/api/mobile/vehicles/$vehicleId/assign-driver", body)
+    }
+
+    suspend fun clearDriverFromVehicle(vehicleId: Int): Unit = withContext(Dispatchers.IO) {
+        httpDelete("/api/mobile/vehicles/$vehicleId/assign-driver")
     }
 
     // MARK: - Helpers

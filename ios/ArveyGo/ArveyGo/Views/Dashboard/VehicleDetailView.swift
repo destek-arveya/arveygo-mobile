@@ -46,6 +46,7 @@ struct VehicleDetailView: View {
     @StateObject private var observer: VehicleDetailObserver
     @State private var selectedTab: DetailTab = .overview
     @State private var mapCameraPosition: MapCameraPosition = .automatic
+    @State private var showDriverAssign = false
 
     /// Navigation callbacks for quick actions
     var onNavigateToRouteHistory: ((Vehicle) -> Void)?
@@ -389,7 +390,7 @@ struct VehicleDetailView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(vehicle.driver)
+                        Text(vehicle.driver.isEmpty ? "Sürücü Atanmamış" : vehicle.driver)
                             .font(.system(size: 15, weight: .bold))
                             .foregroundColor(AppTheme.navy)
                         Text("Atanmış Sürücü")
@@ -399,23 +400,32 @@ struct VehicleDetailView: View {
 
                     Spacer()
 
-                    VStack(alignment: .trailing, spacing: 4) {
+                    Button(action: { showDriverAssign = true }) {
                         HStack(spacing: 4) {
-                            Image(systemName: "star.fill")
-                                .font(.system(size: 10))
-                                .foregroundColor(.orange)
-                            Text("92")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(AppTheme.navy)
+                            Image(systemName: "pencil")
+                                .font(.system(size: 11))
+                            Text("Değiştir")
+                                .font(.system(size: 11, weight: .semibold))
                         }
-                        Text("Sürüş Puanı")
-                            .font(.system(size: 9))
-                            .foregroundColor(AppTheme.textMuted)
+                        .foregroundColor(AppTheme.indigo)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(AppTheme.indigo.opacity(0.1))
+                        .cornerRadius(8)
                     }
                 }
                 .padding(14)
                 .background(AppTheme.bg)
                 .cornerRadius(10)
+            }
+            .sheet(isPresented: $showDriverAssign) {
+                VehicleDriverAssignSheet(
+                    vehicleId: Int(vehicle.id) ?? 0,
+                    currentDriverName: vehicle.driver,
+                    onAssigned: {
+                        // Vehicle will update via WebSocket
+                    }
+                )
             }
 
             sectionCard(title: "HIZLI İŞLEMLER", icon: "bolt.fill") {
