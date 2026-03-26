@@ -31,6 +31,18 @@ struct LiveMapView: View {
                         Spacer()
                     }
 
+                    // Bottom tracking badge
+                    if let trackId = trackingVehicleId {
+                        VStack {
+                            Spacer()
+                            trackingBadge(vehicleId: trackId)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, selectedVehicle != nil ? 260 : 16)
+                        }
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .animation(.spring(response: 0.3), value: trackingVehicleId)
+                    }
+
                     // (filter bar moved to top overlay)
                 }
                 .navigationBarTitleDisplayMode(.inline)
@@ -179,25 +191,6 @@ struct LiveMapView: View {
     // MARK: - Top Overlay (filter chips + WS status)
     var topOverlay: some View {
         VStack(spacing: 6) {
-            // Live tracking indicator
-            if trackingVehicleId != nil {
-                Button(action: { trackingVehicleId = nil }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "location.circle.fill")
-                            .font(.system(size: 12))
-                        Text("Canlı İzleme Aktif")
-                            .font(.system(size: 10, weight: .semibold))
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 10))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(AppTheme.online)
-                    .cornerRadius(20)
-                }
-            }
-
             // Filter chips row (like Android)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
@@ -239,6 +232,50 @@ struct LiveMapView: View {
             }
         }
         .padding(.top, 4)
+    }
+
+    // MARK: - Tracking Badge (bottom, wider, readable)
+    func trackingBadge(vehicleId: String) -> some View {
+        let trackedPlate = vm.vehicles.first(where: { $0.id == vehicleId })?.plate ?? vehicleId
+        return Button(action: { trackingVehicleId = nil }) {
+            HStack(spacing: 10) {
+                // Pulsing red dot
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 10, height: 10)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.red.opacity(0.4), lineWidth: 3)
+                            .scaleEffect(1.5)
+                    )
+
+                Image(systemName: "location.fill")
+                    .font(.system(size: 16, weight: .semibold))
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Canlı İzleme Aktif")
+                        .font(.system(size: 14, weight: .bold))
+                    Text(trackedPlate)
+                        .font(.system(size: 12, weight: .medium))
+                        .opacity(0.9)
+                }
+
+                Spacer()
+
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 20))
+                    .opacity(0.8)
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(AppTheme.online)
+                    .shadow(color: AppTheme.online.opacity(0.4), radius: 8, y: 4)
+            )
+        }
+        .buttonStyle(.plain)
     }
     
     func statusChip(label: String, count: Int, filter: VehicleStatus?, color: Color) -> some View {
@@ -558,11 +595,19 @@ struct VehicleMapPin: View {
                     .strokeBorder(Color.white, lineWidth: 2.5)
                     .frame(width: pinSize, height: pinSize)
 
-                // Direction arrow (matching Android)
-                DirectionArrow()
-                    .fill(Color.white)
-                    .frame(width: pinSize * 0.5, height: pinSize * 0.6)
-                    .rotationEffect(.degrees(animatedDirection))
+                if vehicle.isMotorcycle {
+                    // Motorcycle icon
+                    Image(systemName: "bicycle")
+                        .font(.system(size: pinSize * 0.4, weight: .bold))
+                        .foregroundColor(.white)
+                        .rotationEffect(.degrees(animatedDirection))
+                } else {
+                    // Direction arrow (matching Android)
+                    DirectionArrow()
+                        .fill(Color.white)
+                        .frame(width: pinSize * 0.5, height: pinSize * 0.6)
+                        .rotationEffect(.degrees(animatedDirection))
+                }
             }
 
             // Plate label (always visible)

@@ -429,6 +429,7 @@ extension Vehicle {
     }
 
     var vehicleType: String {
+        if vehicleCategory == "motorcycle" { return "Motosiklet" }
         if model.contains("Transit") || model.contains("Sprinter") { return "Panelvan" }
         if model.contains("Crafter") || model.contains("Master") { return "Kamyonet" }
         return "Ticari"

@@ -380,6 +380,27 @@ final class WebSocketManager: ObservableObject {
 
         vehicles = newVehicles
         orderList = newOrder
+
+        // ── Dummy motorcycle for development ──
+        let mcImei = "DEMO_MC_001"
+        let dummyMotorcycle = Vehicle(
+            id: mcImei, plate: "34 MC 2026", model: "Honda CB650R",
+            status: .idle, kontakOn: false, totalKm: 12480, todayKm: 37,
+            driver: "", city: "İstanbul", lat: 41.0082, lng: 29.0340,
+            vehicleCategory: "motorcycle",
+            imei: mcImei, companyId: 0, name: "Honda CB650R",
+            speed: 0.0, direction: 165.0, ignition: false, isOnline: true,
+            fix: false, hdop: 1.2, input1: false, input2: false, output: false,
+            batteryVoltage: 12.8, externalVoltage: nil, odometer: 12480.0,
+            speedLimit: 120, temperatureC: nil, humidityPct: nil,
+            driverId: nil, alarmCode: nil,
+            deviceTime: nil, ts: Int(Date().timeIntervalSince1970),
+            firstIgnitionOnAtToday: nil, lastIgnitionOnAt: nil, lastIgnitionOffAt: nil
+        )
+        vehicles[mcImei] = dummyMotorcycle
+        orderList.insert(mcImei, at: 0)
+        // ── End dummy motorcycle ──
+
         rebuildVehicleList()
 
         status = .connected

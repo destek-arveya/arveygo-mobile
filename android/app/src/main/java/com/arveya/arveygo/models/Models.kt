@@ -72,6 +72,8 @@ data class Vehicle(
     var city: String,
     var lat: Double,
     var lng: Double,
+    // Vehicle category: "car", "motorcycle", "truck", etc.
+    var vehicleCategory: String = "car",
     // WebSocket / ATS fields
     var imei: String = "",
     var companyId: Int = 0,
@@ -100,6 +102,8 @@ data class Vehicle(
     var lastIgnitionOnAt: String? = null,
     var lastIgnitionOffAt: String? = null
 ) {
+    val isMotorcycle: Boolean get() = vehicleCategory == "motorcycle"
+
     val formattedTotalKm: String
         get() {
             val fmt = NumberFormat.getNumberInstance(Locale("tr", "TR"))
@@ -196,6 +200,7 @@ data class Vehicle(
 
     val vehicleType: String
         get() = when {
+            vehicleCategory == "motorcycle" -> "Motosiklet"
             model.contains("Transit") || model.contains("Sprinter") -> "Panelvan"
             model.contains("Crafter") || model.contains("Master") -> "Kamyonet"
             else -> "Ticari"
@@ -266,6 +271,7 @@ data class Vehicle(
             val lastIgnitionOffAt = if (json.has("last_ignition_off_at")) json.optString("last_ignition_off_at") else null
             val batteryVoltage = if (json.has("battery_voltage")) json.optDouble("battery_voltage") else null
             val externalVoltage = if (json.has("external_voltage")) json.optDouble("external_voltage") else null
+            val vehicleCategory = json.optString("vehicle_category", "car")
 
             // Temperature: check top-level first (backend sends snake_case: temperature_c)
             // Note: optDouble returns NaN for null/missing values, so we must filter NaN
@@ -328,6 +334,7 @@ data class Vehicle(
                 id = imei, plate = plate, model = name, status = status,
                 kontakOn = ignition, totalKm = odometer.toInt(), todayKm = speed.toInt(),
                 driver = driverId ?: "", city = "", lat = lat, lng = lon,
+                vehicleCategory = vehicleCategory,
                 imei = imei, companyId = companyId, name = name,
                 speed = speed, direction = direction, ignition = ignition,
                 isOnline = isOnline, fix = fix, hdop = hdop,
@@ -368,7 +375,8 @@ data class Vehicle(
             alarmCode = patch.alarmCode ?: alarmCode,
             firstIgnitionOnAtToday = patch.firstIgnitionOnAtToday ?: firstIgnitionOnAtToday,
             lastIgnitionOnAt = patch.lastIgnitionOnAt ?: lastIgnitionOnAt,
-            lastIgnitionOffAt = patch.lastIgnitionOffAt ?: lastIgnitionOffAt
+            lastIgnitionOffAt = patch.lastIgnitionOffAt ?: lastIgnitionOffAt,
+            vehicleCategory = if (patch.vehicleCategory != "car") patch.vehicleCategory else vehicleCategory
         )
     }
 }

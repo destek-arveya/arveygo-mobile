@@ -35,6 +35,9 @@ struct Vehicle: Identifiable, Hashable {
     var lat: Double
     var lng: Double
 
+    // Vehicle category: "car", "motorcycle", "truck", etc.
+    var vehicleCategory: String = "car"
+
     // WebSocket / ATS fields
     var imei: String = ""
     var companyId: Int = 0
@@ -63,6 +66,15 @@ struct Vehicle: Identifiable, Hashable {
     var firstIgnitionOnAtToday: String? = nil
     var lastIgnitionOnAt: String? = nil
     var lastIgnitionOffAt: String? = nil
+
+    var isMotorcycle: Bool { vehicleCategory == "motorcycle" }
+
+    var mapIcon: String {
+        switch vehicleCategory {
+        case "motorcycle": return "motorcycle.fill"
+        default: return "car.fill"
+        }
+    }
 
     var formattedTotalKm: String {
         let formatter = NumberFormatter()
@@ -172,6 +184,7 @@ struct Vehicle: Identifiable, Hashable {
 
         let plate = (json["plate"] as? String) ?? ""
         let name = (json["name"] as? String) ?? ""
+        let vehicleCategory = (json["vehicle_category"] as? String) ?? "car"
         let lat = (json["lat"] as? Double) ?? 0
         let lon = (json["lon"] as? Double) ?? 0
         let speed = (json["speed"] as? Double) ?? ((json["speed"] as? Int).map { Double($0) } ?? 0)
@@ -261,6 +274,7 @@ struct Vehicle: Identifiable, Hashable {
             city: "",
             lat: lat,
             lng: lon,
+            vehicleCategory: vehicleCategory,
             imei: imei,
             companyId: companyId,
             name: name,
@@ -294,6 +308,7 @@ struct Vehicle: Identifiable, Hashable {
     mutating func mergeUpdate(from patch: Vehicle) {
         if !patch.plate.isEmpty { plate = patch.plate }
         if !patch.model.isEmpty { model = patch.model }
+        if patch.vehicleCategory != "car" { vehicleCategory = patch.vehicleCategory }
         if patch.lat != 0 || patch.lng != 0 { lat = patch.lat; lng = patch.lng }
         speed = patch.speed
         direction = patch.direction

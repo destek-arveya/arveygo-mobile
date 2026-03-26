@@ -2,6 +2,7 @@ package com.arveya.arveygo.services
 
 import android.util.Log
 import com.arveya.arveygo.models.Vehicle
+import com.arveya.arveygo.models.VehicleStatus
 import com.arveya.arveygo.ui.theme.AppColors
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -407,6 +408,30 @@ object WebSocketManager {
 
         _vehicles.value = newVehicles
         orderList = newOrder
+
+        // ── Dummy motorcycle for development ──
+        val mcImei = "DEMO_MC_001"
+        val dummyMotorcycle = Vehicle(
+            id = mcImei, plate = "34 MC 2026", model = "Honda CB650R",
+            status = VehicleStatus.IDLE, kontakOn = false,
+            totalKm = 12480, todayKm = 37,
+            driver = "", city = "İstanbul", lat = 41.0082, lng = 29.0340,
+            vehicleCategory = "motorcycle",
+            imei = mcImei, companyId = 0, name = "Honda CB650R",
+            speed = 0.0, direction = 165.0, ignition = false, isOnline = true,
+            fix = false, hdop = 1.2, input1 = false, input2 = false, output = false,
+            batteryVoltage = 12.8, externalVoltage = null,
+            temperatureC = null, humidityPct = null, odometer = 12480.0,
+            speedLimit = 120, driverId = null, alarmCode = null,
+            deviceTime = null, ts = (System.currentTimeMillis() / 1000).toInt(),
+            firstIgnitionOnAtToday = null, lastIgnitionOnAt = null, lastIgnitionOffAt = null
+        )
+        val mutableVehicles = _vehicles.value.toMutableMap()
+        mutableVehicles[mcImei] = dummyMotorcycle
+        _vehicles.value = mutableVehicles
+        orderList.add(0, mcImei)
+        // ── End dummy motorcycle ──
+
         rebuildVehicleList()
 
         _status.value = WSConnectionStatus.Connected

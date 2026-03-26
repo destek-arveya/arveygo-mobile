@@ -46,6 +46,7 @@ struct VehicleDetailView: View {
     @StateObject private var observer: VehicleDetailObserver
     @State private var selectedTab: DetailTab = .overview
     @State private var mapCameraPosition: MapCameraPosition = .automatic
+    @State private var showMotorcycleSettings = false
 
     /// Navigation callbacks for quick actions
     var onNavigateToRouteHistory: ((Vehicle) -> Void)?
@@ -171,6 +172,9 @@ struct VehicleDetailView: View {
                     span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
                 ))
             }
+            .sheet(isPresented: $showMotorcycleSettings) {
+                MotorcycleSettingsView(vehicle: vehicle)
+            }
         }
     }
 
@@ -225,7 +229,7 @@ struct VehicleDetailView: View {
                     RoundedRectangle(cornerRadius: 14)
                         .fill(vehicle.status.color.opacity(0.1))
                         .frame(width: 56, height: 56)
-                    Image(systemName: "car.fill")
+                    Image(systemName: vehicle.isMotorcycle ? "bicycle" : "car.fill")
                         .font(.system(size: 22))
                         .foregroundColor(vehicle.status.color)
                 }
@@ -243,11 +247,23 @@ struct VehicleDetailView: View {
 
                     HStack(spacing: 6) {
                         vehicleTag(vehicle.group, icon: "folder.fill", color: .blue)
-                        vehicleTag(vehicle.vehicleType, icon: "car.2.fill", color: .purple)
+                        vehicleTag(vehicle.vehicleType, icon: vehicle.isMotorcycle ? "bicycle" : "car.2.fill", color: .purple)
                     }
                     .padding(.top, 2)
                 }
                 Spacer()
+
+                // Motorcycle settings gear button
+                if vehicle.isMotorcycle {
+                    Button(action: { showMotorcycleSettings = true }) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(AppTheme.online)
+                            .padding(10)
+                            .background(AppTheme.online.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                }
             }
             .padding(16)
 

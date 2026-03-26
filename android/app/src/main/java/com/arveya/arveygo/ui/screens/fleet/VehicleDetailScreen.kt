@@ -52,6 +52,7 @@ fun VehicleDetailScreen(
     var selectedTab by remember { mutableStateOf(DetailTab.OVERVIEW) }
     val context = LocalContext.current
     var currentVehicle by remember { mutableStateOf(vehicle) }
+    var showMotorcycleSettings by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         Configuration.getInstance().userAgentValue = context.packageName
@@ -154,7 +155,7 @@ fun VehicleDetailScreen(
             MapHeader(currentVehicle, context)
 
             // Vehicle Identity Card (overlapping map)
-            VehicleIdentityCard(currentVehicle)
+            VehicleIdentityCard(currentVehicle, onMotorcycleSettings = { showMotorcycleSettings = true })
 
             // Tab Selector
             TabSelector(selectedTab) { selectedTab = it }
@@ -174,6 +175,14 @@ fun VehicleDetailScreen(
                 }
             }
         }
+    }
+
+    // Motorcycle Settings Dialog
+    if (showMotorcycleSettings) {
+        MotorcycleSettingsDialog(
+            vehicle = currentVehicle,
+            onDismiss = { showMotorcycleSettings = false }
+        )
     }
 }
 
@@ -244,7 +253,7 @@ private fun MapHeader(vehicle: Vehicle, context: Context) {
 
 // MARK: - Vehicle Identity Card
 @Composable
-private fun VehicleIdentityCard(vehicle: Vehicle) {
+private fun VehicleIdentityCard(vehicle: Vehicle, onMotorcycleSettings: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -263,7 +272,10 @@ private fun VehicleIdentityCard(vehicle: Vehicle) {
                     .size(56.dp)
                     .background(vehicle.status.color.copy(alpha = 0.1f), RoundedCornerShape(14.dp))
             ) {
-                Icon(Icons.Default.DirectionsCar, null, tint = vehicle.status.color, modifier = Modifier.size(22.dp))
+                Icon(
+                    if (vehicle.isMotorcycle) Icons.Default.TwoWheeler else Icons.Default.DirectionsCar,
+                    null, tint = vehicle.status.color, modifier = Modifier.size(22.dp)
+                )
             }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -276,7 +288,29 @@ private fun VehicleIdentityCard(vehicle: Vehicle) {
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     VehicleTag(vehicle.group, Icons.Default.Folder, Color.Blue)
-                    VehicleTag(vehicle.vehicleType, Icons.Default.DirectionsCar, Color(0xFF9C27B0))
+                    VehicleTag(
+                        vehicle.vehicleType,
+                        if (vehicle.isMotorcycle) Icons.Default.TwoWheeler else Icons.Default.DirectionsCar,
+                        Color(0xFF9C27B0)
+                    )
+                }
+            }
+
+            // Motorcycle settings gear button
+            if (vehicle.isMotorcycle) {
+                IconButton(onClick = onMotorcycleSettings) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(AppColors.Online.copy(alpha = 0.1f), CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.Settings, null,
+                            tint = AppColors.Online,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
@@ -817,5 +851,157 @@ private fun EventRow(icon: ImageVector, title: String, subtitle: String, time: S
             Text(subtitle, fontSize = 11.sp, color = AppColors.TextMuted)
         }
         Text(time, fontSize = 10.sp, color = AppColors.TextFaint, textAlign = TextAlign.End)
+    }
+}
+
+// MARK: - Motorcycle Settings Dialog
+@Composable
+private fun MotorcycleSettingsDialog(vehicle: Vehicle, onDismiss: () -> Unit) {
+    var kontakOnNotification by remember { mutableStateOf(true) }
+    var kontakOffNotification by remember { mutableStateOf(true) }
+    var batteryRemovedNotification by remember { mutableStateOf(true) }
+    var batteryInstalledNotification by remember { mutableStateOf(true) }
+    var motionDetectedNotification by remember { mutableStateOf(true) }
+    var motionDetectedPhoneCall by remember { mutableStateOf(false) }
+    var phoneNumber by remember { mutableStateOf("") }
+    var sleepDelaySeconds by remember { mutableStateOf("30") }
+    var wakeIntervalHours by remember { mutableStateOf("6") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(
+                onClick = { /* TODO: Save to backend */ onDismiss() },
+                colors = ButtonDefaults.buttonColors(containerColor = AppColors.Online)
+            ) {
+                Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Ayarları Kaydet", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("İptal") }
+        },
+        icon = {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(AppColors.Online.copy(alpha = 0.1f), CircleShape)
+            ) {
+                Icon(Icons.Default.TwoWheeler, null, tint = AppColors.Online, modifier = Modifier.size(24.dp))
+            }
+        },
+        title = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Motosiklet Ayarları", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AppColors.Navy)
+                Text("${vehicle.plate} · ${vehicle.model}", fontSize = 12.sp, color = AppColors.TextMuted)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Section: Kontak
+                SettingsSectionHeader("Kontak Bildirimleri", Icons.Default.Key)
+                SettingsToggle("Kontak Açılma Bildirimi", "Kontak açıldığında bildirim al", kontakOnNotification) { kontakOnNotification = it }
+                SettingsToggle("Kontak Kapanma Bildirimi", "Kontak kapandığında bildirim al", kontakOffNotification) { kontakOffNotification = it }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Section: Akü
+                SettingsSectionHeader("Akü Bildirimleri", Icons.Default.BatteryChargingFull)
+                SettingsToggle("Aküden Söküldü Bildirimi", "Cihaz aküden sökülünce bildirim al", batteryRemovedNotification) { batteryRemovedNotification = it }
+                SettingsToggle("Aküye Takıldı Bildirimi", "Cihaz aküye takılınca bildirim al", batteryInstalledNotification) { batteryInstalledNotification = it }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Section: Hareket
+                SettingsSectionHeader("Hareket Algılama", Icons.Default.DirectionsWalk)
+                SettingsToggle("Hareket Algılandı Bildirimi", "Araç hareket edince bildirim al", motionDetectedNotification) { motionDetectedNotification = it }
+                SettingsToggle("Telefon Araması", "Hareket algılanınca telefon ile ara", motionDetectedPhoneCall) { motionDetectedPhoneCall = it }
+
+                if (motionDetectedPhoneCall) {
+                    OutlinedTextField(
+                        value = phoneNumber,
+                        onValueChange = { phoneNumber = it },
+                        label = { Text("Telefon Numarası") },
+                        leadingIcon = { Icon(Icons.Default.Phone, null, tint = AppColors.Online) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(start = 8.dp)
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Section: Uyku
+                SettingsSectionHeader("Cihaz Uyku Ayarları", Icons.Default.Bedtime)
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Uyku Süresi", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
+                        Text("Kontak kapandıktan sonra", fontSize = 10.sp, color = AppColors.TextMuted)
+                    }
+                    OutlinedTextField(
+                        value = sleepDelaySeconds,
+                        onValueChange = { sleepDelaySeconds = it.filter { c -> c.isDigit() } },
+                        suffix = { Text("sn", fontSize = 12.sp) },
+                        singleLine = true,
+                        modifier = Modifier.width(80.dp)
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Uyanma Periyodu", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
+                        Text("Kaç saatte bir veri atsın", fontSize = 10.sp, color = AppColors.TextMuted)
+                    }
+                    OutlinedTextField(
+                        value = wakeIntervalHours,
+                        onValueChange = { wakeIntervalHours = it.filter { c -> c.isDigit() } },
+                        suffix = { Text("saat", fontSize = 12.sp) },
+                        singleLine = true,
+                        modifier = Modifier.width(80.dp)
+                    )
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun SettingsSectionHeader(title: String, icon: ImageVector) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 4.dp)
+    ) {
+        Icon(icon, null, tint = AppColors.Online, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+    }
+}
+
+@Composable
+private fun SettingsToggle(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
+            Text(subtitle, fontSize = 10.sp, color = AppColors.TextMuted)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(checkedTrackColor = AppColors.Online)
+        )
     }
 }

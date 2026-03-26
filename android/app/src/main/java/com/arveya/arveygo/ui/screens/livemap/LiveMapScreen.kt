@@ -91,7 +91,8 @@ private fun createVehiclePinBitmap(
     direction: Float,
     plate: String,
     speed: String,
-    isSelected: Boolean
+    isSelected: Boolean,
+    isMotorcycle: Boolean = false
 ): Bitmap {
     val density = context.resources.displayMetrics.density
     val baseSize = if (isSelected) 52 else 42
@@ -129,21 +130,40 @@ private fun createVehiclePinBitmap(
     }
     canvas.drawCircle(cx, cy, radius, borderPaint)
 
-    // Direction arrow
+    // Direction arrow or motorcycle icon
     val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.WHITE
         style = Paint.Style.FILL
     }
     canvas.save()
     canvas.rotate(direction, cx, cy)
-    val arrowPath = Path().apply {
-        moveTo(cx, cy - radius * 0.5f)
-        lineTo(cx - radius * 0.3f, cy + radius * 0.3f)
-        lineTo(cx, cy + radius * 0.1f)
-        lineTo(cx + radius * 0.3f, cy + radius * 0.3f)
-        close()
+    if (isMotorcycle) {
+        // Draw motorcycle icon (simplified two-wheel shape)
+        val mPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 2f * density
+            strokeCap = Paint.Cap.ROUND
+        }
+        val r = radius * 0.28f
+        // Front wheel
+        canvas.drawCircle(cx, cy - radius * 0.25f, r, mPaint)
+        // Rear wheel
+        canvas.drawCircle(cx, cy + radius * 0.25f, r, mPaint)
+        // Body line connecting wheels
+        canvas.drawLine(cx, cy - radius * 0.25f + r, cx, cy + radius * 0.25f - r, mPaint)
+        // Handlebar
+        canvas.drawLine(cx - radius * 0.25f, cy - radius * 0.18f, cx + radius * 0.25f, cy - radius * 0.18f, mPaint)
+    } else {
+        val arrowPath = Path().apply {
+            moveTo(cx, cy - radius * 0.5f)
+            lineTo(cx - radius * 0.3f, cy + radius * 0.3f)
+            lineTo(cx, cy + radius * 0.1f)
+            lineTo(cx + radius * 0.3f, cy + radius * 0.3f)
+            close()
+        }
+        canvas.drawPath(arrowPath, iconPaint)
     }
-    canvas.drawPath(arrowPath, iconPaint)
     canvas.restore()
 
     // Plate label (always shown)
@@ -285,7 +305,7 @@ fun LiveMapScreen(
 
             val existing = animatedMarkers[vehicle.id]
             if (existing != null) {
-                val bmp = createVehiclePinBitmap(context, statusColor, vehicle.direction.toFloat(), vehicle.plate, vehicle.formattedSpeed, isSel)
+                val bmp = createVehiclePinBitmap(context, statusColor, vehicle.direction.toFloat(), vehicle.plate, vehicle.formattedSpeed, isSel, vehicle.isMotorcycle)
                 existing.marker.icon = BitmapDrawable(context.resources, bmp)
                 existing.marker.title = vehicle.plate
                 existing.marker.snippet = "${vehicle.formattedSpeed} \u00b7 ${vehicle.status.label}"
@@ -297,7 +317,7 @@ fun LiveMapScreen(
                     position = target
                     title = vehicle.plate
                     snippet = "${vehicle.formattedSpeed} \u00b7 ${vehicle.status.label}"
-                    val bmp = createVehiclePinBitmap(context, statusColor, vehicle.direction.toFloat(), vehicle.plate, vehicle.formattedSpeed, isSel)
+                    val bmp = createVehiclePinBitmap(context, statusColor, vehicle.direction.toFloat(), vehicle.plate, vehicle.formattedSpeed, isSel, vehicle.isMotorcycle)
                     icon = BitmapDrawable(context.resources, bmp)
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                     // Disable osmdroid's built-in info window to prevent double popup
@@ -460,17 +480,6 @@ fun LiveMapScreen(
                     .align(Alignment.CenterEnd)
                     .padding(end = 12.dp)
             ) {
-                // Live tracking indicator
-                AnimatedVisibility(visible = trackingVehicleId != null) {
-                    FloatingActionButton(
-                        onClick = { trackingVehicleId = null },
-                        containerColor = AppColors.Online,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(Icons.Default.MyLocation, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
                 FloatingActionButton(
                     onClick = { mapViewRef.value?.controller?.zoomIn() },
                     containerColor = AppColors.Surface,
@@ -490,6 +499,64 @@ fun LiveMapScreen(
 
             // Bottom controls
             Column(modifier = Modifier.align(Alignment.BottomCenter)) {
+                // Live tracking badge (wide, readable)
+                AnimatedVisibility(
+                    visible = trackingVehicleId != null,
+                    enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                ) {
+                    val trackedPlate = vehicles.firstOrNull { it.id == trackingVehicleId }?.plate ?: ""
+                    Surface(
+                        onClick = { trackingVehicleId = null },
+                        shape = RoundedCornerShape(14.dp),
+                        color = AppColors.Online,
+                        shadowElevation = 8.dp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                        ) {
+                            // Pulsing red dot
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .background(Color.Red, CircleShape)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Icon(
+                                Icons.Default.MyLocation, null,
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Canlı İzleme Aktif",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (trackedPlate.isNotEmpty()) {
+                                    Text(
+                                        trackedPlate,
+                                        color = Color.White.copy(alpha = 0.9f),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                            Icon(
+                                Icons.Default.Close, null,
+                                tint = Color.White.copy(alpha = 0.8f),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                }
+
                 Row(
                     horizontalArrangement = Arrangement.End,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
