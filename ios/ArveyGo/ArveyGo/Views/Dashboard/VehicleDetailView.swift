@@ -47,10 +47,16 @@ struct VehicleDetailView: View {
     @State private var selectedTab: DetailTab = .overview
     @State private var mapCameraPosition: MapCameraPosition = .automatic
 
+    /// Navigation callbacks for quick actions
+    var onNavigateToRouteHistory: ((Vehicle) -> Void)?
+    var onNavigateToAlarms: (() -> Void)?
+
     private var vehicle: Vehicle { observer.vehicle }
 
-    init(vehicle: Vehicle) {
+    init(vehicle: Vehicle, onNavigateToRouteHistory: ((Vehicle) -> Void)? = nil, onNavigateToAlarms: (() -> Void)? = nil) {
         _observer = StateObject(wrappedValue: VehicleDetailObserver(vehicle: vehicle))
+        self.onNavigateToRouteHistory = onNavigateToRouteHistory
+        self.onNavigateToAlarms = onNavigateToAlarms
     }
 
     enum DetailTab: String, CaseIterable {
@@ -124,11 +130,26 @@ struct VehicleDetailView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
-                        Button(action: {}) {
-                            Label("Haritada Göster", systemImage: "map.fill")
+                        Button(action: {
+                            openMapsDirections(lat: vehicle.lat, lng: vehicle.lng, label: vehicle.plate)
+                        }) {
+                            Label("Konuma Git", systemImage: "location.fill")
                         }
-                        Button(action: {}) {
+                        Button(action: {
+                            dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                onNavigateToRouteHistory?(vehicle)
+                            }
+                        }) {
                             Label("Rota Geçmişi", systemImage: "clock.arrow.circlepath")
+                        }
+                        Button(action: {
+                            dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                onNavigateToAlarms?()
+                            }
+                        }) {
+                            Label("Alarm Kur", systemImage: "bell.fill")
                         }
                         Button(action: {}) {
                             Label("Paylaş", systemImage: "square.and.arrow.up")
@@ -426,14 +447,26 @@ struct VehicleDetailView: View {
 
             sectionCard(title: "HIZLI İŞLEMLER", icon: "bolt.fill") {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    actionButton(icon: "location.fill", label: "Konuma\nGit", color: .blue)
-                    actionButton(icon: "clock.arrow.circlepath", label: "Rota\nGeçmişi", color: AppTheme.indigo)
-                    actionButton(icon: "bell.fill", label: "Alarm\nKur", color: .orange)
-                    actionButton(icon: "lock.fill", label: "Blokaj\nGönder", color: .red)
-                    actionButton(icon: "wrench.fill", label: "Bakım\nEkle", color: AppTheme.online)
-                    actionButton(icon: "doc.text.fill", label: "Belge\nEkle", color: .purple)
-                    actionButton(icon: "fuelpump.fill", label: "Yakıt\nKayıt", color: .cyan)
-                    actionButton(icon: "square.and.arrow.up", label: "Paylaş", color: AppTheme.textMuted)
+                    actionButton(icon: "location.fill", label: "Konuma\nGit", color: .blue) {
+                        openMapsDirections(lat: vehicle.lat, lng: vehicle.lng, label: vehicle.plate)
+                    }
+                    actionButton(icon: "clock.arrow.circlepath", label: "Rota\nGeçmişi", color: AppTheme.indigo) {
+                        dismiss()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            onNavigateToRouteHistory?(vehicle)
+                        }
+                    }
+                    actionButton(icon: "bell.fill", label: "Alarm\nKur", color: .orange) {
+                        dismiss()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            onNavigateToAlarms?()
+                        }
+                    }
+                    actionButton(icon: "lock.fill", label: "Blokaj\nGönder", color: .red) {}
+                    actionButton(icon: "wrench.fill", label: "Bakım\nEkle", color: AppTheme.online) {}
+                    actionButton(icon: "doc.text.fill", label: "Belge\nEkle", color: .purple) {}
+                    actionButton(icon: "fuelpump.fill", label: "Yakıt\nKayıt", color: .cyan) {}
+                    actionButton(icon: "square.and.arrow.up", label: "Paylaş", color: AppTheme.textMuted) {}
                 }
             }
         }
@@ -609,8 +642,8 @@ struct VehicleDetailView: View {
         .cornerRadius(10)
     }
 
-    func actionButton(icon: String, label: String, color: Color) -> some View {
-        Button(action: {}) {
+    func actionButton(icon: String, label: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             VStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 17))
@@ -771,6 +804,14 @@ struct VehicleDetailView: View {
         case "Sigorta": return "shield.fill"
         default: return "ellipsis"
         }
+    }
+
+    // MARK: - Open Maps Directions
+    private func openMapsDirections(lat: Double, lng: Double, label: String) {
+        let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+        mapItem.name = label
+        mapItem.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
     }
 
     func eventRow(icon: String, title: String, subtitle: String, time: String, severity: AlertSeverity) -> some View {

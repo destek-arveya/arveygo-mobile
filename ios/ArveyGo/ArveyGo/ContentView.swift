@@ -41,9 +41,9 @@ struct ContentView: View {
                 case .dashboard:
                     DashboardView(showSideMenu: $showSideMenu, selectedPage: $selectedPage)
                 case .liveMap:
-                    LiveMapView(showSideMenu: $showSideMenu)
+                    LiveMapView(showSideMenu: $showSideMenu, selectedPage: $selectedPage)
                 case .vehicles:
-                    VehiclesListView(showSideMenu: $showSideMenu)
+                    VehiclesListView(showSideMenu: $showSideMenu, selectedPage: $selectedPage)
                 case .routeHistory:
                     RouteHistoryView(showSideMenu: $showSideMenu)
                 case .alarms:

@@ -76,7 +76,11 @@ class VehiclesListViewModel {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun VehiclesListScreen(onMenuClick: () -> Unit) {
+fun VehiclesListScreen(
+    onMenuClick: () -> Unit,
+    onNavigateToRouteHistory: ((Vehicle) -> Unit)? = null,
+    onNavigateToAlarms: (() -> Unit)? = null
+) {
     val authVM = LocalAuthViewModel.current
     val user by authVM.currentUser.collectAsState()
     val vm = remember { VehiclesListViewModel() }
@@ -117,7 +121,15 @@ fun VehiclesListScreen(onMenuClick: () -> Unit) {
     selectedVehicle?.let { vehicle ->
         VehicleDetailScreen(
             vehicle = vehicle,
-            onBack = { selectedVehicle = null }
+            onBack = { selectedVehicle = null },
+            onNavigateToRouteHistory = { v ->
+                selectedVehicle = null
+                onNavigateToRouteHistory?.invoke(v)
+            },
+            onNavigateToAlarms = {
+                selectedVehicle = null
+                onNavigateToAlarms?.invoke()
+            }
         )
         return
     }

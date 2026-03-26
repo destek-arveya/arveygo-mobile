@@ -74,13 +74,18 @@ fun MainContent(authVM: AuthViewModel) {
                 onMenuClick = { showSideMenu = true },
                 onNavigateToMap = { selectedPage = AppPage.LIVE_MAP },
                 onNavigateToVehicles = { selectedPage = AppPage.VEHICLES },
-                onNavigateToAlarms = { selectedPage = AppPage.ALARMS }
+                onNavigateToAlarms = { selectedPage = AppPage.ALARMS },
+                onNavigateToRouteHistory = { selectedPage = AppPage.ROUTE_HISTORY }
             )
             AppPage.LIVE_MAP -> LiveMapScreen(
-                onMenuClick = { showSideMenu = true }
+                onMenuClick = { showSideMenu = true },
+                onNavigateToRouteHistory = { _ -> selectedPage = AppPage.ROUTE_HISTORY },
+                onNavigateToAlarms = { selectedPage = AppPage.ALARMS }
             )
             AppPage.VEHICLES -> VehiclesListScreen(
-                onMenuClick = { showSideMenu = true }
+                onMenuClick = { showSideMenu = true },
+                onNavigateToRouteHistory = { _ -> selectedPage = AppPage.ROUTE_HISTORY },
+                onNavigateToAlarms = { selectedPage = AppPage.ALARMS }
             )
             AppPage.ROUTE_HISTORY -> RouteHistoryScreen(
                 onMenuClick = { showSideMenu = true }

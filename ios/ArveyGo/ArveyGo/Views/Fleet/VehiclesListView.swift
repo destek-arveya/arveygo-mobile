@@ -5,6 +5,7 @@ struct VehiclesListView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @StateObject private var vm = VehiclesListViewModel()
     @Binding var showSideMenu: Bool
+    @Binding var selectedPage: AppPage
     @State private var selectedVehicle: Vehicle?
 
     var body: some View {
@@ -65,7 +66,21 @@ struct VehiclesListView: View {
                     }
                 }
                 .fullScreenCover(item: $selectedVehicle) { vehicle in
-                    VehicleDetailView(vehicle: vehicle)
+                    VehicleDetailView(
+                        vehicle: vehicle,
+                        onNavigateToRouteHistory: { v in
+                            selectedVehicle = nil
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                selectedPage = .routeHistory
+                            }
+                        },
+                        onNavigateToAlarms: {
+                            selectedVehicle = nil
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                selectedPage = .alarms
+                            }
+                        }
+                    )
                 }
             }
     }
@@ -543,6 +558,6 @@ class VehiclesListViewModel: ObservableObject {
 }
 
 #Preview {
-    VehiclesListView(showSideMenu: .constant(false))
+    VehiclesListView(showSideMenu: .constant(false), selectedPage: Binding.constant(AppPage.vehicles))
         .environmentObject(AuthViewModel())
 }

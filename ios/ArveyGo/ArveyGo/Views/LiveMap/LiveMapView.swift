@@ -6,6 +6,7 @@ struct LiveMapView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @StateObject private var vm = LiveMapViewModel()
     @Binding var showSideMenu: Bool
+    @Binding var selectedPage: AppPage
     @State private var selectedVehicle: Vehicle?
     @State private var showVehicleDetail = false
     @State private var detailVehicle: Vehicle?
@@ -71,7 +72,21 @@ struct LiveMapView: View {
                         .presentationCornerRadius(20)
                 }
                 .fullScreenCover(item: $detailVehicle) { vehicle in
-                    VehicleDetailView(vehicle: vehicle)
+                    VehicleDetailView(
+                        vehicle: vehicle,
+                        onNavigateToRouteHistory: { v in
+                            detailVehicle = nil
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                selectedPage = .routeHistory
+                            }
+                        },
+                        onNavigateToAlarms: {
+                            detailVehicle = nil
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                selectedPage = .alarms
+                            }
+                        }
+                    )
                 }
                 .onAppear {
                     // Connect WebSocket when map appears
@@ -380,10 +395,22 @@ struct LiveMapView: View {
 
                     // Quick actions row
                     HStack(spacing: 10) {
-                        quickAction(icon: "location.fill", label: "Konuma Git", color: .blue)
-                        quickAction(icon: "clock.arrow.circlepath", label: "Rota Geçmişi", color: AppTheme.indigo)
-                        quickAction(icon: "bell.fill", label: "Alarm Kur", color: .orange)
-                        quickAction(icon: "lock.fill", label: "Blokaj", color: .red)
+                        quickAction(icon: "location.fill", label: "Konuma Git", color: .blue) {
+                            openMapsDirections(lat: vehicle.lat, lng: vehicle.lng, label: vehicle.plate)
+                        }
+                        quickAction(icon: "clock.arrow.circlepath", label: "Rota Geçmişi", color: AppTheme.indigo) {
+                            selectedVehicle = nil
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                selectedPage = .routeHistory
+                            }
+                        }
+                        quickAction(icon: "bell.fill", label: "Alarm Kur", color: .orange) {
+                            selectedVehicle = nil
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                selectedPage = .alarms
+                            }
+                        }
+                        quickAction(icon: "lock.fill", label: "Blokaj", color: .red) {}
                     }
                     .padding(.horizontal, 20)
 
@@ -483,8 +510,16 @@ struct LiveMapView: View {
         .cornerRadius(10)
     }
 
-    func quickAction(icon: String, label: String, color: Color) -> some View {
-        Button(action: {}) {
+    // MARK: - Open Maps Directions
+    private func openMapsDirections(lat: Double, lng: Double, label: String) {
+        let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+        mapItem.name = label
+        mapItem.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
+    }
+
+    func quickAction(icon: String, label: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             VStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 16))
@@ -760,6 +795,6 @@ class LiveMapViewModel: ObservableObject {
 }
 
 #Preview {
-    LiveMapView(showSideMenu: .constant(false))
+    LiveMapView(showSideMenu: .constant(false), selectedPage: .constant(.liveMap))
         .environmentObject(AuthViewModel())
 }

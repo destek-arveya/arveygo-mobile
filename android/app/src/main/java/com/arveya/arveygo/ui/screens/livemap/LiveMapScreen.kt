@@ -1,5 +1,7 @@
 package com.arveya.arveygo.ui.screens.livemap
 
+import android.content.Intent
+import android.net.Uri
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
@@ -200,7 +202,11 @@ private fun createVehiclePinBitmap(
 // Main Screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LiveMapScreen(onMenuClick: () -> Unit) {
+fun LiveMapScreen(
+    onMenuClick: () -> Unit,
+    onNavigateToRouteHistory: ((Vehicle) -> Unit)? = null,
+    onNavigateToAlarms: (() -> Unit)? = null
+) {
     val context = LocalContext.current
     val authVM = LocalAuthViewModel.current
     val user by authVM.currentUser.collectAsState()
@@ -222,7 +228,15 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
     detailVehicle?.let { vehicle ->
         com.arveya.arveygo.ui.screens.fleet.VehicleDetailScreen(
             vehicle = vehicle,
-            onBack = { detailVehicle = null }
+            onBack = { detailVehicle = null },
+            onNavigateToRouteHistory = { v ->
+                detailVehicle = null
+                onNavigateToRouteHistory?.invoke(v)
+            },
+            onNavigateToAlarms = {
+                detailVehicle = null
+                onNavigateToAlarms?.invoke()
+            }
         )
         return
     }
@@ -528,6 +542,14 @@ fun LiveMapScreen(onMenuClick: () -> Unit) {
                             val vehicleToOpen = liveVehicle
                             selectedVehicle = null
                             detailVehicle = vehicleToOpen
+                        },
+                        onNavigateToRouteHistory = { v ->
+                            selectedVehicle = null
+                            onNavigateToRouteHistory?.invoke(v)
+                        },
+                        onNavigateToAlarms = {
+                            selectedVehicle = null
+                            onNavigateToAlarms?.invoke()
                         }
                     )
                 }
@@ -575,6 +597,25 @@ private fun StatusFilterChip(
     }
 }
 
+// Open Maps Directions Helper
+private fun openMapsDirectionsLiveMap(context: Context, lat: Double, lng: Double, label: String) {
+    try {
+        val gmmIntentUri = Uri.parse("google.navigation:q=$lat,$lng&mode=d")
+        val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri).apply {
+            setPackage("com.google.android.apps.maps")
+        }
+        if (mapIntent.resolveActivity(context.packageManager) != null) {
+            context.startActivity(mapIntent)
+        } else {
+            val genericUri = Uri.parse("geo:$lat,$lng?q=$lat,$lng($label)")
+            context.startActivity(Intent(Intent.ACTION_VIEW, genericUri))
+        }
+    } catch (e: Exception) {
+        val browserUri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng")
+        context.startActivity(Intent(Intent.ACTION_VIEW, browserUri))
+    }
+}
+
 // Vehicle Popup Sheet (redesigned to match VehicleDetailScreen identity card)
 @Composable
 private fun VehiclePopupCard(
@@ -582,8 +623,11 @@ private fun VehiclePopupCard(
     onClose: () -> Unit,
     onZoomTo: () -> Unit,
     onLiveTrack: () -> Unit,
-    onDetail: () -> Unit
+    onDetail: () -> Unit,
+    onNavigateToRouteHistory: ((Vehicle) -> Unit)? = null,
+    onNavigateToAlarms: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -714,9 +758,17 @@ private fun VehiclePopupCard(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(horizontal = 16.dp)
         ) {
-            PopupQuickAction(Icons.Default.LocationOn, "Konuma Git", Color.Blue, Modifier.weight(1f), onZoomTo)
-            PopupQuickAction(Icons.Default.History, "Rota Ge\u00e7mi\u015fi", AppColors.Indigo, Modifier.weight(1f)) {}
-            PopupQuickAction(Icons.Default.Notifications, "Alarm Kur", Color(0xFFFF9800), Modifier.weight(1f)) {}
+            PopupQuickAction(Icons.Default.LocationOn, "Konuma Git", Color.Blue, Modifier.weight(1f)) {
+                openMapsDirectionsLiveMap(context, vehicle.lat, vehicle.lng, vehicle.plate)
+            }
+            PopupQuickAction(Icons.Default.History, "Rota Ge\u00e7mi\u015fi", AppColors.Indigo, Modifier.weight(1f)) {
+                onClose()
+                onNavigateToRouteHistory?.invoke(vehicle)
+            }
+            PopupQuickAction(Icons.Default.Notifications, "Alarm Kur", Color(0xFFFF9800), Modifier.weight(1f)) {
+                onClose()
+                onNavigateToAlarms?.invoke()
+            }
             PopupQuickAction(Icons.Default.Lock, "Blokaj", Color.Red, Modifier.weight(1f)) {}
         }
 

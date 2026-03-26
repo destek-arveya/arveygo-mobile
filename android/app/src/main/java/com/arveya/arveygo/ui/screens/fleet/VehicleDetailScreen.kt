@@ -1,6 +1,8 @@
 package com.arveya.arveygo.ui.screens.fleet
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -43,7 +45,9 @@ private enum class DetailTab(val label: String) {
 @Composable
 fun VehicleDetailScreen(
     vehicle: Vehicle,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToRouteHistory: ((Vehicle) -> Unit)? = null,
+    onNavigateToAlarms: (() -> Unit)? = null
 ) {
     var selectedTab by remember { mutableStateOf(DetailTab.OVERVIEW) }
     val context = LocalContext.current
@@ -96,14 +100,30 @@ fun VehicleDetailScreen(
                         }
                         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                             DropdownMenuItem(
-                                text = { Text("Haritada Göster", fontSize = 13.sp) },
-                                onClick = { menuExpanded = false },
-                                leadingIcon = { Icon(Icons.Default.Map, null, modifier = Modifier.size(16.dp)) }
+                                text = { Text("Konuma Git", fontSize = 13.sp) },
+                                onClick = {
+                                    menuExpanded = false
+                                    openMapsDirections(context, currentVehicle.lat, currentVehicle.lng, currentVehicle.plate)
+                                },
+                                leadingIcon = { Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(16.dp)) }
                             )
                             DropdownMenuItem(
                                 text = { Text("Rota Geçmişi", fontSize = 13.sp) },
-                                onClick = { menuExpanded = false },
+                                onClick = {
+                                    menuExpanded = false
+                                    onBack()
+                                    onNavigateToRouteHistory?.invoke(currentVehicle)
+                                },
                                 leadingIcon = { Icon(Icons.Default.History, null, modifier = Modifier.size(16.dp)) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Alarm Kur", fontSize = 13.sp) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onBack()
+                                    onNavigateToAlarms?.invoke()
+                                },
+                                leadingIcon = { Icon(Icons.Default.Notifications, null, modifier = Modifier.size(16.dp)) }
                             )
                             DropdownMenuItem(
                                 text = { Text("Paylaş", fontSize = 13.sp) },
@@ -147,7 +167,7 @@ fun VehicleDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 when (selectedTab) {
-                    DetailTab.OVERVIEW -> OverviewTab(currentVehicle)
+                    DetailTab.OVERVIEW -> OverviewTab(currentVehicle, context, onBack, onNavigateToRouteHistory, onNavigateToAlarms)
                     DetailTab.MAINTENANCE -> MaintenanceTab(currentVehicle)
                     DetailTab.COSTS -> CostsTab(currentVehicle)
                     DetailTab.EVENTS -> EventsTab(currentVehicle)
@@ -339,7 +359,13 @@ private fun TabSelector(selectedTab: DetailTab, onSelect: (DetailTab) -> Unit) {
 
 // MARK: - Overview Tab
 @Composable
-private fun OverviewTab(vehicle: Vehicle) {
+private fun OverviewTab(
+    vehicle: Vehicle,
+    context: Context,
+    onBack: () -> Unit,
+    onNavigateToRouteHistory: ((Vehicle) -> Unit)?,
+    onNavigateToAlarms: (() -> Unit)?
+) {
     val infoItems = listOf(
         Triple(Icons.Default.Folder, "GRUP", vehicle.group),
         Triple(Icons.Default.Speed, "KİLOMETRE", vehicle.formattedTotalKm + " km"),
@@ -460,15 +486,24 @@ private fun OverviewTab(vehicle: Vehicle) {
     }
 
     SectionCard(title = "HIZLI İŞLEMLER", icon = Icons.Default.FlashOn) {
+        data class QuickAction(val icon: ImageVector, val label: String, val color: Color, val onClick: () -> Unit)
         val actions = listOf(
-            Triple(Icons.Default.LocationOn, "Konuma\nGit", Color.Blue),
-            Triple(Icons.Default.History, "Rota\nGeçmişi", AppColors.Indigo),
-            Triple(Icons.Default.Notifications, "Alarm\nKur", Color(0xFFFF9800)),
-            Triple(Icons.Default.Lock, "Blokaj\nGönder", Color.Red),
-            Triple(Icons.Default.Build, "Bakım\nEkle", AppColors.Online),
-            Triple(Icons.Default.Description, "Belge\nEkle", Color(0xFF9C27B0)),
-            Triple(Icons.Default.LocalGasStation, "Yakıt\nKayıt", Color(0xFF00BCD4)),
-            Triple(Icons.Default.Share, "Paylaş", AppColors.TextMuted),
+            QuickAction(Icons.Default.LocationOn, "Konuma\nGit", Color.Blue) {
+                openMapsDirections(context, vehicle.lat, vehicle.lng, vehicle.plate)
+            },
+            QuickAction(Icons.Default.History, "Rota\nGeçmişi", AppColors.Indigo) {
+                onBack()
+                onNavigateToRouteHistory?.invoke(vehicle)
+            },
+            QuickAction(Icons.Default.Notifications, "Alarm\nKur", Color(0xFFFF9800)) {
+                onBack()
+                onNavigateToAlarms?.invoke()
+            },
+            QuickAction(Icons.Default.Lock, "Blokaj\nGönder", Color.Red) {},
+            QuickAction(Icons.Default.Build, "Bakım\nEkle", AppColors.Online) {},
+            QuickAction(Icons.Default.Description, "Belge\nEkle", Color(0xFF9C27B0)) {},
+            QuickAction(Icons.Default.LocalGasStation, "Yakıt\nKayıt", Color(0xFF00BCD4)) {},
+            QuickAction(Icons.Default.Share, "Paylaş", AppColors.TextMuted) {},
         )
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             for (i in actions.indices step 4) {
@@ -476,7 +511,7 @@ private fun OverviewTab(vehicle: Vehicle) {
                     for (j in 0 until 4) {
                         val idx = i + j
                         if (idx < actions.size) {
-                            ActionButton(actions[idx].first, actions[idx].second, actions[idx].third, Modifier.weight(1f))
+                            ActionButton(actions[idx].icon, actions[idx].label, actions[idx].color, Modifier.weight(1f), actions[idx].onClick)
                         } else {
                             Spacer(Modifier.weight(1f))
                         }
@@ -571,6 +606,31 @@ private fun EventsTab(vehicle: Vehicle) {
 }
 
 // ============================================================================
+// MARK: - Open Maps Directions Helper
+// ============================================================================
+
+private fun openMapsDirections(context: Context, lat: Double, lng: Double, label: String) {
+    // Try Google Maps first, fall back to generic geo intent
+    try {
+        val gmmIntentUri = Uri.parse("google.navigation:q=$lat,$lng&mode=d")
+        val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri).apply {
+            setPackage("com.google.android.apps.maps")
+        }
+        if (mapIntent.resolveActivity(context.packageManager) != null) {
+            context.startActivity(mapIntent)
+        } else {
+            // Fallback to generic geo intent
+            val genericUri = Uri.parse("geo:$lat,$lng?q=$lat,$lng($label)")
+            context.startActivity(Intent(Intent.ACTION_VIEW, genericUri))
+        }
+    } catch (e: Exception) {
+        // Ultimate fallback: open in browser
+        val browserUri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng")
+        context.startActivity(Intent(Intent.ACTION_VIEW, browserUri))
+    }
+}
+
+// ============================================================================
 // MARK: - Reusable Components
 // ============================================================================
 
@@ -615,10 +675,10 @@ private fun InfoCell(icon: ImageVector, label: String, value: String, modifier: 
 }
 
 @Composable
-private fun ActionButton(icon: ImageVector, label: String, color: Color, modifier: Modifier = Modifier) {
+private fun ActionButton(icon: ImageVector, label: String, color: Color, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier.clickable { }
+        modifier = modifier.clickable { onClick() }
     ) {
         Box(
             contentAlignment = Alignment.Center,

@@ -30,7 +30,7 @@ import com.arveya.arveygo.viewmodels.DashboardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}, onNavigateToVehicles: () -> Unit = {}, onNavigateToAlarms: () -> Unit = {}) {
+fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}, onNavigateToVehicles: () -> Unit = {}, onNavigateToAlarms: () -> Unit = {}, onNavigateToRouteHistory: (() -> Unit)? = null) {
     val authVM = LocalAuthViewModel.current
     val vm: DashboardViewModel = viewModel()
     val user by authVM.currentUser.collectAsState()
@@ -221,7 +221,15 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}, o
     selectedVehicle?.let { vehicle ->
         com.arveya.arveygo.ui.screens.fleet.VehicleDetailScreen(
             vehicle = vehicle,
-            onBack = { selectedVehicle = null }
+            onBack = { selectedVehicle = null },
+            onNavigateToRouteHistory = { _ ->
+                selectedVehicle = null
+                onNavigateToRouteHistory?.invoke()
+            },
+            onNavigateToAlarms = {
+                selectedVehicle = null
+                onNavigateToAlarms()
+            }
         )
     }
 }
