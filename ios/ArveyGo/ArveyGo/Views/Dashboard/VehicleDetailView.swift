@@ -46,7 +46,6 @@ struct VehicleDetailView: View {
     @StateObject private var observer: VehicleDetailObserver
     @State private var selectedTab: DetailTab = .overview
     @State private var mapCameraPosition: MapCameraPosition = .automatic
-    @State private var showMotorcycleSettings = false
 
     /// Navigation callbacks for quick actions
     var onNavigateToRouteHistory: ((Vehicle) -> Void)?
@@ -130,39 +129,12 @@ struct VehicleDetailView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button(action: {
-                            openMapsDirections(lat: vehicle.lat, lng: vehicle.lng, label: vehicle.plate)
-                        }) {
-                            Label("Konuma Git", systemImage: "location.fill")
+                    if vehicle.isMotorcycle {
+                        NavigationLink(destination: MotorcycleSettingsView(vehicle: vehicle)) {
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(AppTheme.online)
                         }
-                        Button(action: {
-                            dismiss()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                onNavigateToRouteHistory?(vehicle)
-                            }
-                        }) {
-                            Label("Rota Geçmişi", systemImage: "clock.arrow.circlepath")
-                        }
-                        Button(action: {
-                            dismiss()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                onNavigateToAlarms?()
-                            }
-                        }) {
-                            Label("Alarm Kur", systemImage: "bell.fill")
-                        }
-                        Button(action: {}) {
-                            Label("Paylaş", systemImage: "square.and.arrow.up")
-                        }
-                        Divider()
-                        Button(role: .destructive, action: {}) {
-                            Label("Blokaj Gönder", systemImage: "lock.fill")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .font(.system(size: 18))
-                            .foregroundColor(AppTheme.navy)
                     }
                 }
             }
@@ -171,9 +143,6 @@ struct VehicleDetailView: View {
                     center: CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng),
                     span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
                 ))
-            }
-            .sheet(isPresented: $showMotorcycleSettings) {
-                MotorcycleSettingsView(vehicle: vehicle)
             }
         }
     }
@@ -252,18 +221,6 @@ struct VehicleDetailView: View {
                     .padding(.top, 2)
                 }
                 Spacer()
-
-                // Motorcycle settings gear button
-                if vehicle.isMotorcycle {
-                    Button(action: { showMotorcycleSettings = true }) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(AppTheme.online)
-                            .padding(10)
-                            .background(AppTheme.online.opacity(0.1))
-                            .clipShape(Circle())
-                    }
-                }
             }
             .padding(16)
 
@@ -482,7 +439,9 @@ struct VehicleDetailView: View {
                     actionButton(icon: "wrench.fill", label: "Bakım\nEkle", color: AppTheme.online) {}
                     actionButton(icon: "doc.text.fill", label: "Belge\nEkle", color: .purple) {}
                     actionButton(icon: "fuelpump.fill", label: "Yakıt\nKayıt", color: .cyan) {}
-                    actionButton(icon: "square.and.arrow.up", label: "Paylaş", color: AppTheme.textMuted) {}
+                    actionButton(icon: "square.and.arrow.up", label: "Paylaş", color: AppTheme.textMuted) {
+                        shareVehicleLocation(vehicle: vehicle)
+                    }
                 }
             }
         }
@@ -828,6 +787,26 @@ struct VehicleDetailView: View {
         let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
         mapItem.name = label
         mapItem.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
+    }
+
+    // MARK: - Share Vehicle Location
+    private func shareVehicleLocation(vehicle: Vehicle) {
+        let mapsURL = "https://www.google.com/maps?q=\(vehicle.lat),\(vehicle.lng)"
+        let message = """
+        📍 \(vehicle.plate) - Anlık Konum
+        🚗 \(vehicle.model)
+        📊 Hız: \(vehicle.formattedSpeed)
+        🔑 \(vehicle.kontakLabel)
+        🗺️ \(mapsURL)
+        """
+        let activityVC = UIActivityViewController(activityItems: [message.trimmingCharacters(in: .whitespaces)], applicationActivities: nil)
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootVC = windowScene.windows.first?.rootViewController {
+            var topVC = rootVC
+            while let presented = topVC.presentedViewController { topVC = presented }
+            activityVC.popoverPresentationController?.sourceView = topVC.view
+            topVC.present(activityVC, animated: true)
+        }
     }
 
     func eventRow(icon: String, title: String, subtitle: String, time: String, severity: AlertSeverity) -> some View {

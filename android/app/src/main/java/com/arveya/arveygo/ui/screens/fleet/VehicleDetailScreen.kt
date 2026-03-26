@@ -54,6 +54,15 @@ fun VehicleDetailScreen(
     var currentVehicle by remember { mutableStateOf(vehicle) }
     var showMotorcycleSettings by remember { mutableStateOf(false) }
 
+    // If motorcycle settings is showing, show the full-screen settings page
+    if (showMotorcycleSettings) {
+        MotorcycleSettingsScreen(
+            vehicle = currentVehicle,
+            onBack = { showMotorcycleSettings = false }
+        )
+        return
+    }
+
     LaunchedEffect(Unit) {
         Configuration.getInstance().userAgentValue = context.packageName
     }
@@ -94,49 +103,9 @@ fun VehicleDetailScreen(
                     }
                 },
                 actions = {
-                    var menuExpanded by remember { mutableStateOf(false) }
-                    Box {
-                        IconButton(onClick = { menuExpanded = true }) {
-                            Icon(Icons.Default.MoreVert, null, tint = AppColors.Navy, modifier = Modifier.size(20.dp))
-                        }
-                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Konuma Git", fontSize = 13.sp) },
-                                onClick = {
-                                    menuExpanded = false
-                                    openMapsDirections(context, currentVehicle.lat, currentVehicle.lng, currentVehicle.plate)
-                                },
-                                leadingIcon = { Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(16.dp)) }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Rota Geçmişi", fontSize = 13.sp) },
-                                onClick = {
-                                    menuExpanded = false
-                                    onBack()
-                                    onNavigateToRouteHistory?.invoke(currentVehicle)
-                                },
-                                leadingIcon = { Icon(Icons.Default.History, null, modifier = Modifier.size(16.dp)) }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Alarm Kur", fontSize = 13.sp) },
-                                onClick = {
-                                    menuExpanded = false
-                                    onBack()
-                                    onNavigateToAlarms?.invoke()
-                                },
-                                leadingIcon = { Icon(Icons.Default.Notifications, null, modifier = Modifier.size(16.dp)) }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Paylaş", fontSize = 13.sp) },
-                                onClick = { menuExpanded = false },
-                                leadingIcon = { Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp)) }
-                            )
-                            HorizontalDivider()
-                            DropdownMenuItem(
-                                text = { Text("Blokaj Gönder", fontSize = 13.sp, color = Color.Red) },
-                                onClick = { menuExpanded = false },
-                                leadingIcon = { Icon(Icons.Default.Lock, null, tint = Color.Red, modifier = Modifier.size(16.dp)) }
-                            )
+                    if (currentVehicle.isMotorcycle) {
+                        IconButton(onClick = { showMotorcycleSettings = true }) {
+                            Icon(Icons.Default.Settings, null, tint = AppColors.Online, modifier = Modifier.size(22.dp))
                         }
                     }
                 },
@@ -155,7 +124,7 @@ fun VehicleDetailScreen(
             MapHeader(currentVehicle, context)
 
             // Vehicle Identity Card (overlapping map)
-            VehicleIdentityCard(currentVehicle, onMotorcycleSettings = { showMotorcycleSettings = true })
+            VehicleIdentityCard(currentVehicle)
 
             // Tab Selector
             TabSelector(selectedTab) { selectedTab = it }
@@ -175,14 +144,6 @@ fun VehicleDetailScreen(
                 }
             }
         }
-    }
-
-    // Motorcycle Settings Dialog
-    if (showMotorcycleSettings) {
-        MotorcycleSettingsDialog(
-            vehicle = currentVehicle,
-            onDismiss = { showMotorcycleSettings = false }
-        )
     }
 }
 
@@ -253,7 +214,7 @@ private fun MapHeader(vehicle: Vehicle, context: Context) {
 
 // MARK: - Vehicle Identity Card
 @Composable
-private fun VehicleIdentityCard(vehicle: Vehicle, onMotorcycleSettings: () -> Unit = {}) {
+private fun VehicleIdentityCard(vehicle: Vehicle) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -296,23 +257,7 @@ private fun VehicleIdentityCard(vehicle: Vehicle, onMotorcycleSettings: () -> Un
                 }
             }
 
-            // Motorcycle settings gear button
-            if (vehicle.isMotorcycle) {
-                IconButton(onClick = onMotorcycleSettings) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(AppColors.Online.copy(alpha = 0.1f), CircleShape)
-                    ) {
-                        Icon(
-                            Icons.Default.Settings, null,
-                            tint = AppColors.Online,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
+
         }
 
         HorizontalDivider(color = AppColors.BorderSoft)
@@ -537,7 +482,9 @@ private fun OverviewTab(
             QuickAction(Icons.Default.Build, "Bakım\nEkle", AppColors.Online) {},
             QuickAction(Icons.Default.Description, "Belge\nEkle", Color(0xFF9C27B0)) {},
             QuickAction(Icons.Default.LocalGasStation, "Yakıt\nKayıt", Color(0xFF00BCD4)) {},
-            QuickAction(Icons.Default.Share, "Paylaş", AppColors.TextMuted) {},
+            QuickAction(Icons.Default.Share, "Paylaş", AppColors.TextMuted) {
+                shareVehicleLocation(context, vehicle)
+            },
         )
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             for (i in actions.indices step 4) {
@@ -662,6 +609,21 @@ private fun openMapsDirections(context: Context, lat: Double, lng: Double, label
         val browserUri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng")
         context.startActivity(Intent(Intent.ACTION_VIEW, browserUri))
     }
+}
+
+// ============================================================================
+// MARK: - Share Vehicle Location Helper
+// ============================================================================
+
+private fun shareVehicleLocation(context: Context, vehicle: Vehicle) {
+    val mapsUrl = "https://www.google.com/maps?q=${vehicle.lat},${vehicle.lng}"
+    val shareText = "${vehicle.plate} konumu:\n${vehicle.city}\n\n$mapsUrl"
+    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, shareText)
+        putExtra(Intent.EXTRA_SUBJECT, "${vehicle.plate} Araç Konumu")
+    }
+    context.startActivity(Intent.createChooser(sendIntent, "Konumu Paylaş"))
 }
 
 // ============================================================================
@@ -854,9 +816,10 @@ private fun EventRow(icon: ImageVector, title: String, subtitle: String, time: S
     }
 }
 
-// MARK: - Motorcycle Settings Dialog
+// MARK: - Motorcycle Settings Screen (Full Page)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MotorcycleSettingsDialog(vehicle: Vehicle, onDismiss: () -> Unit) {
+private fun MotorcycleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
     var kontakOnNotification by remember { mutableStateOf(true) }
     var kontakOffNotification by remember { mutableStateOf(true) }
     var batteryRemovedNotification by remember { mutableStateOf(true) }
@@ -866,59 +829,118 @@ private fun MotorcycleSettingsDialog(vehicle: Vehicle, onDismiss: () -> Unit) {
     var phoneNumber by remember { mutableStateOf("") }
     var sleepDelaySeconds by remember { mutableStateOf("30") }
     var wakeIntervalHours by remember { mutableStateOf("6") }
+    var alarmEnabled by remember { mutableStateOf(false) }
+    var alarmDurationSeconds by remember { mutableFloatStateOf(30f) }
+    var showKontakAlert by remember { mutableStateOf(false) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            Button(
-                onClick = { /* TODO: Save to backend */ onDismiss() },
-                colors = ButtonDefaults.buttonColors(containerColor = AppColors.Online)
-            ) {
-                Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Ayarları Kaydet", fontWeight = FontWeight.Bold)
+    // Kontak alert dialog
+    if (showKontakAlert) {
+        AlertDialog(
+            onDismissRequest = { showKontakAlert = false },
+            confirmButton = {
+                TextButton(onClick = { showKontakAlert = false }) {
+                    Text("Tamam", fontWeight = FontWeight.Bold, color = AppColors.Online)
+                }
+            },
+            icon = {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(Color(0xFFFF9800).copy(alpha = 0.1f), CircleShape)
+                ) {
+                    Icon(Icons.Default.Warning, null, tint = Color(0xFFFF9800), modifier = Modifier.size(24.dp))
+                }
+            },
+            title = {
+                Text("Kontak Kapalı", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AppColors.Navy)
+            },
+            text = {
+                Text("Ayarları kaydetmek için aracın kontağının açık olması gereklidir.", fontSize = 14.sp, color = AppColors.TextMuted)
             }
+        )
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.ChevronLeft, null, tint = AppColors.Navy, modifier = Modifier.size(18.dp))
+                            Text("Geri", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
+                        }
+                    }
+                },
+                title = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Text("Motosiklet Ayarları", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+                        Text("${vehicle.plate} · ${vehicle.model}", fontSize = 10.sp, color = AppColors.TextMuted)
+                    }
+                },
+                actions = { Spacer(Modifier.width(48.dp)) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+            )
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("İptal") }
-        },
-        icon = {
+        bottomBar = {
+            Surface(shadowElevation = 8.dp) {
+                Button(
+                    onClick = {
+                        if (!vehicle.ignition) {
+                            showKontakAlert = true
+                        } else {
+                            // TODO: Save to backend
+                            onBack()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .height(50.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Online),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Ayarları Kaydet", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            }
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(AppColors.Bg)
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header icon
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(48.dp)
+                    .align(Alignment.CenterHorizontally)
+                    .size(64.dp)
                     .background(AppColors.Online.copy(alpha = 0.1f), CircleShape)
             ) {
-                Icon(Icons.Default.TwoWheeler, null, tint = AppColors.Online, modifier = Modifier.size(24.dp))
+                Icon(Icons.Default.TwoWheeler, null, tint = AppColors.Online, modifier = Modifier.size(32.dp))
             }
-        },
-        title = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Motosiklet Ayarları", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AppColors.Navy)
-                Text("${vehicle.plate} · ${vehicle.model}", fontSize = 12.sp, color = AppColors.TextMuted)
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                // Section: Kontak
-                SettingsSectionHeader("Kontak Bildirimleri", Icons.Default.Key)
+
+            // Section: Kontak
+            SettingsSection("Kontak Bildirimleri", Icons.Default.Key) {
                 SettingsToggle("Kontak Açılma Bildirimi", "Kontak açıldığında bildirim al", kontakOnNotification) { kontakOnNotification = it }
                 SettingsToggle("Kontak Kapanma Bildirimi", "Kontak kapandığında bildirim al", kontakOffNotification) { kontakOffNotification = it }
+            }
 
-                Spacer(Modifier.height(8.dp))
-
-                // Section: Akü
-                SettingsSectionHeader("Akü Bildirimleri", Icons.Default.BatteryChargingFull)
+            // Section: Akü
+            SettingsSection("Akü Bildirimleri", Icons.Default.BatteryChargingFull) {
                 SettingsToggle("Aküden Söküldü Bildirimi", "Cihaz aküden sökülünce bildirim al", batteryRemovedNotification) { batteryRemovedNotification = it }
                 SettingsToggle("Aküye Takıldı Bildirimi", "Cihaz aküye takılınca bildirim al", batteryInstalledNotification) { batteryInstalledNotification = it }
+            }
 
-                Spacer(Modifier.height(8.dp))
-
-                // Section: Hareket
-                SettingsSectionHeader("Hareket Algılama", Icons.Default.DirectionsWalk)
+            // Section: Hareket
+            SettingsSection("Hareket Algılama", Icons.Default.DirectionsWalk) {
                 SettingsToggle("Hareket Algılandı Bildirimi", "Araç hareket edince bildirim al", motionDetectedNotification) { motionDetectedNotification = it }
                 SettingsToggle("Telefon Araması", "Hareket algılanınca telefon ile ara", motionDetectedPhoneCall) { motionDetectedPhoneCall = it }
 
@@ -929,15 +951,47 @@ private fun MotorcycleSettingsDialog(vehicle: Vehicle, onDismiss: () -> Unit) {
                         label = { Text("Telefon Numarası") },
                         leadingIcon = { Icon(Icons.Default.Phone, null, tint = AppColors.Online) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(start = 8.dp)
+                        modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 4.dp)
                     )
                 }
+            }
 
-                Spacer(Modifier.height(8.dp))
+            // Section: Alarm
+            SettingsSection("Alarm Ayarları", Icons.Default.Notifications) {
+                SettingsToggle("Alarm Kur", "Uzaktan alarm çalıştır", alarmEnabled) { alarmEnabled = it }
 
-                // Section: Uyku
-                SettingsSectionHeader("Cihaz Uyku Ayarları", Icons.Default.Bedtime)
+                if (alarmEnabled) {
+                    Column(modifier = Modifier.padding(start = 8.dp, top = 4.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Alarm Süresi", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
+                            Spacer(Modifier.weight(1f))
+                            Text("${alarmDurationSeconds.toInt()} saniye", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AppColors.Online)
+                        }
+                        Slider(
+                            value = alarmDurationSeconds,
+                            onValueChange = { alarmDurationSeconds = it },
+                            valueRange = 10f..60f,
+                            steps = 4,
+                            colors = SliderDefaults.colors(
+                                thumbColor = AppColors.Online,
+                                activeTrackColor = AppColors.Online
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text("10 sn", fontSize = 10.sp, color = AppColors.TextMuted)
+                            Spacer(Modifier.weight(1f))
+                            Text("60 sn", fontSize = 10.sp, color = AppColors.TextMuted)
+                        }
+                    }
+                }
+            }
 
+            // Section: Uyku
+            SettingsSection("Cihaz Uyku Ayarları", Icons.Default.Bedtime) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
@@ -973,18 +1027,27 @@ private fun MotorcycleSettingsDialog(vehicle: Vehicle, onDismiss: () -> Unit) {
                 }
             }
         }
-    )
+    }
 }
 
 @Composable
-private fun SettingsSectionHeader(title: String, icon: ImageVector) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(vertical = 4.dp)
+private fun SettingsSection(title: String, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Icon(icon, null, tint = AppColors.Online, modifier = Modifier.size(14.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                Icon(icon, null, tint = AppColors.Online, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+            }
+            content()
+        }
     }
 }
 
