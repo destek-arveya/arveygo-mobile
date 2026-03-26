@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -186,6 +187,13 @@ fun AlarmsScreen(onMenuClick: () -> Unit) {
     // Tab state
     var selectedTab by remember { mutableIntStateOf(0) }
 
+    // Search
+    var searchText by remember { mutableStateOf("") }
+
+    // Detail sheets
+    var selectedAlarm by remember { mutableStateOf<AlarmEvent?>(null) }
+    var selectedRule by remember { mutableStateOf<AlarmRule?>(null) }
+
     // State
     var alarms by remember { mutableStateOf(listOf<AlarmEvent>()) }
     var isLoading by remember { mutableStateOf(false) }
@@ -285,9 +293,40 @@ fun AlarmsScreen(onMenuClick: () -> Unit) {
         },
         containerColor = AppColors.Bg
     ) { innerPadding ->
+        // Filtered lists
+        val filteredAlarms = if (searchText.isBlank()) alarms else {
+            val q = searchText.lowercase()
+            alarms.filter {
+                it.typeLabel.lowercase().contains(q) ||
+                it.plate.lowercase().contains(q) ||
+                it.vehicleName.lowercase().contains(q) ||
+                it.code.lowercase().contains(q)
+            }
+        }
+
+        val filteredRules = if (searchText.isBlank()) DUMMY_ALARM_RULES else {
+            val q = searchText.lowercase()
+            DUMMY_ALARM_RULES.filter {
+                it.name.lowercase().contains(q) ||
+                it.typeLabel.lowercase().contains(q) ||
+                it.condition.lowercase().contains(q) ||
+                it.vehicles.lowercase().contains(q)
+            }
+        }
+
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             // Tab Selector
-            TabSelector(selectedTab = selectedTab, onTabSelected = { selectedTab = it })
+            TabSelector(selectedTab = selectedTab, onTabSelected = {
+                selectedTab = it
+                searchText = ""
+            })
+
+            // Search Bar
+            SearchBar(
+                text = searchText,
+                onTextChange = { searchText = it },
+                placeholder = if (selectedTab == 0) "Alarm ara (plaka, tür, açıklama...)" else "Kural ara (isim, tür, araç...)"
+            )
 
             if (selectedTab == 0) {
                 // MARK: Gelen Alarmlar Tab
@@ -337,7 +376,7 @@ fun AlarmsScreen(onMenuClick: () -> Unit) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "$totalCount alarm",
+                                "${filteredAlarms.size} alarm",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = AppColors.TextMuted
@@ -358,8 +397,8 @@ fun AlarmsScreen(onMenuClick: () -> Unit) {
                             contentPadding = PaddingValues(bottom = 20.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(alarms, key = { it.id }) { alarm ->
-                                AlarmCard(alarm)
+                            items(filteredAlarms, key = { it.id }) { alarm ->
+                                AlarmCard(alarm, onClick = { selectedAlarm = alarm })
                             }
 
                             // Pagination
@@ -384,9 +423,19 @@ fun AlarmsScreen(onMenuClick: () -> Unit) {
                 }
             } else {
                 // MARK: Alarm Kuralları Tab
-                AlarmRulesTab()
+                AlarmRulesTab(filteredRules = filteredRules, onRuleClick = { selectedRule = it })
             }
         }
+    }
+
+    // Alarm Detail Bottom Sheet
+    selectedAlarm?.let { alarm ->
+        AlarmDetailSheet(alarm = alarm, onDismiss = { selectedAlarm = null })
+    }
+
+    // Rule Detail Bottom Sheet
+    selectedRule?.let { rule ->
+        RuleDetailSheet(rule = rule, onDismiss = { selectedRule = null })
     }
 
     // Filtre Bottom Sheet
@@ -428,6 +477,48 @@ fun AlarmsScreen(onMenuClick: () -> Unit) {
                 ) {
                     Text("Uygula", fontWeight = FontWeight.SemiBold)
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Search Bar
+@Composable
+private fun SearchBar(text: String, onTextChange: (String) -> Unit, placeholder: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 4.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(AppColors.Surface)
+            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+    ) {
+        Icon(Icons.Default.Search, null, tint = AppColors.TextMuted, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(8.dp))
+        BasicTextField(
+            value = text,
+            onValueChange = onTextChange,
+            singleLine = true,
+            textStyle = androidx.compose.ui.text.TextStyle(
+                fontSize = 13.sp,
+                color = AppColors.TextPrimary
+            ),
+            decorationBox = { innerTextField ->
+                Box(modifier = Modifier.weight(1f).padding(vertical = 6.dp)) {
+                    if (text.isEmpty()) {
+                        Text(placeholder, fontSize = 13.sp, color = AppColors.TextMuted)
+                    }
+                    innerTextField()
+                }
+            },
+            modifier = Modifier.weight(1f)
+        )
+        if (text.isNotEmpty()) {
+            IconButton(onClick = { onTextChange("") }, modifier = Modifier.size(24.dp)) {
+                Icon(Icons.Default.Close, null, tint = AppColors.TextMuted, modifier = Modifier.size(14.dp))
             }
         }
     }
@@ -481,51 +572,84 @@ private fun TabSelector(selectedTab: Int, onTabSelected: (Int) -> Unit) {
 
 // MARK: - Alarm Rules Tab
 @Composable
-private fun AlarmRulesTab() {
+private fun AlarmRulesTab(filteredRules: List<AlarmRule>, onRuleClick: (AlarmRule) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // Yeni Kural Ekle — kart tarzı buton
+        item {
+            NewRuleButton()
+        }
+
         // Header
         item {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "${DUMMY_ALARM_RULES.size} kural tanımlı",
+                    "${filteredRules.size} kural tanımlı",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     color = AppColors.TextMuted
                 )
-                Spacer(Modifier.weight(1f))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { }
-                ) {
-                    Icon(Icons.Default.AddCircle, null, tint = AppColors.Indigo, modifier = Modifier.size(16.dp))
-                    Text("Yeni Kural", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Indigo)
-                }
             }
         }
 
-        items(DUMMY_ALARM_RULES, key = { it.id }) { rule ->
-            AlarmRuleCard(rule)
+        items(filteredRules, key = { it.id }) { rule ->
+            AlarmRuleCard(rule, onClick = { onRuleClick(rule) })
         }
+    }
+}
+
+// MARK: - New Rule Button (Kart tarzı)
+@Composable
+private fun NewRuleButton() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(AppColors.Indigo.copy(alpha = 0.04f))
+            .border(1.dp, AppColors.Indigo.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+            .clickable { }
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        // İkon
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(AppColors.Indigo.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.Add, null, tint = AppColors.Indigo, modifier = Modifier.size(18.dp))
+        }
+
+        Spacer(Modifier.width(10.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Yeni Alarm Kuralı Ekle", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Indigo)
+            Text("Araçlarınız için özel alarm kuralı tanımlayın", fontSize = 10.sp, color = AppColors.TextMuted)
+        }
+
+        Icon(Icons.Default.ChevronRight, null, tint = AppColors.Indigo.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
     }
 }
 
 // MARK: - Alarm Rule Card
 @Composable
-private fun AlarmRuleCard(rule: AlarmRule) {
+private fun AlarmRuleCard(rule: AlarmRule, onClick: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(AppColors.Surface)
+            .clickable { onClick() }
             .padding(12.dp)
     ) {
         Row(
@@ -594,13 +718,14 @@ private fun AlarmRuleCard(rule: AlarmRule) {
 
 // MARK: - Alarm Card
 @Composable
-private fun AlarmCard(alarm: AlarmEvent) {
+private fun AlarmCard(alarm: AlarmEvent, onClick: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(AppColors.Surface)
+            .clickable { onClick() }
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -780,6 +905,165 @@ private fun EmptyContent(hasFilters: Boolean, onClearFilters: () -> Unit) {
                     Text("Filtreleri Temizle", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Indigo)
                 }
             }
+        }
+    }
+}
+
+// MARK: - Alarm Detail Sheet
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AlarmDetailSheet(alarm: AlarmEvent, onDismiss: () -> Unit) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = AppColors.Bg
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 32.dp)
+        ) {
+            // Header
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(alarm.color.copy(alpha = 0.04f))
+                    .padding(vertical = 24.dp)
+            ) {
+                Box(
+                    modifier = Modifier.size(60.dp).clip(CircleShape).background(alarm.color.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(alarm.icon, null, tint = alarm.color, modifier = Modifier.size(28.dp))
+                }
+                Spacer(Modifier.height(12.dp))
+                Text(alarm.typeLabel, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
+                Spacer(Modifier.height(4.dp))
+                Text(alarm.formattedDate, fontSize = 12.sp, color = AppColors.TextMuted)
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Details
+            DetailRow(icon = Icons.Default.DirectionsCar, title = "Araç", value = if (alarm.plate.isNotEmpty()) "${alarm.plate} — ${alarm.vehicleName}" else alarm.vehicleName)
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            DetailRow(icon = Icons.Default.Tag, title = "IMEI", value = alarm.imei)
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            DetailRow(icon = Icons.Default.Speed, title = "Hız", value = if (alarm.speed > 0) "${alarm.speed} km/s" else "—")
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            DetailRow(icon = Icons.Default.Description, title = "Açıklama", value = alarm.code.ifEmpty { "—" })
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            DetailRow(icon = Icons.Default.LocationOn, title = "Konum", value = String.format("%.4f, %.4f", alarm.lat, alarm.lng))
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            DetailRow(icon = Icons.Default.CalendarMonth, title = "Tarih", value = alarm.createdAt)
+        }
+    }
+}
+
+// MARK: - Rule Detail Sheet
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RuleDetailSheet(rule: AlarmRule, onDismiss: () -> Unit) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = AppColors.Bg
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 32.dp)
+        ) {
+            // Header
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(rule.color.copy(alpha = 0.04f))
+                    .padding(vertical = 24.dp)
+            ) {
+                Box(
+                    modifier = Modifier.size(60.dp).clip(CircleShape).background(rule.color.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(rule.icon, null, tint = rule.color, modifier = Modifier.size(28.dp))
+                }
+                Spacer(Modifier.height(12.dp))
+                Text(rule.name, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
+                Spacer(Modifier.height(8.dp))
+                // Aktif/Pasif badge
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (rule.isActive) Color(0xFF22C55E).copy(alpha = 0.1f) else Color.Gray.copy(alpha = 0.1f))
+                        .padding(horizontal = 12.dp, vertical = 5.dp)
+                ) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(if (rule.isActive) Color(0xFF22C55E) else Color.Gray))
+                    Text(
+                        if (rule.isActive) "Aktif" else "Pasif",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (rule.isActive) Color(0xFF22C55E) else Color.Gray
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Details
+            DetailRow(icon = Icons.Default.Sell, title = "Alarm Türü", value = rule.typeLabel)
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            DetailRow(icon = Icons.Default.Warning, title = "Koşul", value = rule.condition)
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            DetailRow(icon = Icons.Default.DirectionsCar, title = "Araçlar", value = rule.vehicles)
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            DetailRow(icon = Icons.Default.CalendarMonth, title = "Oluşturulma", value = rule.createdAt)
+
+            // Actions
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = {},
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Indigo),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Kuralı Düzenle", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                }
+
+                OutlinedButton(
+                    onClick = {},
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
+                    border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.3f)),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Delete, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Kuralı Sil", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Detail Row
+@Composable
+private fun DetailRow(icon: ImageVector, title: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(icon, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp))
+        Column {
+            Text(title, fontSize = 11.sp, color = AppColors.TextFaint)
+            Spacer(Modifier.height(2.dp))
+            Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
         }
     }
 }
