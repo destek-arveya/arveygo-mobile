@@ -507,20 +507,51 @@ data class Geofence(
 
     companion object {
         fun fromJson(json: JSONObject): Geofence {
-            val pointsArray = json.optJSONArray("points") ?: org.json.JSONArray()
-            val pts = (0 until pointsArray.length()).map { i ->
-                val p = pointsArray.getJSONObject(i)
-                GeofencePoint(p.optDouble("lat", 0.0), p.optDouble("lng", 0.0))
+            // API returns "path" with {lat, lon} — normalise to GeofencePoint {lat, lng}
+            val rawPath = when {
+                json.has("path") && !json.isNull("path") -> {
+                    val v = json.get("path")
+                    when (v) {
+                        is org.json.JSONArray -> v
+                        is String -> try { org.json.JSONArray(v) } catch (_: Exception) { org.json.JSONArray() }
+                        else -> org.json.JSONArray()
+                    }
+                }
+                json.has("points") && !json.isNull("points") -> json.optJSONArray("points") ?: org.json.JSONArray()
+                else -> org.json.JSONArray()
             }
+            val pts = (0 until rawPath.length()).map { i ->
+                val p = rawPath.getJSONObject(i)
+                val lat = p.optDouble("lat", 0.0)
+                val lng = if (p.has("lon")) p.optDouble("lon", 0.0) else p.optDouble("lng", 0.0)
+                GeofencePoint(lat, lng)
+            }
+
+            // API returns shape_type, radius_m, center_lon
+            val type = if (json.has("shape_type") && !json.isNull("shape_type"))
+                json.optString("shape_type", "polygon") else json.optString("type", "polygon")
+
+            val radius = when {
+                json.has("radius_m") && !json.isNull("radius_m") -> json.optDouble("radius_m")
+                json.has("radius") && !json.isNull("radius") -> json.optDouble("radius")
+                else -> null
+            }
+            val centerLat = if (json.has("center_lat") && !json.isNull("center_lat")) json.optDouble("center_lat") else null
+            val centerLng = when {
+                json.has("center_lon") && !json.isNull("center_lon") -> json.optDouble("center_lon")
+                json.has("center_lng") && !json.isNull("center_lng") -> json.optDouble("center_lng")
+                else -> null
+            }
+
             return Geofence(
                 id = json.optInt("id", 0),
                 name = json.optString("name", ""),
-                type = json.optString("type", "polygon"),
+                type = type,
                 color = json.optString("color", "#3b82f6"),
                 points = pts,
-                radius = if (json.has("radius") && !json.isNull("radius")) json.optDouble("radius") else null,
-                centerLat = if (json.has("center_lat") && !json.isNull("center_lat")) json.optDouble("center_lat") else null,
-                centerLng = if (json.has("center_lng") && !json.isNull("center_lng")) json.optDouble("center_lng") else null,
+                radius = radius,
+                centerLat = centerLat,
+                centerLng = centerLng,
                 createdAt = json.optString("created_at", null)
             )
         }

@@ -321,21 +321,32 @@ final class APIService {
             guard let id = dict["id"] as? Int,
                   let name = dict["name"] as? String else { return nil }
 
-            let type = (dict["type"] as? String) ?? "polygon"
+            // API returns shape_type (circle / polygon / rectangle)
+            let type = (dict["shape_type"] as? String) ?? (dict["type"] as? String) ?? "polygon"
             let color = (dict["color"] as? String) ?? "#3b82f6"
 
+            // API returns "path" with {lat, lon} — normalise to GeofencePoint {lat, lng}
             var points: [GeofencePoint] = []
-            if let pArr = dict["points"] as? [[String: Any]] {
-                points = pArr.compactMap { p in
-                    guard let lat = p["lat"] as? Double,
-                          let lng = p["lng"] as? Double else { return nil }
+            if let raw = dict["path"] ?? dict["points"] {
+                var pathArray: [[String: Any]] = []
+                if let arr = raw as? [[String: Any]] {
+                    pathArray = arr
+                } else if let str = raw as? String,
+                          let data = str.data(using: .utf8),
+                          let decoded = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                    pathArray = decoded
+                }
+                points = pathArray.compactMap { p in
+                    guard let lat = p["lat"] as? Double else { return nil }
+                    let lng = (p["lon"] as? Double) ?? (p["lng"] as? Double) ?? 0
                     return GeofencePoint(lat: lat, lng: lng)
                 }
             }
 
-            let radius = dict["radius"] as? Double
+            // API returns radius_m and center_lon
+            let radius = (dict["radius_m"] as? Double) ?? (dict["radius"] as? Double)
             let centerLat = dict["center_lat"] as? Double
-            let centerLng = dict["center_lng"] as? Double
+            let centerLng = (dict["center_lon"] as? Double) ?? (dict["center_lng"] as? Double)
             let createdAt = dict["created_at"] as? String
 
             return Geofence(
