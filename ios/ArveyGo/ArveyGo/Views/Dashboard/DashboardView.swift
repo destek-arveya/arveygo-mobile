@@ -379,6 +379,7 @@ struct DashboardView: View {
     // MARK: - Alerts Card
     var alertsCard: some View {
         CardView(title: DL.recentAlarms, count: "\(dashVM.alerts.count)", actionLabel: DL.allLabel) {
+            selectedPage = .alarms
         } content: {
             VStack(spacing: 0) {
                 ForEach(dashVM.alerts) { alert in

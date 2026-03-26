@@ -202,12 +202,72 @@ class AlarmsViewModel: ObservableObject {
     ]
 }
 
+// MARK: - Alarm Rule Model (Kullanıcının oluşturduğu kurallar)
+struct AlarmRule: Identifiable {
+    let id: Int
+    let name: String
+    let type: String
+    let condition: String
+    let vehicles: String // hangi araçlara uygulanıyor
+    let isActive: Bool
+    let createdAt: String
+
+    var icon: String {
+        switch type.lowercased() {
+        case "overspeed": return "gauge.with.dots.needle.33percent"
+        case "geofence": return "mappin.and.ellipse"
+        case "idle": return "clock.fill"
+        case "harsh_brake": return "exclamationmark.octagon.fill"
+        case "disconnect": return "antenna.radiowaves.left.and.right.slash"
+        case "power_cut": return "bolt.slash.fill"
+        case "sos": return "sos"
+        default: return "bell.badge.fill"
+        }
+    }
+
+    var color: Color {
+        switch type.lowercased() {
+        case "overspeed", "sos": return .red
+        case "geofence": return .green
+        case "idle": return Color(red: 245/255, green: 158/255, blue: 11/255)
+        case "harsh_brake", "disconnect": return .orange
+        default: return AppTheme.indigo
+        }
+    }
+
+    var typeLabel: String {
+        switch type.lowercased() {
+        case "overspeed": return "Hız Aşımı"
+        case "geofence": return "Geofence"
+        case "idle": return "Rölanti"
+        case "harsh_brake": return "Sert Fren"
+        case "disconnect": return "Bağlantı Kopma"
+        case "power_cut": return "Güç Kesilmesi"
+        case "sos": return "SOS / Panik"
+        default: return type.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+}
+
+// MARK: - Dummy Alarm Rules
+private let dummyAlarmRules: [AlarmRule] = [
+    AlarmRule(id: 1, name: "Şehir İçi Hız Limiti", type: "overspeed", condition: "Hız > 50 km/s", vehicles: "Tüm Araçlar", isActive: true, createdAt: "2026-01-15"),
+    AlarmRule(id: 2, name: "Otoban Hız Limiti", type: "overspeed", condition: "Hız > 120 km/s", vehicles: "Tüm Araçlar", isActive: true, createdAt: "2026-01-15"),
+    AlarmRule(id: 3, name: "Ankara Merkez Bölgesi", type: "geofence", condition: "Bölgeden çıkışta bildir", vehicles: "06 ATS 001, 06 TUV 222", isActive: true, createdAt: "2026-02-10"),
+    AlarmRule(id: 4, name: "İstanbul Depo Bölgesi", type: "geofence", condition: "Bölgeye girişte bildir", vehicles: "34 ARV 34, 34 ABC 123", isActive: false, createdAt: "2026-02-20"),
+    AlarmRule(id: 5, name: "Rölanti Uyarısı", type: "idle", condition: "10 dk üzeri rölanti", vehicles: "Tüm Araçlar", isActive: true, createdAt: "2026-03-01"),
+    AlarmRule(id: 6, name: "Sert Fren Algılama", type: "harsh_brake", condition: "Ani fren algılandığında", vehicles: "Tüm Araçlar", isActive: true, createdAt: "2026-03-05"),
+    AlarmRule(id: 7, name: "Bağlantı Kopma Uyarısı", type: "disconnect", condition: "Cihaz bağlantısı kesildiğinde", vehicles: "06 ATS 001", isActive: false, createdAt: "2026-03-10"),
+    AlarmRule(id: 8, name: "SOS Butonu", type: "sos", condition: "Panik butonu basıldığında", vehicles: "Tüm Araçlar", isActive: true, createdAt: "2026-03-12"),
+]
+
 // MARK: - Alarms View
 struct AlarmsView: View {
     @Binding var showSideMenu: Bool
     @EnvironmentObject var authVM: AuthViewModel
     @StateObject private var vm = AlarmsViewModel()
     @State private var showFilters = false
+    @State private var selectedTab = 0 // 0: Gelen Alarmlar, 1: Alarm Kuralları
 
     let alarmTypes = [
         ("overspeed", "Hız Aşımı"),
@@ -228,19 +288,30 @@ struct AlarmsView: View {
                 AppTheme.bg.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // Aktif filtre özeti
-                    if hasActiveFilters {
-                        activeFiltersBar
-                    }
+                    // Tab Selector
+                    tabSelector
 
-                    if vm.isLoading && vm.alarms.isEmpty {
-                        loadingView
-                    } else if let error = vm.errorMessage, vm.alarms.isEmpty {
-                        errorView(error)
-                    } else if vm.alarms.isEmpty {
-                        emptyView
+                    if selectedTab == 0 {
+                        // MARK: Gelen Alarmlar Tab
+                        VStack(spacing: 0) {
+                            // Aktif filtre özeti
+                            if hasActiveFilters {
+                                activeFiltersBar
+                            }
+
+                            if vm.isLoading && vm.alarms.isEmpty {
+                                loadingView
+                            } else if let error = vm.errorMessage, vm.alarms.isEmpty {
+                                errorView(error)
+                            } else if vm.alarms.isEmpty {
+                                emptyView
+                            } else {
+                                alarmList
+                            }
+                        }
                     } else {
-                        alarmList
+                        // MARK: Alarm Kuralları Tab
+                        alarmRulesTab
                     }
                 }
             }
@@ -265,10 +336,12 @@ struct AlarmsView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 12) {
-                        Button(action: { withAnimation { showFilters.toggle() } }) {
-                            Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                                .font(.system(size: 18))
-                                .foregroundColor(hasActiveFilters ? AppTheme.indigo : AppTheme.textMuted)
+                        if selectedTab == 0 {
+                            Button(action: { withAnimation { showFilters.toggle() } }) {
+                                Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(hasActiveFilters ? AppTheme.indigo : AppTheme.textMuted)
+                            }
                         }
                         AvatarCircle(
                             initials: authVM.currentUser?.avatar ?? "A",
@@ -286,8 +359,141 @@ struct AlarmsView: View {
         }
     }
 
+    // MARK: - Tab Selector
+    var tabSelector: some View {
+        HStack(spacing: 0) {
+            tabButton(title: "Gelen Alarmlar", icon: "bell.fill", index: 0)
+            tabButton(title: "Alarm Kuralları", icon: "gearshape.fill", index: 1)
+        }
+        .padding(4)
+        .background(AppTheme.surface)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(AppTheme.borderSoft, lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+
+    func tabButton(title: String, icon: String, index: Int) -> some View {
+        Button(action: { withAnimation(.easeInOut(duration: 0.2)) { selectedTab = index } }) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .foregroundColor(selectedTab == index ? .white : AppTheme.textMuted)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(selectedTab == index ? AppTheme.navy : Color.clear)
+            .cornerRadius(10)
+        }
+    }
+
     var hasActiveFilters: Bool {
         vm.selectedImei != nil || vm.selectedType != nil || vm.dateFrom != nil || vm.dateTo != nil
+    }
+
+    // MARK: - Alarm Rules Tab
+    var alarmRulesTab: some View {
+        ScrollView {
+            LazyVStack(spacing: 8) {
+                // Başlık
+                HStack {
+                    Text("\(dummyAlarmRules.count) kural tanımlı")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(AppTheme.textMuted)
+                    Spacer()
+                    Button(action: {}) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 14))
+                            Text("Yeni Kural")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundColor(AppTheme.indigo)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+
+                ForEach(dummyAlarmRules) { rule in
+                    alarmRuleCard(rule)
+                }
+            }
+            .padding(.bottom, 20)
+        }
+    }
+
+    // MARK: - Alarm Rule Card
+    func alarmRuleCard(_ rule: AlarmRule) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                // İkon
+                ZStack {
+                    Circle()
+                        .fill(rule.color.opacity(0.12))
+                        .frame(width: 38, height: 38)
+                    Image(systemName: rule.icon)
+                        .font(.system(size: 15))
+                        .foregroundColor(rule.color)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(rule.name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(AppTheme.textPrimary)
+                    Text(rule.typeLabel)
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.textMuted)
+                }
+
+                Spacer()
+
+                // Aktif/Pasif toggle göstergesi
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(rule.isActive ? Color.green : Color.gray)
+                        .frame(width: 7, height: 7)
+                    Text(rule.isActive ? "Aktif" : "Pasif")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(rule.isActive ? .green : .gray)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background((rule.isActive ? Color.green : Color.gray).opacity(0.1))
+                .cornerRadius(12)
+            }
+
+            // Detaylar
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(AppTheme.textFaint)
+                    Text("Koşul: \(rule.condition)")
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.textSecondary)
+                }
+                HStack(spacing: 6) {
+                    Image(systemName: "car.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(AppTheme.textFaint)
+                    Text("Araçlar: \(rule.vehicles)")
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.leading, 48)
+        }
+        .padding(12)
+        .background(AppTheme.surface)
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.03), radius: 2, y: 1)
+        .padding(.horizontal, 16)
     }
 
     // MARK: - Active Filters Bar

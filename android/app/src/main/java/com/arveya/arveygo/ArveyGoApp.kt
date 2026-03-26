@@ -73,7 +73,8 @@ fun MainContent(authVM: AuthViewModel) {
             AppPage.DASHBOARD -> DashboardScreen(
                 onMenuClick = { showSideMenu = true },
                 onNavigateToMap = { selectedPage = AppPage.LIVE_MAP },
-                onNavigateToVehicles = { selectedPage = AppPage.VEHICLES }
+                onNavigateToVehicles = { selectedPage = AppPage.VEHICLES },
+                onNavigateToAlarms = { selectedPage = AppPage.ALARMS }
             )
             AppPage.LIVE_MAP -> LiveMapScreen(
                 onMenuClick = { showSideMenu = true }

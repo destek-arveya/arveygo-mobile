@@ -107,6 +107,59 @@ data class AlarmEvent(
     }
 }
 
+// MARK: - Alarm Rule Model
+data class AlarmRule(
+    val id: Int,
+    val name: String,
+    val type: String,
+    val condition: String,
+    val vehicles: String,
+    val isActive: Boolean,
+    val createdAt: String
+) {
+    val icon: ImageVector get() = when (type.lowercase()) {
+        "overspeed" -> Icons.Default.Speed
+        "geofence" -> Icons.Default.LocationOn
+        "idle" -> Icons.Default.HourglassBottom
+        "harsh_brake" -> Icons.Default.Warning
+        "disconnect" -> Icons.Default.WifiOff
+        "power_cut" -> Icons.Default.PowerOff
+        "sos" -> Icons.Default.Emergency
+        else -> Icons.Default.Notifications
+    }
+
+    val color: Color get() = when (type.lowercase()) {
+        "overspeed", "sos" -> Color(0xFFEF4444)
+        "geofence" -> Color(0xFF22C55E)
+        "idle" -> Color(0xFFF59E0B)
+        "harsh_brake", "disconnect" -> Color(0xFFF97316)
+        else -> AppColors.Indigo
+    }
+
+    val typeLabel: String get() = when (type.lowercase()) {
+        "overspeed" -> "Hız Aşımı"
+        "geofence" -> "Geofence"
+        "idle" -> "Rölanti"
+        "harsh_brake" -> "Sert Fren"
+        "disconnect" -> "Bağlantı Kopma"
+        "power_cut" -> "Güç Kesilmesi"
+        "sos" -> "SOS / Panik"
+        else -> type.replace("_", " ").replaceFirstChar { it.uppercase() }
+    }
+}
+
+// MARK: - Dummy Alarm Rules
+private val DUMMY_ALARM_RULES = listOf(
+    AlarmRule(1, "Şehir İçi Hız Limiti", "overspeed", "Hız > 50 km/s", "Tüm Araçlar", true, "2026-01-15"),
+    AlarmRule(2, "Otoban Hız Limiti", "overspeed", "Hız > 120 km/s", "Tüm Araçlar", true, "2026-01-15"),
+    AlarmRule(3, "Ankara Merkez Bölgesi", "geofence", "Bölgeden çıkışta bildir", "06 ATS 001, 06 TUV 222", true, "2026-02-10"),
+    AlarmRule(4, "İstanbul Depo Bölgesi", "geofence", "Bölgeye girişte bildir", "34 ARV 34, 34 ABC 123", false, "2026-02-20"),
+    AlarmRule(5, "Rölanti Uyarısı", "idle", "10 dk üzeri rölanti", "Tüm Araçlar", true, "2026-03-01"),
+    AlarmRule(6, "Sert Fren Algılama", "harsh_brake", "Ani fren algılandığında", "Tüm Araçlar", true, "2026-03-05"),
+    AlarmRule(7, "Bağlantı Kopma Uyarısı", "disconnect", "Cihaz bağlantısı kesildiğinde", "06 ATS 001", false, "2026-03-10"),
+    AlarmRule(8, "SOS Butonu", "sos", "Panik butonu basıldığında", "Tüm Araçlar", true, "2026-03-12"),
+)
+
 // MARK: - Alarm Types
 private val ALARM_TYPES = listOf(
     "overspeed" to "Hız Aşımı",
@@ -129,6 +182,9 @@ fun AlarmsScreen(onMenuClick: () -> Unit) {
     val user by authVM.currentUser.collectAsState()
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+
+    // Tab state
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     // State
     var alarms by remember { mutableStateOf(listOf<AlarmEvent>()) }
@@ -211,13 +267,15 @@ fun AlarmsScreen(onMenuClick: () -> Unit) {
                     }
                 },
                 actions = {
-                    // Filtre butonu
-                    IconButton(onClick = { showFilterSheet = true }) {
-                        Icon(
-                            if (hasActiveFilters) Icons.Default.FilterAlt else Icons.Default.FilterList,
-                            "Filtreler",
-                            tint = if (hasActiveFilters) AppColors.Indigo else AppColors.TextMuted
-                        )
+                    // Filtre butonu - sadece Gelen Alarmlar tabında göster
+                    if (selectedTab == 0) {
+                        IconButton(onClick = { showFilterSheet = true }) {
+                            Icon(
+                                if (hasActiveFilters) Icons.Default.FilterAlt else Icons.Default.FilterList,
+                                "Filtreler",
+                                tint = if (hasActiveFilters) AppColors.Indigo else AppColors.TextMuted
+                            )
+                        }
                     }
                     AvatarCircle(initials = user?.avatar ?: "A", size = 30.dp)
                     Spacer(Modifier.width(8.dp))
@@ -228,96 +286,105 @@ fun AlarmsScreen(onMenuClick: () -> Unit) {
         containerColor = AppColors.Bg
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            // Aktif filtre bar
-            if (hasActiveFilters) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(AppColors.Surface)
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    selectedType?.let { type ->
-                        FilterChip(label = ALARM_TYPES.firstOrNull { it.first == type }?.second ?: type) {
-                            selectedType = null
-                            scope.launch { fetchAlarms() }
-                        }
-                    }
-                    TextButton(
-                        onClick = {
-                            selectedType = null
-                            scope.launch { fetchAlarms() }
-                        },
-                        contentPadding = PaddingValues(horizontal = 8.dp)
-                    ) {
-                        Text("Temizle", fontSize = 11.sp, color = Color.Red)
-                    }
-                }
-            }
+            // Tab Selector
+            TabSelector(selectedTab = selectedTab, onTabSelected = { selectedTab = it })
 
-            // İçerik
-            when {
-                isLoading && alarms.isEmpty() -> LoadingContent()
-                errorMessage != null && alarms.isEmpty() -> ErrorContent(errorMessage!!) {
-                    scope.launch { fetchAlarms() }
-                }
-                alarms.isEmpty() -> EmptyContent(hasActiveFilters) {
-                    selectedType = null
-                    scope.launch { fetchAlarms() }
-                }
-                else -> {
-                    // Sonuç sayısı
+            if (selectedTab == 0) {
+                // MARK: Gelen Alarmlar Tab
+                // Aktif filtre bar
+                if (hasActiveFilters) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(AppColors.Surface)
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "$totalCount alarm",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = AppColors.TextMuted
-                        )
-                        Spacer(Modifier.weight(1f))
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
-                                strokeWidth = 2.dp,
-                                color = AppColors.Indigo
-                            )
+                        selectedType?.let { type ->
+                            FilterChip(label = ALARM_TYPES.firstOrNull { it.first == type }?.second ?: type) {
+                                selectedType = null
+                                scope.launch { fetchAlarms() }
+                            }
+                        }
+                        TextButton(
+                            onClick = {
+                                selectedType = null
+                                scope.launch { fetchAlarms() }
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp)
+                        ) {
+                            Text("Temizle", fontSize = 11.sp, color = Color.Red)
                         }
                     }
+                }
 
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 20.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(alarms, key = { it.id }) { alarm ->
-                            AlarmCard(alarm)
+                // İçerik
+                when {
+                    isLoading && alarms.isEmpty() -> LoadingContent()
+                    errorMessage != null && alarms.isEmpty() -> ErrorContent(errorMessage!!) {
+                        scope.launch { fetchAlarms() }
+                    }
+                    alarms.isEmpty() -> EmptyContent(hasActiveFilters) {
+                        selectedType = null
+                        scope.launch { fetchAlarms() }
+                    }
+                    else -> {
+                        // Sonuç sayısı
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "$totalCount alarm",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = AppColors.TextMuted
+                            )
+                            Spacer(Modifier.weight(1f))
+                            if (isLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    strokeWidth = 2.dp,
+                                    color = AppColors.Indigo
+                                )
+                            }
                         }
 
-                        // Pagination — son öğeye gelince yükle
-                        if (currentPage < lastPage) {
-                            item {
-                                LaunchedEffect(Unit) {
-                                    fetchAlarms(currentPage + 1, append = true)
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Yükleniyor...", fontSize = 12.sp, color = AppColors.TextMuted)
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(bottom = 20.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(alarms, key = { it.id }) { alarm ->
+                                AlarmCard(alarm)
+                            }
+
+                            // Pagination
+                            if (currentPage < lastPage) {
+                                item {
+                                    LaunchedEffect(Unit) {
+                                        fetchAlarms(currentPage + 1, append = true)
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Yükleniyor...", fontSize = 12.sp, color = AppColors.TextMuted)
+                                    }
                                 }
                             }
                         }
                     }
                 }
+            } else {
+                // MARK: Alarm Kuralları Tab
+                AlarmRulesTab()
             }
         }
     }
@@ -361,6 +428,165 @@ fun AlarmsScreen(onMenuClick: () -> Unit) {
                 ) {
                     Text("Uygula", fontWeight = FontWeight.SemiBold)
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Tab Selector
+@Composable
+private fun TabSelector(selectedTab: Int, onTabSelected: (Int) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(AppColors.Surface)
+            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
+            .padding(4.dp)
+    ) {
+        // Tab 0: Gelen Alarmlar
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(if (selectedTab == 0) AppColors.Navy else Color.Transparent)
+                .clickable { onTabSelected(0) }
+                .padding(vertical = 10.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.NotificationsActive, null, tint = if (selectedTab == 0) Color.White else AppColors.TextMuted, modifier = Modifier.size(14.dp))
+                Text("Gelen Alarmlar", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (selectedTab == 0) Color.White else AppColors.TextMuted)
+            }
+        }
+
+        // Tab 1: Alarm Kuralları
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(if (selectedTab == 1) AppColors.Navy else Color.Transparent)
+                .clickable { onTabSelected(1) }
+                .padding(vertical = 10.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Settings, null, tint = if (selectedTab == 1) Color.White else AppColors.TextMuted, modifier = Modifier.size(14.dp))
+                Text("Alarm Kuralları", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (selectedTab == 1) Color.White else AppColors.TextMuted)
+            }
+        }
+    }
+}
+
+// MARK: - Alarm Rules Tab
+@Composable
+private fun AlarmRulesTab() {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Header
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "${DUMMY_ALARM_RULES.size} kural tanımlı",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = AppColors.TextMuted
+                )
+                Spacer(Modifier.weight(1f))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { }
+                ) {
+                    Icon(Icons.Default.AddCircle, null, tint = AppColors.Indigo, modifier = Modifier.size(16.dp))
+                    Text("Yeni Kural", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Indigo)
+                }
+            }
+        }
+
+        items(DUMMY_ALARM_RULES, key = { it.id }) { rule ->
+            AlarmRuleCard(rule)
+        }
+    }
+}
+
+// MARK: - Alarm Rule Card
+@Composable
+private fun AlarmRuleCard(rule: AlarmRule) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(AppColors.Surface)
+            .padding(12.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // İkon
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(rule.color.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(rule.icon, null, tint = rule.color, modifier = Modifier.size(16.dp))
+            }
+
+            // İsim ve tür
+            Column(modifier = Modifier.weight(1f)) {
+                Text(rule.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                Text(rule.typeLabel, fontSize = 11.sp, color = AppColors.TextMuted)
+            }
+
+            // Aktif/Pasif badge
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (rule.isActive) Color(0xFF22C55E).copy(alpha = 0.1f) else Color.Gray.copy(alpha = 0.1f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(if (rule.isActive) Color(0xFF22C55E) else Color.Gray)
+                )
+                Text(
+                    if (rule.isActive) "Aktif" else "Pasif",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (rule.isActive) Color(0xFF22C55E) else Color.Gray
+                )
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        // Detaylar
+        Column(
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(start = 48.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Warning, null, tint = AppColors.TextFaint, modifier = Modifier.size(12.dp))
+                Text("Koşul: ${rule.condition}", fontSize = 11.sp, color = AppColors.TextSecondary)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.DirectionsCar, null, tint = AppColors.TextFaint, modifier = Modifier.size(12.dp))
+                Text("Araçlar: ${rule.vehicles}", fontSize = 11.sp, color = AppColors.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
