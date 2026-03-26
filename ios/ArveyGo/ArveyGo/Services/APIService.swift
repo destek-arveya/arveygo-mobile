@@ -483,6 +483,12 @@ final class APIService {
         return json["vehicles"] as? [[String: Any]] ?? []
     }
 
+    /// GET /api/mobile/vehicles/{id} — vehicle detail with driver info
+    func fetchVehicleDetail(deviceId: Int) async throws -> [String: Any] {
+        let json = try await get("/api/mobile/vehicles/\(deviceId)")
+        return json["data"] as? [String: Any] ?? json
+    }
+
     /// POST /api/mobile/vehicles/{id}/assign-driver
     func assignDriverToVehicle(vehicleId: Int, driverProfileId: Int?, driverCode: String?) async throws {
         var body: [String: Any] = [:]

@@ -24,10 +24,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.arveya.arveygo.models.*
+import com.arveya.arveygo.services.APIService
 import com.arveya.arveygo.services.WSEvent
 import com.arveya.arveygo.services.WebSocketManager
 import com.arveya.arveygo.ui.components.StatusBadge
 import com.arveya.arveygo.ui.theme.AppColors
+import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -53,6 +55,40 @@ fun VehicleDetailScreen(
     val context = LocalContext.current
     var currentVehicle by remember { mutableStateOf(vehicle) }
     var showMotorcycleSettings by remember { mutableStateOf(false) }
+    var driverName by remember { mutableStateOf("") }
+    var driverPhone by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+
+    fun refreshDriverInfo() {
+        if (vehicle.deviceId > 0) {
+            scope.launch {
+                try {
+                    val detail = APIService.fetchVehicleDetail(vehicle.deviceId)
+                    val driverObj = detail.optJSONObject("driver")
+                    if (driverObj != null) {
+                        driverName = driverObj.optString("name", "")
+                        driverPhone = driverObj.optString("phone", "")
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    // Fetch driver info from API
+    LaunchedEffect(vehicle.deviceId) {
+        if (vehicle.deviceId > 0) {
+            try {
+                val detail = APIService.fetchVehicleDetail(vehicle.deviceId)
+                val driverObj = detail.optJSONObject("driver")
+                if (driverObj != null) {
+                    driverName = driverObj.optString("name", "")
+                    driverPhone = driverObj.optString("phone", "")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("VehicleDetail", "fetchDriverInfo error", e)
+            }
+        }
+    }
 
     // If motorcycle settings is showing, show the full-screen settings page
     if (showMotorcycleSettings) {
@@ -137,7 +173,9 @@ fun VehicleDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 when (selectedTab) {
-                    DetailTab.OVERVIEW -> OverviewTab(currentVehicle, context, onBack, onNavigateToRouteHistory, onNavigateToAlarms)
+                    DetailTab.OVERVIEW -> OverviewTab(currentVehicle, context, onBack, onNavigateToRouteHistory, onNavigateToAlarms, driverName, onDriverAssigned = {
+                        refreshDriverInfo()
+                    })
                     DetailTab.MAINTENANCE -> MaintenanceTab(currentVehicle)
                     DetailTab.COSTS -> CostsTab(currentVehicle)
                     DetailTab.EVENTS -> EventsTab(currentVehicle)
@@ -343,7 +381,9 @@ private fun OverviewTab(
     context: Context,
     onBack: () -> Unit,
     onNavigateToRouteHistory: ((Vehicle) -> Unit)?,
-    onNavigateToAlarms: (() -> Unit)?
+    onNavigateToAlarms: (() -> Unit)?,
+    driverName: String = "",
+    onDriverAssigned: (() -> Unit)? = null
 ) {
     val infoItems = listOf(
         Triple(Icons.Default.Folder, "GRUP", vehicle.group),
@@ -438,6 +478,7 @@ private fun OverviewTab(
     }
 
     var showDriverAssign by remember { mutableStateOf(false) }
+    val displayName = if (driverName.isNotEmpty()) driverName else vehicle.driver
 
     SectionCard(title = "SÜRÜCÜ BİLGİLERİ", icon = Icons.Default.Person) {
         Row(
@@ -449,14 +490,14 @@ private fun OverviewTab(
                 modifier = Modifier.size(50.dp).clip(CircleShape).background(AppColors.Indigo.copy(alpha = 0.1f))
             ) {
                 Text(
-                    if (vehicle.driver.isEmpty()) "?" else vehicle.driver.take(1),
+                    if (displayName.isEmpty()) "?" else displayName.take(1),
                     fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Indigo
                 )
             }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    if (vehicle.driver.isEmpty()) "Sürücü Atanmamış" else vehicle.driver,
+                    if (displayName.isEmpty()) "Sürücü Atanmamış" else displayName,
                     fontSize = 15.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy
                 )
                 Text("Atanmış Sürücü", fontSize = 11.sp, color = AppColors.TextMuted)
@@ -472,9 +513,9 @@ private fun OverviewTab(
     if (showDriverAssign) {
         VehicleDriverAssignDialog(
             vehicleId = vehicle.deviceId,
-            currentDriverName = vehicle.driver,
+            currentDriverName = displayName,
             onDismiss = { showDriverAssign = false },
-            onAssigned = { showDriverAssign = false }
+            onAssigned = { showDriverAssign = false; onDriverAssigned?.invoke() }
         )
     }
 

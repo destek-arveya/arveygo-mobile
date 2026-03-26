@@ -323,6 +323,11 @@ object APIService {
         (0 until arr.length()).map { arr.getJSONObject(it) }
     }
 
+    suspend fun fetchVehicleDetail(deviceId: Int): org.json.JSONObject = withContext(Dispatchers.IO) {
+        val json = get("/api/mobile/vehicles/$deviceId")
+        json.optJSONObject("data") ?: json
+    }
+
     suspend fun assignDriverToVehicle(vehicleId: Int, driverProfileId: Int?, driverCode: String?): Unit = withContext(Dispatchers.IO) {
         val body = org.json.JSONObject()
         if (driverProfileId != null) body.put("driver_profile_id", driverProfileId)

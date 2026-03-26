@@ -7,11 +7,33 @@ import Combine
 @MainActor
 class VehicleDetailObserver: ObservableObject {
     @Published var vehicle: Vehicle
+    @Published var driverName: String = ""
+    @Published var driverPhone: String = ""
     private var cancellables = Set<AnyCancellable>()
 
     init(vehicle: Vehicle) {
         self.vehicle = vehicle
         subscribeToUpdates()
+        fetchDriverInfo()
+    }
+
+    func fetchDriverInfo() {
+        guard vehicle.deviceId > 0 else { return }
+        Task {
+            do {
+                let detail = try await APIService.shared.fetchVehicleDetail(deviceId: vehicle.deviceId)
+                if let driverDict = detail["driver"] as? [String: Any] {
+                    let name = driverDict["name"] as? String ?? ""
+                    let phone = driverDict["phone"] as? String ?? ""
+                    await MainActor.run {
+                        self.driverName = name
+                        self.driverPhone = phone
+                    }
+                }
+            } catch {
+                print("[VehicleDetail] fetchDriverInfo error: \(error)")
+            }
+        }
     }
 
     private func subscribeToUpdates() {
@@ -232,7 +254,7 @@ struct VehicleDetailView: View {
                 Divider().frame(height: 40)
                 quickStatItem(icon: "road.lanes", value: vehicle.formattedTodayKm, label: "Bugün", color: AppTheme.indigo)
                 Divider().frame(height: 40)
-                quickStatItem(icon: "person.fill", value: vehicle.driver.components(separatedBy: " ").first ?? "—", label: "Sürücü", color: AppTheme.online)
+                quickStatItem(icon: "person.fill", value: !observer.driverName.isEmpty ? observer.driverName.components(separatedBy: " ").first ?? "—" : (vehicle.driver.isEmpty ? "—" : vehicle.driver.components(separatedBy: " ").first ?? "—"), label: "Sürücü", color: AppTheme.online)
                 Divider().frame(height: 40)
                 quickStatItem(icon: "mappin.circle.fill", value: vehicle.city, label: "Konum", color: .orange)
             }
@@ -379,18 +401,19 @@ struct VehicleDetailView: View {
             }
 
             sectionCard(title: "SÜRÜCÜ BİLGİLERİ", icon: "person.fill") {
+                let displayName = !observer.driverName.isEmpty ? observer.driverName : (vehicle.driver.isEmpty ? "" : vehicle.driver)
                 HStack(spacing: 14) {
                     ZStack {
                         Circle()
                             .fill(AppTheme.indigo.opacity(0.1))
                             .frame(width: 50, height: 50)
-                        Text(String(vehicle.driver.prefix(1)))
+                        Text(String(displayName.prefix(1)))
                             .font(.system(size: 20, weight: .bold))
                             .foregroundColor(AppTheme.indigo)
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(vehicle.driver.isEmpty ? "Sürücü Atanmamış" : vehicle.driver)
+                        Text(displayName.isEmpty ? "Sürücü Atanmamış" : displayName)
                             .font(.system(size: 15, weight: .bold))
                             .foregroundColor(AppTheme.navy)
                         Text("Atanmış Sürücü")
@@ -421,9 +444,9 @@ struct VehicleDetailView: View {
             .sheet(isPresented: $showDriverAssign) {
                 VehicleDriverAssignSheet(
                     vehicleId: vehicle.deviceId,
-                    currentDriverName: vehicle.driver,
+                    currentDriverName: !observer.driverName.isEmpty ? observer.driverName : vehicle.driver,
                     onAssigned: {
-                        // Vehicle will update via WebSocket
+                        observer.fetchDriverInfo()
                     }
                 )
             }
