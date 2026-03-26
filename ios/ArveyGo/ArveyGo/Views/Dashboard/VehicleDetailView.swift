@@ -36,6 +36,8 @@ class VehicleDetailObserver: ObservableObject {
         }
     }
 
+    private var hasFetchedDriverInfo = false
+
     private func subscribeToUpdates() {
         let targetId = vehicle.id
         let targetImei = vehicle.imei
@@ -46,6 +48,15 @@ class VehicleDetailObserver: ObservableObject {
                 guard let self = self else { return }
                 if let updated = vehicles.first(where: { $0.id == targetId || (!targetImei.isEmpty && $0.imei == targetImei) }) {
                     self.vehicle = updated
+                    // Use enriched driverName from WS manager if available
+                    if !updated.driverName.isEmpty && self.driverName.isEmpty {
+                        self.driverName = updated.driverName
+                    }
+                    // If deviceId became available and we haven't fetched yet, do it now
+                    if !self.hasFetchedDriverInfo && updated.deviceId > 0 && self.driverName.isEmpty {
+                        self.hasFetchedDriverInfo = true
+                        self.fetchDriverInfo()
+                    }
                 }
             }
             .store(in: &cancellables)

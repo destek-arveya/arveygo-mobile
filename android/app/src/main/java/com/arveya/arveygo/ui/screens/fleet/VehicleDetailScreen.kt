@@ -60,10 +60,11 @@ fun VehicleDetailScreen(
     val scope = rememberCoroutineScope()
 
     fun refreshDriverInfo() {
-        if (vehicle.deviceId > 0) {
+        val deviceId = currentVehicle.deviceId
+        if (deviceId > 0) {
             scope.launch {
                 try {
-                    val detail = APIService.fetchVehicleDetail(vehicle.deviceId)
+                    val detail = APIService.fetchVehicleDetail(deviceId)
                     val driverObj = detail.optJSONObject("driver")
                     if (driverObj != null) {
                         driverName = driverObj.optString("name", "")
@@ -74,11 +75,15 @@ fun VehicleDetailScreen(
         }
     }
 
-    // Fetch driver info from API
-    LaunchedEffect(vehicle.deviceId) {
-        if (vehicle.deviceId > 0) {
+    // Fetch driver info from API when deviceId becomes available
+    LaunchedEffect(currentVehicle.deviceId) {
+        // Use enriched driverName from WS manager if available
+        if (currentVehicle.driverName.isNotEmpty() && driverName.isEmpty()) {
+            driverName = currentVehicle.driverName
+        }
+        if (currentVehicle.deviceId > 0 && driverName.isEmpty()) {
             try {
-                val detail = APIService.fetchVehicleDetail(vehicle.deviceId)
+                val detail = APIService.fetchVehicleDetail(currentVehicle.deviceId)
                 val driverObj = detail.optJSONObject("driver")
                 if (driverObj != null) {
                     driverName = driverObj.optString("name", "")

@@ -54,6 +54,8 @@ final class WebSocketManager: ObservableObject {
 
     /// Cache: driverCode → driverName (fetched from API once)
     private var driverNameCache: [String: String] = [:]
+    /// Cache: imei → deviceId (fetched from catalog API)
+    private var deviceIdCache: [String: Int] = [:]
 
     /// Combine subject for downstream consumers (LiveMapViewModel)
     let eventSubject = PassthroughSubject<WSEvent, Never>()
@@ -411,15 +413,20 @@ final class WebSocketManager: ObservableObject {
         eventSubject.send(.statusChanged(.connected))
         eventSubject.send(.snapshot(vehicles: vehicleList, count: vehicleList.count, ts: ts))
 
-        // Fetch driver names from API and enrich vehicles
-        fetchDriverNames()
+        // Fetch driver names + device IDs from API and enrich vehicles
+        enrichVehicleData()
     }
 
-    /// Fetches driver list from API and populates driverName on all vehicles
-    private func fetchDriverNames() {
+    /// Fetches driver names and device IDs from API, then enriches all vehicles
+    private func enrichVehicleData() {
         Task {
+            // Fetch drivers and catalog in parallel
+            async let driversResult = APIService.shared.fetchDrivers()
+            async let catalogResult = APIService.shared.fetchDriverCatalog()
+
+            // Driver names
             do {
-                let response = try await APIService.shared.fetchDrivers()
+                let response = try await driversResult
                 var cache: [String: String] = [:]
                 for driver in response.drivers {
                     if !driver.driverCode.isEmpty && !driver.name.isEmpty {
@@ -427,23 +434,51 @@ final class WebSocketManager: ObservableObject {
                     }
                 }
                 self.driverNameCache = cache
-                // Apply to all vehicles
-                applyDriverNames()
             } catch {
-                print("[WS] fetchDriverNames error: \(error)")
+                print("[WS] fetchDrivers error: \(error)")
             }
+
+            // Device IDs (catalog returns [{id: Int, imei: String, ...}])
+            do {
+                let vehicles = try await catalogResult
+                var cache: [String: Int] = [:]
+                for v in vehicles {
+                    if let id = v["id"] as? Int, let imei = v["imei"] as? String, !imei.isEmpty {
+                        cache[imei] = id
+                    }
+                }
+                self.deviceIdCache = cache
+            } catch {
+                print("[WS] fetchCatalog error: \(error)")
+            }
+
+            // Apply enrichment to all vehicles
+            applyEnrichment()
         }
     }
 
-    /// Apply cached driver names to all vehicles
-    private func applyDriverNames() {
+    /// Apply cached driver names and device IDs to all vehicles
+    private func applyEnrichment() {
         var changed = false
         for (imei, vehicle) in vehicles {
+            var updated = vehicle
+            var modified = false
+
+            // Apply driver name
             if let code = vehicle.driverId, !code.isEmpty,
                let name = driverNameCache[code], !name.isEmpty,
                vehicle.driverName != name {
-                var updated = vehicle
                 updated.driverName = name
+                modified = true
+            }
+
+            // Apply device ID
+            if vehicle.deviceId == 0, let deviceId = deviceIdCache[imei], deviceId > 0 {
+                updated.deviceId = deviceId
+                modified = true
+            }
+
+            if modified {
                 vehicles[imei] = updated
                 changed = true
             }
@@ -469,12 +504,19 @@ final class WebSocketManager: ObservableObject {
                let name = driverNameCache[code], !name.isEmpty {
                 existing.driverName = name
             }
+            // Apply cached device ID
+            if existing.deviceId == 0, let deviceId = deviceIdCache[patch.imei], deviceId > 0 {
+                existing.deviceId = deviceId
+            }
             vehicles[patch.imei] = existing
         } else {
             var newVehicle = patch
             if let code = newVehicle.driverId, !code.isEmpty,
                let name = driverNameCache[code], !name.isEmpty {
                 newVehicle.driverName = name
+            }
+            if newVehicle.deviceId == 0, let deviceId = deviceIdCache[patch.imei], deviceId > 0 {
+                newVehicle.deviceId = deviceId
             }
             vehicles[patch.imei] = newVehicle
             orderList.append(patch.imei)

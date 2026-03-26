@@ -97,6 +97,8 @@ object WebSocketManager {
     private var orderList = mutableListOf<String>()
     // Cache: driverCode → driverName (fetched from API once)
     private var driverNameCache = mutableMapOf<String, String>()
+    // Cache: imei → deviceId (fetched from catalog API)
+    private var deviceIdCache = mutableMapOf<String, Int>()
     // Socket generation counter — prevents stale socket callbacks from triggering reconnect
     private var socketGeneration = 0
     // DNS fallback tracking — persists across connect() calls
@@ -441,13 +443,14 @@ object WebSocketManager {
         _events.tryEmit(WSEvent.StatusChanged(WSConnectionStatus.Connected))
         _events.tryEmit(WSEvent.Snapshot(_vehicleList.value, _vehicleList.value.size, ts))
 
-        // Fetch driver names from API and enrich vehicles
-        fetchDriverNames()
+        // Fetch driver names + device IDs from API and enrich vehicles
+        enrichVehicleData()
     }
 
-    /** Fetches driver list from API and populates driverName on all vehicles */
-    private fun fetchDriverNames() {
+    /** Fetches driver names and device IDs from API, then enriches all vehicles */
+    private fun enrichVehicleData() {
         scope.launch {
+            // Fetch drivers
             try {
                 val response = APIService.fetchDrivers()
                 val cache = mutableMapOf<String, String>()
@@ -457,25 +460,61 @@ object WebSocketManager {
                     }
                 }
                 driverNameCache = cache
-                applyDriverNames()
             } catch (e: Exception) {
-                Log.d(TAG, "fetchDriverNames error: $e")
+                Log.d(TAG, "fetchDrivers error: $e")
             }
+
+            // Fetch catalog for device IDs
+            try {
+                val catalogVehicles = APIService.fetchDriverCatalog()
+                val cache = mutableMapOf<String, Int>()
+                for (v in catalogVehicles) {
+                    val id = v.optInt("id", 0)
+                    val imei = v.optString("imei", "")
+                    if (id > 0 && imei.isNotEmpty()) {
+                        cache[imei] = id
+                    }
+                }
+                deviceIdCache = cache
+            } catch (e: Exception) {
+                Log.d(TAG, "fetchCatalog error: $e")
+            }
+
+            // Apply enrichment
+            applyEnrichment()
         }
     }
 
-    /** Apply cached driver names to all vehicles */
-    private fun applyDriverNames() {
+    /** Apply cached driver names and device IDs to all vehicles */
+    private fun applyEnrichment() {
         val current = _vehicles.value.toMutableMap()
         var changed = false
         for ((imei, vehicle) in current) {
+            var updated = vehicle
+            var modified = false
+
+            // Apply driver name
             val code = vehicle.driverId
             if (!code.isNullOrEmpty()) {
                 val name = driverNameCache[code]
                 if (!name.isNullOrEmpty() && vehicle.driverName != name) {
-                    current[imei] = vehicle.copy(driverName = name)
-                    changed = true
+                    updated = updated.copy(driverName = name)
+                    modified = true
                 }
+            }
+
+            // Apply device ID
+            if (vehicle.deviceId == 0) {
+                val deviceId = deviceIdCache[imei]
+                if (deviceId != null && deviceId > 0) {
+                    updated = updated.copy(deviceId = deviceId)
+                    modified = true
+                }
+            }
+
+            if (modified) {
+                current[imei] = updated
+                changed = true
             }
         }
         if (changed) {
@@ -503,6 +542,11 @@ object WebSocketManager {
                 val name = driverNameCache[code]
                 if (!name.isNullOrEmpty()) merged = merged.copy(driverName = name)
             }
+            // Apply cached device ID
+            if (merged.deviceId == 0) {
+                val deviceId = deviceIdCache[patch.imei]
+                if (deviceId != null && deviceId > 0) merged = merged.copy(deviceId = deviceId)
+            }
             current[patch.imei] = merged
         } else {
             var newVehicle = patch
@@ -510,6 +554,10 @@ object WebSocketManager {
             if (!code.isNullOrEmpty()) {
                 val name = driverNameCache[code]
                 if (!name.isNullOrEmpty()) newVehicle = newVehicle.copy(driverName = name)
+            }
+            if (newVehicle.deviceId == 0) {
+                val deviceId = deviceIdCache[patch.imei]
+                if (deviceId != null && deviceId > 0) newVehicle = newVehicle.copy(deviceId = deviceId)
             }
             current[patch.imei] = newVehicle
             orderList.add(patch.imei)
