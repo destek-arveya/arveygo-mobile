@@ -30,11 +30,12 @@ struct RouteHistoryView: View {
                     // Selector bar (vehicle + date range)
                     selectorBar
 
-                    // Map area
+                    // Map area - takes all available space
                     mapArea
 
-                    // Bottom panel
+                    // Bottom panel - limited height, scrollable
                     bottomPanel
+                        .frame(height: UIScreen.main.bounds.height * 0.30)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -95,15 +96,24 @@ struct RouteHistoryView: View {
     }
 
     private func zoomToSelectedRoute() {
-        guard let route = vm.selectedRoute, !route.points.isEmpty else { return }
+        guard let route = vm.selectedRoute, !route.points.isEmpty else {
+            print("[RouteHistory] zoomToSelectedRoute: no route or no points")
+            return
+        }
+        print("[RouteHistory] zoomToSelectedRoute: \(route.points.count) points for trip \(route.id)")
         let lats = route.points.map { $0.lat }
         let lngs = route.points.map { $0.lng }
         guard let minLat = lats.min(), let maxLat = lats.max(),
               let minLng = lngs.min(), let maxLng = lngs.max() else { return }
+        // Filter out invalid coordinates
+        guard minLat > -90 && maxLat < 90 && minLng > -180 && maxLng < 180 else {
+            print("[RouteHistory] Invalid coordinates detected, skipping zoom")
+            return
+        }
         let centerLat = (minLat + maxLat) / 2.0
         let centerLng = (minLng + maxLng) / 2.0
-        let spanLat = max((maxLat - minLat) * 2.0, 0.005)
-        let spanLng = max((maxLng - minLng) * 2.0, 0.005)
+        let spanLat = max((maxLat - minLat) * 1.5, 0.005)
+        let spanLng = max((maxLng - minLng) * 1.5, 0.005)
         withAnimation(.easeInOut(duration: 0.6)) {
             mapCameraPosition = .region(MKCoordinateRegion(
                 center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLng),
@@ -429,7 +439,7 @@ struct RouteHistoryView: View {
                 }
             }
         }
-        .frame(height: UIScreen.main.bounds.height * 0.30)
+        .frame(maxHeight: .infinity)
     }
 
     // MARK: - Playback Bar
@@ -844,6 +854,10 @@ class RouteHistoryViewModel: ObservableObject {
 
                 self.routes = parsedRoutes
                 self.isLoadingRoutes = false
+                print("[RouteHistory] Loaded \(parsedRoutes.count) trips")
+                for r in parsedRoutes {
+                    print("[RouteHistory]   Trip \(r.id): \(r.points.count) points, start=(\(r.points.first?.lat ?? 0),\(r.points.first?.lng ?? 0))")
+                }
 
                 if let first = parsedRoutes.first {
                     self.selectedRoute = first

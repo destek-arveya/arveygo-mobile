@@ -258,6 +258,9 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
                     }
                 }
                 trips = parsed
+                if (selectedTrip == null || !parsed.any { it.id == selectedTrip?.id }) {
+                    selectedTrip = parsed.firstOrNull()
+                }
                 Log.d("RouteHistory", "Loaded ${parsed.size} trips")
             } catch (e: Exception) {
                 Log.e("RouteHistory", "Failed to load routes", e)
@@ -330,27 +333,35 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
 
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
 
-    // Draw route on map when trip is selected
-    LaunchedEffect(selectedTrip) {
+    // Draw routes on map when trip is selected or trips change
+    LaunchedEffect(selectedTrip, trips) {
         val mapView = mapViewRef.value ?: return@LaunchedEffect
         // Clear previous overlays
         mapView.overlays.clear()
 
+        // Draw all trip polylines (non-selected in lighter color)
+        for (trip in trips) {
+            if (trip.points.size < 2) continue
+            val isSelected = trip.id == selectedTrip?.id
+            val polyline = OsmPolyline().apply {
+                outlinePaint.color = if (isSelected) AppColors.Indigo.toArgb() else Color(0xFFB0B0FF).toArgb()
+                outlinePaint.strokeWidth = if (isSelected) 6f else 3f
+                outlinePaint.isAntiAlias = true
+                outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+                setPoints(trip.points.map { GeoPoint(it.lat, it.lng) })
+            }
+            mapView.overlays.add(polyline)
+        }
+
+        // Add start/end markers for selected trip
         selectedTrip?.let { trip ->
             if (trip.points.isNotEmpty()) {
-                // Draw polyline
-                val polyline = OsmPolyline().apply {
-                    outlinePaint.color = AppColors.Indigo.toArgb()
-                    outlinePaint.strokeWidth = 5f
-                    setPoints(trip.points.map { GeoPoint(it.lat, it.lng) })
-                }
-                mapView.overlays.add(polyline)
-
                 // Start marker
                 trip.points.firstOrNull()?.let { start ->
                     val startMarker = Marker(mapView).apply {
                         position = GeoPoint(start.lat, start.lng)
-                        title = "Ba\u015flang\u0131\u00e7"
+                        title = "Başlangıç"
                         snippet = trip.startAddress
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                     }
@@ -361,7 +372,7 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
                 trip.points.lastOrNull()?.let { end ->
                     val endMarker = Marker(mapView).apply {
                         position = GeoPoint(end.lat, end.lng)
-                        title = "Biti\u015f"
+                        title = "Bitiş"
                         snippet = trip.endAddress
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                     }
@@ -370,12 +381,21 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
 
                 // Zoom to fit
                 try {
-                    val north = trip.points.maxOf { it.lat }
-                    val south = trip.points.minOf { it.lat }
-                    val east = trip.points.maxOf { it.lng }
-                    val west = trip.points.minOf { it.lng }
-                    val box = BoundingBox(north + 0.02, east + 0.02, south - 0.02, west - 0.02)
-                    mapView.zoomToBoundingBox(box, true, 60)
+                    val allPts = trip.points
+                    if (allPts.size >= 2) {
+                        val north = allPts.maxOf { it.lat }
+                        val south = allPts.minOf { it.lat }
+                        val east = allPts.maxOf { it.lng }
+                        val west = allPts.minOf { it.lng }
+                        val latPad = maxOf((north - south) * 0.15, 0.005)
+                        val lngPad = maxOf((east - west) * 0.15, 0.005)
+                        val box = BoundingBox(north + latPad, east + lngPad, south - latPad, west - lngPad)
+                        mapView.zoomToBoundingBox(box, true, 60)
+                    } else {
+                        val pt = allPts.first()
+                        mapView.controller.setCenter(GeoPoint(pt.lat, pt.lng))
+                        mapView.controller.setZoom(15.0)
+                    }
                 } catch (_: Exception) {}
             }
         }
@@ -497,7 +517,7 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(250.dp)
+                    .weight(1f)
                     .padding(horizontal = 16.dp, vertical = 4.dp)
                     .clip(RoundedCornerShape(14.dp))
             ) {
@@ -575,7 +595,7 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
             if (isLoadingRoutes) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxWidth().height(100.dp)
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = AppColors.Indigo, modifier = Modifier.size(32.dp))
@@ -586,7 +606,7 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
             } else if (errorMessage != null) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxWidth().height(100.dp)
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.ErrorOutline, null, tint = AppColors.Offline, modifier = Modifier.size(32.dp))
@@ -597,7 +617,7 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
             } else if (trips.isEmpty()) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxWidth().height(100.dp)
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.Route, null, tint = AppColors.TextMuted, modifier = Modifier.size(32.dp))
@@ -609,7 +629,9 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
                 LazyColumn(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 260.dp)
                 ) {
                     val grouped = trips.groupBy { it.dateLabel }
                     grouped.forEach { (date, dayTrips) ->
