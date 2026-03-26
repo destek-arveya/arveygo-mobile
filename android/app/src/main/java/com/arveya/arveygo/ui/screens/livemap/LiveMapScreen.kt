@@ -806,7 +806,10 @@ private fun VehiclePopupCard(
             ) {
                 PopupStatItem(Icons.Default.Speed, vehicle.formattedSpeed, "H\u0131z", Color(0xFFFF9800))
                 PopupStatItem(Icons.Default.Route, vehicle.formattedTodayKm, "Bug\u00fcn", AppColors.Indigo)
-                PopupStatItem(Icons.Default.Person, vehicle.driver.split(" ").firstOrNull() ?: "\u2014", "S\u00fcr\u00fcc\u00fc", AppColors.Online)
+                PopupStatItem(Icons.Default.Person, run {
+                    val name = if (vehicle.driverName.isNotEmpty()) vehicle.driverName else vehicle.driver
+                    if (name.isEmpty()) "\u2014" else name.split(" ").firstOrNull() ?: "\u2014"
+                }, "S\u00fcr\u00fcc\u00fc", AppColors.Online)
                 PopupStatItem(Icons.Default.LocationOn, vehicle.city, "Konum", Color.Blue)
             }
         }

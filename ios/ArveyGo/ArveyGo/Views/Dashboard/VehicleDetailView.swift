@@ -254,7 +254,10 @@ struct VehicleDetailView: View {
                 Divider().frame(height: 40)
                 quickStatItem(icon: "road.lanes", value: vehicle.formattedTodayKm, label: "Bugün", color: AppTheme.indigo)
                 Divider().frame(height: 40)
-                quickStatItem(icon: "person.fill", value: !observer.driverName.isEmpty ? observer.driverName.components(separatedBy: " ").first ?? "—" : (vehicle.driver.isEmpty ? "—" : vehicle.driver.components(separatedBy: " ").first ?? "—"), label: "Sürücü", color: AppTheme.online)
+                quickStatItem(icon: "person.fill", value: {
+                    let name = !observer.driverName.isEmpty ? observer.driverName : (!vehicle.driverName.isEmpty ? vehicle.driverName : vehicle.driver)
+                    return name.isEmpty ? "—" : (name.components(separatedBy: " ").first ?? "—")
+                }(), label: "Sürücü", color: AppTheme.online)
                 Divider().frame(height: 40)
                 quickStatItem(icon: "mappin.circle.fill", value: vehicle.city, label: "Konum", color: .orange)
             }
@@ -401,7 +404,7 @@ struct VehicleDetailView: View {
             }
 
             sectionCard(title: "SÜRÜCÜ BİLGİLERİ", icon: "person.fill") {
-                let displayName = !observer.driverName.isEmpty ? observer.driverName : (vehicle.driver.isEmpty ? "" : vehicle.driver)
+                let displayName = !observer.driverName.isEmpty ? observer.driverName : (!vehicle.driverName.isEmpty ? vehicle.driverName : "")
                 HStack(spacing: 14) {
                     ZStack {
                         Circle()
@@ -444,7 +447,7 @@ struct VehicleDetailView: View {
             .sheet(isPresented: $showDriverAssign) {
                 VehicleDriverAssignSheet(
                     vehicleId: vehicle.deviceId,
-                    currentDriverName: !observer.driverName.isEmpty ? observer.driverName : vehicle.driver,
+                    currentDriverName: !observer.driverName.isEmpty ? observer.driverName : vehicle.driverName,
                     onAssigned: {
                         observer.fetchDriverInfo()
                     }

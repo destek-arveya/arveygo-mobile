@@ -1318,7 +1318,7 @@ struct RouteHistoryView: View {
                                     Text(vehicle.plate)
                                         .font(.system(size: 15, weight: .bold))
                                         .foregroundColor(AppTheme.navy)
-                                    Text("\(vehicle.model) • \(vehicle.driver)")
+                                    Text("\(vehicle.model) • \(!vehicle.driverName.isEmpty ? vehicle.driverName : vehicle.driver)")
                                         .font(.system(size: 11))
                                         .foregroundColor(AppTheme.textMuted)
                                         .lineLimit(1)

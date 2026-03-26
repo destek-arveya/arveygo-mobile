@@ -52,6 +52,9 @@ final class WebSocketManager: ObservableObject {
     @Published private(set) var vehicles: [String: Vehicle] = [:]  // imei → Vehicle
     @Published private(set) var vehicleList: [Vehicle] = []        // ordered array
 
+    /// Cache: driverCode → driverName (fetched from API once)
+    private var driverNameCache: [String: String] = [:]
+
     /// Combine subject for downstream consumers (LiveMapViewModel)
     let eventSubject = PassthroughSubject<WSEvent, Never>()
 
@@ -407,6 +410,47 @@ final class WebSocketManager: ObservableObject {
         startHealthCheckTimer()
         eventSubject.send(.statusChanged(.connected))
         eventSubject.send(.snapshot(vehicles: vehicleList, count: vehicleList.count, ts: ts))
+
+        // Fetch driver names from API and enrich vehicles
+        fetchDriverNames()
+    }
+
+    /// Fetches driver list from API and populates driverName on all vehicles
+    private func fetchDriverNames() {
+        Task {
+            do {
+                let response = try await APIService.shared.fetchDrivers()
+                var cache: [String: String] = [:]
+                for driver in response.drivers {
+                    if !driver.driverCode.isEmpty && !driver.name.isEmpty {
+                        cache[driver.driverCode] = driver.name
+                    }
+                }
+                self.driverNameCache = cache
+                // Apply to all vehicles
+                applyDriverNames()
+            } catch {
+                print("[WS] fetchDriverNames error: \(error)")
+            }
+        }
+    }
+
+    /// Apply cached driver names to all vehicles
+    private func applyDriverNames() {
+        var changed = false
+        for (imei, vehicle) in vehicles {
+            if let code = vehicle.driverId, !code.isEmpty,
+               let name = driverNameCache[code], !name.isEmpty,
+               vehicle.driverName != name {
+                var updated = vehicle
+                updated.driverName = name
+                vehicles[imei] = updated
+                changed = true
+            }
+        }
+        if changed {
+            rebuildVehicleList()
+        }
     }
 
     private func handleUpdate(_ json: [String: Any]) {
@@ -420,9 +464,19 @@ final class WebSocketManager: ObservableObject {
 
         if var existing = vehicles[patch.imei] {
             existing.mergeUpdate(from: patch)
+            // Preserve/apply cached driver name
+            if let code = existing.driverId, !code.isEmpty,
+               let name = driverNameCache[code], !name.isEmpty {
+                existing.driverName = name
+            }
             vehicles[patch.imei] = existing
         } else {
-            vehicles[patch.imei] = patch
+            var newVehicle = patch
+            if let code = newVehicle.driverId, !code.isEmpty,
+               let name = driverNameCache[code], !name.isEmpty {
+                newVehicle.driverName = name
+            }
+            vehicles[patch.imei] = newVehicle
             orderList.append(patch.imei)
         }
 

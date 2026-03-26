@@ -305,7 +305,10 @@ private fun VehicleIdentityCard(vehicle: Vehicle) {
             Box(Modifier.width(1.dp).height(40.dp).background(AppColors.BorderSoft))
             QuickStatItem("Bugün", vehicle.formattedTodayKm, Icons.Default.Route, AppColors.Indigo, Modifier.weight(1f))
             Box(Modifier.width(1.dp).height(40.dp).background(AppColors.BorderSoft))
-            QuickStatItem("Sürücü", vehicle.driver.split(" ").firstOrNull() ?: "—", Icons.Default.Person, AppColors.Online, Modifier.weight(1f))
+            QuickStatItem("Sürücü", run {
+                val name = if (vehicle.driverName.isNotEmpty()) vehicle.driverName else vehicle.driver
+                if (name.isEmpty()) "—" else name.split(" ").firstOrNull() ?: "—"
+            }, Icons.Default.Person, AppColors.Online, Modifier.weight(1f))
             Box(Modifier.width(1.dp).height(40.dp).background(AppColors.BorderSoft))
             QuickStatItem("Konum", vehicle.city, Icons.Default.LocationOn, Color(0xFFFF9800), Modifier.weight(1f))
         }
@@ -478,7 +481,7 @@ private fun OverviewTab(
     }
 
     var showDriverAssign by remember { mutableStateOf(false) }
-    val displayName = if (driverName.isNotEmpty()) driverName else vehicle.driver
+    val displayName = if (driverName.isNotEmpty()) driverName else if (vehicle.driverName.isNotEmpty()) vehicle.driverName else ""
 
     SectionCard(title = "SÜRÜCÜ BİLGİLERİ", icon = Icons.Default.Person) {
         Row(

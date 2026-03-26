@@ -321,12 +321,12 @@ struct VehiclesListView: View {
 
                 Spacer()
 
-                if !vehicle.driver.isEmpty {
+                if !vehicle.driverName.isEmpty || !vehicle.driver.isEmpty {
                     HStack(spacing: 3) {
                         Image(systemName: "person.fill")
                             .font(.system(size: 9))
                             .foregroundColor(AppTheme.textFaint)
-                        Text(vehicle.driver)
+                        Text(!vehicle.driverName.isEmpty ? vehicle.driverName : vehicle.driver)
                             .font(.system(size: 10))
                             .foregroundColor(AppTheme.textFaint)
                             .lineLimit(1)

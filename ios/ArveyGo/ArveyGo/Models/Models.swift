@@ -58,6 +58,7 @@ struct Vehicle: Identifiable, Hashable {
     var temperatureC: Double? = nil
     var humidityPct: Double? = nil
     var driverId: String? = nil
+    var driverName: String = ""
     var alarmCode: String? = nil
     var deviceTime: String? = nil
     var ts: Int = 0
@@ -333,6 +334,7 @@ struct Vehicle: Identifiable, Hashable {
         if let tc = patch.temperatureC { temperatureC = tc }
         if let hp = patch.humidityPct { humidityPct = hp }
         if let di = patch.driverId { driverId = di }
+        if !patch.driverName.isEmpty { driverName = patch.driverName }
         if let ac = patch.alarmCode { alarmCode = ac }
         if let fi = patch.firstIgnitionOnAtToday { firstIgnitionOnAtToday = fi }
         if let li = patch.lastIgnitionOnAt { lastIgnitionOnAt = li }

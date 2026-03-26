@@ -386,7 +386,10 @@ struct LiveMapView: View {
                     Divider().frame(height: 36)
                     popupStatItem(icon: "road.lanes", value: vehicle.formattedTodayKm, label: "Bugün", color: AppTheme.indigo)
                     Divider().frame(height: 36)
-                    popupStatItem(icon: "person.fill", value: vehicle.driver.components(separatedBy: " ").first ?? "—", label: "Sürücü", color: AppTheme.online)
+                    popupStatItem(icon: "person.fill", value: {
+                        let name = !vehicle.driverName.isEmpty ? vehicle.driverName : vehicle.driver
+                        return name.isEmpty ? "—" : (name.components(separatedBy: " ").first ?? "—")
+                    }(), label: "Sürücü", color: AppTheme.online)
                     Divider().frame(height: 36)
                     popupStatItem(icon: "mappin.circle.fill", value: vehicle.city, label: "Konum", color: .blue)
                 }

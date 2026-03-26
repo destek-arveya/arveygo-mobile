@@ -446,10 +446,13 @@ private fun VehicleCard(vehicle: Vehicle, onClick: () -> Unit) {
 
             Spacer(Modifier.weight(1f))
 
-            if (vehicle.driver.isNotEmpty()) {
+            if (vehicle.driverName.isNotEmpty() || vehicle.driver.isNotEmpty()) {
                 Icon(Icons.Default.Person, null, tint = AppColors.TextFaint, modifier = Modifier.size(11.dp))
                 Spacer(Modifier.width(3.dp))
-                Text(vehicle.driver, fontSize = 10.sp, color = AppColors.TextFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (vehicle.driverName.isNotEmpty()) vehicle.driverName else vehicle.driver,
+                    fontSize = 10.sp, color = AppColors.TextFaint, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
