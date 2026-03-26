@@ -34,6 +34,9 @@ import com.arveya.arveygo.ui.components.LanguageSwitcher
 import com.arveya.arveygo.ui.theme.AppColors
 import com.arveya.arveygo.utils.LoginStrings
 import androidx.compose.ui.res.painterResource
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import com.arveya.arveygo.R
 import com.arveya.arveygo.models.CountryCode
 import kotlinx.coroutines.delay
@@ -118,8 +121,11 @@ fun LoginScreen() {
 
                     // Logo
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        Image(
-                            painter = painterResource(id = R.drawable.logo_arveygo),
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data("https://arveya.com/images/genel/logo.webp")
+                                .crossfade(true)
+                                .build(),
                             contentDescription = "ArveyGo Logo",
                             modifier = Modifier
                                 .height(64.dp)

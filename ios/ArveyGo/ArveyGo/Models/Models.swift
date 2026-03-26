@@ -86,33 +86,37 @@ struct Vehicle: Identifiable, Hashable {
     func formatTimestamp(_ raw: String?) -> String {
         guard let raw = raw, !raw.isEmpty else { return "—" }
         let cleaned = raw.replacingOccurrences(of: "\\.\\d+", with: "", options: .regularExpression)
+        
+        func formatSmart(_ date: Date) -> String {
+            let outFormatter = DateFormatter()
+            outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
+            outFormatter.locale = Locale(identifier: "tr_TR")
+            // Bugün ise sadece saat göster
+            if Calendar.current.isDateInToday(date) {
+                outFormatter.dateFormat = "HH:mm"
+            } else if Calendar.current.isDateInYesterday(date) {
+                outFormatter.dateFormat = "'Dün' HH:mm"
+            } else {
+                outFormatter.dateFormat = "dd.MM HH:mm"
+            }
+            return outFormatter.string(from: date)
+        }
+        
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         if let date = formatter.date(from: cleaned) {
-            let outFormatter = DateFormatter()
-            outFormatter.dateFormat = "dd.MM.yyyy HH:mm"
-            outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
-            outFormatter.locale = Locale(identifier: "tr_TR")
-            return outFormatter.string(from: date)
+            return formatSmart(date)
         }
         let formatter1b = ISO8601DateFormatter()
         formatter1b.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let date1b = formatter1b.date(from: raw) {
-            let outFormatter = DateFormatter()
-            outFormatter.dateFormat = "dd.MM.yyyy HH:mm"
-            outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
-            outFormatter.locale = Locale(identifier: "tr_TR")
-            return outFormatter.string(from: date1b)
+            return formatSmart(date1b)
         }
         let formatter2 = DateFormatter()
         formatter2.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
         formatter2.timeZone = TimeZone(abbreviation: "UTC")
         if let date2 = formatter2.date(from: cleaned) {
-            let outFormatter = DateFormatter()
-            outFormatter.dateFormat = "dd.MM.yyyy HH:mm"
-            outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
-            outFormatter.locale = Locale(identifier: "tr_TR")
-            return outFormatter.string(from: date2)
+            return formatSmart(date2)
         }
         return raw
     }

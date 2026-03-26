@@ -109,7 +109,7 @@ fun SideMenu(
                         MenuItem(Icons.Default.AttachMoney, "Masraflar", null, selectedPage) { onClose() }
                     }
                     MenuSection("İZLEME") {
-                        MenuItem(Icons.Default.Notifications, "Alarmlar", null, selectedPage) { onClose() }
+                        MenuItem(Icons.Default.Notifications, "Alarmlar", AppPage.ALARMS, selectedPage, onPageSelected)
                         MenuItem(Icons.Default.Hexagon, "Geofence", null, selectedPage) { onClose() }
                         MenuItem(Icons.Default.BarChart, "Raporlar", null, selectedPage) { onClose() }
                     }

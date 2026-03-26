@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import com.arveya.arveygo.ui.navigation.AppPage
 import com.arveya.arveygo.ui.screens.auth.LoginScreen
 import com.arveya.arveygo.ui.screens.dashboard.DashboardScreen
+import com.arveya.arveygo.ui.screens.fleet.AlarmsScreen
 import com.arveya.arveygo.ui.screens.fleet.RouteHistoryScreen
 import com.arveya.arveygo.ui.screens.fleet.VehiclesListScreen
 import com.arveya.arveygo.ui.screens.livemap.LiveMapScreen
@@ -81,6 +82,9 @@ fun MainContent(authVM: AuthViewModel) {
                 onMenuClick = { showSideMenu = true }
             )
             AppPage.ROUTE_HISTORY -> RouteHistoryScreen(
+                onMenuClick = { showSideMenu = true }
+            )
+            AppPage.ALARMS -> AlarmsScreen(
                 onMenuClick = { showSideMenu = true }
             )
             AppPage.SETTINGS -> SettingsScreen(

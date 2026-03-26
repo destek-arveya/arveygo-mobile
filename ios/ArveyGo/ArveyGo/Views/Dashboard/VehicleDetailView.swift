@@ -346,9 +346,6 @@ struct VehicleDetailView: View {
 
             sectionCard(title: "ARAÇ BİLGİLERİ", icon: "car.fill") {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    infoCell(icon: "car.fill", label: "MARKA / MODEL", value: vehicle.model)
-                    infoCell(icon: "number", label: "PLAKA", value: vehicle.plate)
-                    infoCell(icon: "person.fill", label: "SÜRÜCÜ", value: vehicle.driver)
                     infoCell(icon: "folder.fill", label: "GRUP", value: vehicle.group)
                     infoCell(icon: "speedometer", label: "KİLOMETRE", value: vehicle.formattedTotalKm + " km")
                     infoCell(icon: "gauge.open.with.lines.needle.33percent", label: "HIZ", value: vehicle.formattedSpeed)

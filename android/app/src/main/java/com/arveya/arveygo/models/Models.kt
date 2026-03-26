@@ -115,20 +115,36 @@ data class Vehicle(
     private fun formatTimestamp(raw: String?): String {
         if (raw.isNullOrEmpty()) return "\u2014"
         val cleaned = raw.replace(Regex("\\.\\d+"), "")
+        
+        fun formatSmart(date: java.util.Date): String {
+            val tz = TimeZone.getTimeZone("Europe/Istanbul")
+            val calNow = java.util.Calendar.getInstance(tz)
+            val calDate = java.util.Calendar.getInstance(tz).apply { time = date }
+            val isToday = calNow.get(java.util.Calendar.YEAR) == calDate.get(java.util.Calendar.YEAR) &&
+                    calNow.get(java.util.Calendar.DAY_OF_YEAR) == calDate.get(java.util.Calendar.DAY_OF_YEAR)
+            calNow.add(java.util.Calendar.DAY_OF_YEAR, -1)
+            val isYesterday = calNow.get(java.util.Calendar.YEAR) == calDate.get(java.util.Calendar.YEAR) &&
+                    calNow.get(java.util.Calendar.DAY_OF_YEAR) == calDate.get(java.util.Calendar.DAY_OF_YEAR)
+            val pattern = when {
+                isToday -> "HH:mm"
+                isYesterday -> "'D\u00fcn' HH:mm"
+                else -> "dd.MM HH:mm"
+            }
+            val fmt = SimpleDateFormat(pattern, Locale("tr", "TR"))
+            fmt.timeZone = tz
+            return fmt.format(date)
+        }
+        
         return try {
             val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
-            val outputFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
-            outputFormat.timeZone = TimeZone.getTimeZone("Europe/Istanbul")
             val date = inputFormat.parse(cleaned) ?: return raw
-            outputFormat.format(date)
+            formatSmart(date)
         } catch (_: Exception) {
             try {
                 val inputFormat2 = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
                 inputFormat2.timeZone = TimeZone.getTimeZone("UTC")
-                val outputFormat2 = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
-                outputFormat2.timeZone = TimeZone.getTimeZone("Europe/Istanbul")
                 val date2 = inputFormat2.parse(cleaned) ?: return raw
-                outputFormat2.format(date2)
+                formatSmart(date2)
             } catch (_: Exception) { raw }
         }
     }

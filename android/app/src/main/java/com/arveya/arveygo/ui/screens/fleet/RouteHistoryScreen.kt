@@ -6,8 +6,9 @@ import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -67,6 +69,9 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
     var isLoadingRoutes by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var loadJob by remember { mutableStateOf<Job?>(null) }
+    var followVehicle by remember { mutableStateOf(true) }
+    var isAutoAdvancing by remember { mutableStateOf(false) }
+    val tripListState = rememberLazyListState()
 
     // Date range state
     var startDate by remember {
@@ -420,6 +425,20 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
         }
     }
 
+    // Reset playback when trip changes (but not during auto-advance)
+    LaunchedEffect(selectedTrip?.id) {
+        if (!isAutoAdvancing) {
+            isPlaying = false
+            playbackIndex = 0
+        }
+        isAutoAdvancing = false
+        // Auto-scroll trip list to selected
+        val idx = trips.indexOfFirst { it.id == selectedTrip?.id }
+        if (idx >= 0) {
+            tripListState.animateScrollToItem(idx)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -429,10 +448,7 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
                     }
                 },
                 title = {
-                    Column {
-                        Text("Rota Ge\u00e7mi\u015fi", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-                        Text(selectedVehicle?.plate ?: "Ara\u00e7 Se\u00e7in", fontSize = 10.sp, color = AppColors.TextMuted)
-                    }
+                    Text("Rota Ge\u00e7mi\u015fi", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.Surface)
             )
@@ -444,32 +460,35 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
                 .padding(padding)
                 .background(AppColors.Bg)
         ) {
-            // Vehicle selector & date range
+            // === COMPACT TOP BAR: Vehicle + Date + Search ===
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
+                // Vehicle selector - compact
                 var expanded by remember { mutableStateOf(false) }
                 Box(modifier = Modifier.weight(1f)) {
                     OutlinedButton(
                         onClick = { expanded = true },
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(8.dp),
                         border = BorderStroke(1.dp, AppColors.BorderSoft),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(42.dp)
+                            .height(36.dp)
                     ) {
                         Icon(Icons.Default.DirectionsCar, null, modifier = Modifier.size(14.dp), tint = AppColors.Indigo)
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(4.dp))
                         Text(
-                            selectedVehicle?.plate ?: "Ara\u00e7 Se\u00e7in",
+                            selectedVehicle?.plate ?: "Ara\u00e7",
                             fontSize = 11.sp, color = AppColors.Navy,
                             maxLines = 1, overflow = TextOverflow.Ellipsis
                         )
                         Spacer(Modifier.weight(1f))
-                        Icon(Icons.Default.KeyboardArrowDown, null, modifier = Modifier.size(16.dp), tint = AppColors.TextMuted)
+                        Icon(Icons.Default.KeyboardArrowDown, null, modifier = Modifier.size(14.dp), tint = AppColors.TextMuted)
                     }
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         vehicles.forEach { v ->
@@ -490,48 +509,96 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
                     }
                 }
 
+                // Date filter - compact toggle
                 OutlinedButton(
                     onClick = { showDatePicker = !showDatePicker },
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(8.dp),
                     border = BorderStroke(1.dp, AppColors.BorderSoft),
-                    modifier = Modifier.height(42.dp)
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                    modifier = Modifier.height(36.dp)
                 ) {
-                    Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(14.dp), tint = AppColors.Indigo)
-                    Spacer(Modifier.width(6.dp))
+                    Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(13.dp), tint = AppColors.Indigo)
+                    Spacer(Modifier.width(4.dp))
                     Text(dateRange, fontSize = 11.sp, color = AppColors.Navy)
+                }
+
+                // Search / Refresh button - PROMINENT
+                Button(
+                    onClick = {
+                        selectedVehicle?.let { v -> loadRoutes(v, startDate, endDate) }
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Indigo),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Icon(Icons.Default.Search, null, modifier = Modifier.size(16.dp), tint = Color.White)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Ara", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
                 }
             }
 
-            // Date quick filters
+            // Date quick filters - collapsible, improved design
             AnimatedVisibility(visible = showDatePicker) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                        .background(AppColors.Surface, RoundedCornerShape(12.dp))
+                        .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
+                        .padding(12.dp)
                 ) {
-                    listOf("Bug\u00fcn", "D\u00fcn", "Bu Hafta", "Bu Ay").forEach { label ->
-                        val isActive = dateRange == label
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(if (isActive) AppColors.Navy else AppColors.Surface)
-                                .border(1.dp, if (isActive) AppColors.Navy else AppColors.BorderSoft, RoundedCornerShape(20.dp))
-                                .clickable { applyDateFilter(label) }
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = if (isActive) Color.White else AppColors.TextSecondary)
+                    Text("Tarih Aral\u0131\u011f\u0131 Se\u00e7in", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        listOf(
+                            "Bug\u00fcn" to Icons.Default.WbSunny,
+                            "D\u00fcn" to Icons.Default.DarkMode,
+                            "Bu Hafta" to Icons.Default.DateRange,
+                            "Bu Ay" to Icons.Default.CalendarMonth
+                        ).forEach { (label, icon) ->
+                            val isActive = dateRange == label
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(
+                                        if (isActive) Brush.horizontalGradient(listOf(AppColors.Indigo, AppColors.Navy))
+                                        else Brush.horizontalGradient(listOf(AppColors.Bg, AppColors.Bg))
+                                    )
+                                    .then(
+                                        if (!isActive) Modifier.border(1.dp, AppColors.BorderSoft, RoundedCornerShape(20.dp))
+                                        else Modifier
+                                    )
+                                    .clickable { applyDateFilter(label) }
+                                    .padding(horizontal = 8.dp, vertical = 7.dp)
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(icon, null, modifier = Modifier.size(11.dp), tint = if (isActive) Color.White else AppColors.TextMuted)
+                                    Spacer(Modifier.width(3.dp))
+                                    Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = if (isActive) Color.White else AppColors.TextSecondary)
+                                }
+                            }
                         }
                     }
                 }
             }
 
-            // Map with route (osmdroid - FREE)
+            // === MAP - Takes maximum available space ===
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .clip(RoundedCornerShape(12.dp))
             ) {
                 AndroidView(
                     factory = { ctx ->
@@ -549,87 +616,196 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Playback controls overlay
+                // Playback controls overlay - compact with global slider
                 if (selectedTrip != null) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                    Column(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(12.dp)
-                            .background(AppColors.Surface.copy(alpha = 0.95f), RoundedCornerShape(12.dp))
-                            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .padding(8.dp)
+                            .background(AppColors.Surface.copy(alpha = 0.95f), RoundedCornerShape(10.dp))
+                            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
-                        // Reset button
-                        IconButton(onClick = {
-                            isPlaying = false
-                            playbackIndex = 0
-                        }, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.SkipPrevious, null, tint = AppColors.Navy, modifier = Modifier.size(16.dp))
+                        // Global calculations for slider (must be before Row so they're accessible)
+                        val totalGlobalPts = trips.sumOf { it.points.size }
+                        val globalIdx = run {
+                            var offset = 0
+                            for (t in trips) {
+                                if (t.id == selectedTrip?.id) break
+                                offset += t.points.size
+                            }
+                            offset + playbackIndex
                         }
-                        // Play/Pause
-                        IconButton(
-                            onClick = {
-                                if (isPlaying) {
-                                    isPlaying = false
-                                } else {
-                                    val pts = selectedTrip?.points ?: emptyList()
-                                    if (playbackIndex >= pts.size - 1) playbackIndex = 0
-                                    isPlaying = true
-                                }
-                            },
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(CircleShape)
-                                .background(AppColors.Navy)
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                null, tint = Color.White, modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        // Skip to end
-                        IconButton(onClick = {
-                            isPlaying = false
-                            val pts = selectedTrip?.points ?: emptyList()
-                            if (pts.isNotEmpty()) playbackIndex = pts.size - 1
-                        }, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.SkipNext, null, tint = AppColors.Navy, modifier = Modifier.size(16.dp))
-                        }
-                        // Speed selector
-                        var speedExpanded by remember { mutableStateOf(false) }
-                        Box {
+                            // Reset
+                            IconButton(onClick = {
+                                isPlaying = false
+                                playbackIndex = 0
+                                // Jump to first trip
+                                if (trips.isNotEmpty()) {
+                                    isAutoAdvancing = true
+                                    selectedTrip = trips.first()
+                                }
+                            }, modifier = Modifier.size(26.dp)) {
+                                Icon(Icons.Default.SkipPrevious, null, tint = AppColors.Navy, modifier = Modifier.size(16.dp))
+                            }
+                            // Play/Pause
+                            IconButton(
+                                onClick = {
+                                    if (isPlaying) {
+                                        isPlaying = false
+                                    } else {
+                                        // If at very end of all trips, restart
+                                        val lastTrip = trips.lastOrNull()
+                                        if (selectedTrip?.id == lastTrip?.id && playbackIndex >= (lastTrip?.points?.size ?: 1) - 1) {
+                                            isAutoAdvancing = true
+                                            selectedTrip = trips.firstOrNull()
+                                            playbackIndex = 0
+                                        } else {
+                                            val pts = selectedTrip?.points ?: emptyList()
+                                            if (playbackIndex >= pts.size - 1) {
+                                                // Advance to next trip
+                                                val idx = trips.indexOfFirst { it.id == selectedTrip?.id }
+                                                if (idx >= 0 && idx + 1 < trips.size) {
+                                                    isAutoAdvancing = true
+                                                    selectedTrip = trips[idx + 1]
+                                                    playbackIndex = 0
+                                                }
+                                            }
+                                        }
+                                        isPlaying = true
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(AppColors.Navy)
+                            ) {
+                                Icon(
+                                    if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    null, tint = Color.White, modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            // Skip to end
+                            IconButton(onClick = {
+                                isPlaying = false
+                                if (trips.isNotEmpty()) {
+                                    val lastTrip = trips.last()
+                                    isAutoAdvancing = true
+                                    selectedTrip = lastTrip
+                                    playbackIndex = maxOf(0, lastTrip.points.size - 1)
+                                }
+                            }, modifier = Modifier.size(26.dp)) {
+                                Icon(Icons.Default.SkipNext, null, tint = AppColors.Navy, modifier = Modifier.size(16.dp))
+                            }
+
+                            // Global progress text
+                            val currentTripIdx = trips.indexOfFirst { it.id == selectedTrip?.id }
                             Text(
-                                "${playbackSpeed.toInt()}x",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
+                                "Sefer ${(currentTripIdx + 1).coerceAtLeast(1)}/${trips.size}",
+                                fontSize = 9.sp,
                                 color = AppColors.Indigo,
-                                modifier = Modifier.clickable { speedExpanded = true }
+                                fontWeight = FontWeight.SemiBold
                             )
-                            DropdownMenu(expanded = speedExpanded, onDismissRequest = { speedExpanded = false }) {
-                                listOf(1f, 2f, 4f, 8f).forEach { spd ->
-                                    DropdownMenuItem(
-                                        text = { Text("${spd.toInt()}x") },
-                                        onClick = { playbackSpeed = spd; speedExpanded = false }
+
+                            // Speed selector
+                            var speedExpanded by remember { mutableStateOf(false) }
+                            Box {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(AppColors.Indigo.copy(alpha = 0.1f))
+                                        .clickable { speedExpanded = true }
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        "${playbackSpeed.toInt()}x",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = AppColors.Indigo
                                     )
                                 }
+                                DropdownMenu(expanded = speedExpanded, onDismissRequest = { speedExpanded = false }) {
+                                    listOf(1f, 2f, 4f, 8f).forEach { spd ->
+                                        DropdownMenuItem(
+                                            text = { Text("${spd.toInt()}x") },
+                                            onClick = { playbackSpeed = spd; speedExpanded = false }
+                                        )
+                                    }
+                                }
                             }
+                        }
+
+                        // Global slider
+                        if (totalGlobalPts > 1) {
+                            Slider(
+                                value = globalIdx.toFloat() / (totalGlobalPts - 1).coerceAtLeast(1).toFloat(),
+                                onValueChange = { frac ->
+                                    val targetIdx = (frac * (totalGlobalPts - 1)).toInt()
+                                    var cumulative = 0
+                                    for ((i, t) in trips.withIndex()) {
+                                        if (cumulative + t.points.size > targetIdx) {
+                                            val localIdx = targetIdx - cumulative
+                                            if (selectedTrip?.id != t.id) {
+                                                isAutoAdvancing = true
+                                                selectedTrip = t
+                                            }
+                                            playbackIndex = localIdx.coerceIn(0, t.points.size - 1)
+                                            return@Slider
+                                        }
+                                        cumulative += t.points.size
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().height(20.dp),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = AppColors.Indigo,
+                                    activeTrackColor = AppColors.Indigo
+                                )
+                            )
                         }
                     }
                 }
 
-                // Playback animation: move vehicle marker along route
-                LaunchedEffect(isPlaying, playbackSpeed) {
+                // Follow vehicle toggle - top right of map
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .background(AppColors.Surface.copy(alpha = 0.9f), RoundedCornerShape(8.dp))
+                        .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(8.dp))
+                        .clickable { followVehicle = !followVehicle }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Icon(
+                        if (followVehicle) Icons.Default.GpsFixed else Icons.Default.GpsOff,
+                        null,
+                        tint = if (followVehicle) AppColors.Indigo else AppColors.TextMuted,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        if (followVehicle) "Takip" else "Serbest",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (followVehicle) AppColors.Indigo else AppColors.TextMuted
+                    )
+                }
+
+                // Playback animation with auto-advance and follow
+                LaunchedEffect(isPlaying, playbackSpeed, selectedTrip?.id) {
                     if (!isPlaying) return@LaunchedEffect
                     val trip = selectedTrip ?: return@LaunchedEffect
                     while (isActive && playbackIndex < trip.points.size - 1) {
-                        delay((500L / playbackSpeed).toLong())
+                        delay((400L / playbackSpeed).toLong())
                         playbackIndex++
-                        // Move animated marker on map
                         val pt = trip.points[playbackIndex]
                         mapViewRef.value?.let { mv ->
-                            // Remove old vehicle marker (last overlay if it's our playback marker)
                             mv.overlays.removeAll { it is Marker && (it as Marker).title == "__playback__" }
                             val marker = Marker(mv).apply {
                                 position = GeoPoint(pt.lat, pt.lng)
@@ -637,160 +813,353 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
                                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                             }
                             mv.overlays.add(marker)
-                            mv.controller.animateTo(GeoPoint(pt.lat, pt.lng))
+                            if (followVehicle) {
+                                mv.controller.animateTo(GeoPoint(pt.lat, pt.lng))
+                            }
                             mv.invalidate()
                         }
                     }
-                    if (playbackIndex >= (selectedTrip?.points?.size ?: 1) - 1) {
-                        isPlaying = false
+                    // Trip ended - auto advance
+                    if (playbackIndex >= (trip.points.size) - 1) {
+                        val tripIdx = trips.indexOfFirst { it.id == selectedTrip?.id }
+                        if (tripIdx >= 0 && tripIdx + 1 < trips.size) {
+                            isAutoAdvancing = true
+                            selectedTrip = trips[tripIdx + 1]
+                            playbackIndex = 0
+                            // isPlaying stays true, new LaunchedEffect will fire
+                        } else {
+                            isPlaying = false
+                        }
                     }
                 }
             }
 
-            // Trip summary
+            // === LIVE HUD BAR - speed graph + info ===
             selectedTrip?.let { trip ->
-                Row(
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                val currentPoint = if ((isPlaying || playbackIndex > 0) && playbackIndex < trip.points.size)
+                    trip.points[playbackIndex] else null
+                val currentSpeed = currentPoint?.speed ?: 0
+                val currentTime = if (currentPoint?.time?.isNotEmpty() == true) currentPoint.time else trip.startTime
+                val currentTripIdx = trips.indexOfFirst { it.id == selectedTrip?.id }
+                val speedColor = when {
+                    currentSpeed == 0 -> AppColors.Idle
+                    currentSpeed < 30 -> AppColors.Online
+                    currentSpeed < 80 -> AppColors.Indigo
+                    currentSpeed < 120 -> Color(0xFFFF9800)
+                    else -> AppColors.Offline
+                }
+
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                        .background(AppColors.Surface, RoundedCornerShape(12.dp))
-                        .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
-                        .padding(12.dp)
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                        .background(AppColors.Surface, RoundedCornerShape(8.dp))
+                        .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(8.dp))
                 ) {
-                    TripStat("Mesafe", trip.distance, Icons.Default.Route)
-                    TripStat("S\u00fcre", trip.duration, Icons.Default.Schedule)
-                    TripStat("Max H\u0131z", trip.maxSpeed, Icons.Default.Speed)
-                    TripStat("Ort. H\u0131z", trip.avgSpeed, Icons.Default.Timeline)
-                    TripStat("Yak\u0131t", trip.fuelUsed, Icons.Default.LocalGasStation)
+                    // Speed graph
+                    SpeedGraphBar(
+                        points = trip.points,
+                        playbackIndex = playbackIndex,
+                        isActive = isPlaying || playbackIndex > 0,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(36.dp)
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+
+                    // Info row: speed badge + time + sefer + address
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp)
+                            .padding(bottom = 6.dp)
+                    ) {
+                        // Compact speed badge
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .background(speedColor.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Icon(Icons.Default.Speed, null, tint = speedColor, modifier = Modifier.size(10.dp))
+                            Spacer(Modifier.width(3.dp))
+                            Text("$currentSpeed km/h", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = speedColor)
+                        }
+
+                        Spacer(Modifier.width(8.dp))
+                        Box(Modifier.width(1.dp).height(20.dp).background(AppColors.BorderSoft))
+                        Spacer(Modifier.width(8.dp))
+
+                        // Dynamic info
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Schedule, null, tint = AppColors.Indigo, modifier = Modifier.size(10.dp))
+                                Spacer(Modifier.width(3.dp))
+                                Text(currentTime, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                                Spacer(Modifier.width(6.dp))
+                                Text("\u2022", fontSize = 8.sp, color = AppColors.TextMuted)
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    "Sefer ${(currentTripIdx + 1).coerceAtLeast(1)}/${trips.size}",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = AppColors.Indigo
+                                )
+                                Spacer(Modifier.weight(1f))
+                            }
+                            Spacer(Modifier.height(2.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.LocationOn, null, tint = AppColors.TextMuted, modifier = Modifier.size(10.dp))
+                                Spacer(Modifier.width(3.dp))
+                                Text(
+                                    trip.startAddress,
+                                    fontSize = 10.sp,
+                                    color = AppColors.TextMuted,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
-            // Trip list
+            // === COMPACT TRIP LIST - horizontal scrollable cards ===
             if (isLoadingRoutes) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxWidth().height(100.dp)
+                    modifier = Modifier.fillMaxWidth().height(60.dp)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = AppColors.Indigo, modifier = Modifier.size(32.dp))
-                        Spacer(Modifier.height(8.dp))
-                        Text("Rotalar yükleniyor...", fontSize = 12.sp, color = AppColors.TextMuted)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(color = AppColors.Indigo, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Y\u00fckleniyor...", fontSize = 11.sp, color = AppColors.TextMuted)
                     }
                 }
             } else if (errorMessage != null) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxWidth().height(100.dp)
+                    modifier = Modifier.fillMaxWidth().height(50.dp)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.ErrorOutline, null, tint = AppColors.Offline, modifier = Modifier.size(32.dp))
-                        Spacer(Modifier.height(8.dp))
-                        Text(errorMessage ?: "Hata oluştu", fontSize = 12.sp, color = AppColors.TextMuted)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.ErrorOutline, null, tint = AppColors.Offline, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(errorMessage ?: "Hata", fontSize = 11.sp, color = AppColors.TextMuted, maxLines = 1)
                     }
                 }
             } else if (trips.isEmpty()) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxWidth().height(100.dp)
+                    modifier = Modifier.fillMaxWidth().height(50.dp)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.Route, null, tint = AppColors.TextMuted, modifier = Modifier.size(32.dp))
-                        Spacer(Modifier.height(8.dp))
-                        Text("Bu tarih aralığında rota bulunamadı", fontSize = 12.sp, color = AppColors.TextMuted)
-                    }
+                    Text("Bu tarihte rota bulunamad\u0131", fontSize = 11.sp, color = AppColors.TextMuted)
                 }
             } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                // Trip count label
+                Text(
+                    "Seferler (${trips.size})",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AppColors.TextMuted,
+                    modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 2.dp)
+                )
+
+                // Horizontal scrollable trip chips with auto-scroll
+                LazyRow(
+                    state = tripListState,
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 260.dp)
+                        .padding(bottom = 8.dp)
                 ) {
-                    val grouped = trips.groupBy { it.dateLabel }
-                    grouped.forEach { (date, dayTrips) ->
-                        item {
-                            Text(date, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextMuted, modifier = Modifier.padding(vertical = 4.dp))
-                        }
-                        items(dayTrips) { trip ->
-                            TripCard(trip, isSelected = selectedTrip?.id == trip.id) { selectedTrip = trip }
-                        }
+                    itemsIndexed(trips) { index, trip ->
+                        CompactTripCard(
+                            trip = trip,
+                            index = index,
+                            isSelected = selectedTrip?.id == trip.id,
+                            onClick = { selectedTrip = trip }
+                        )
                     }
-                    item { Spacer(Modifier.height(20.dp)) }
                 }
             }
         }
     }
 }
 
+/** Compact horizontal trip card - much smaller footprint */
 @Composable
-private fun TripStat(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(icon, null, tint = AppColors.Indigo, modifier = Modifier.size(14.dp))
-        Spacer(Modifier.height(3.dp))
-        Text(value, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-        Text(label, fontSize = 8.sp, color = AppColors.TextMuted)
-    }
-}
-
-@Composable
-private fun TripCard(trip: RouteTrip, isSelected: Boolean, onClick: () -> Unit) {
+private fun CompactTripCard(trip: RouteTrip, index: Int, isSelected: Boolean, onClick: () -> Unit) {
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .background(AppColors.Surface, RoundedCornerShape(14.dp))
+            .width(160.dp)
+            .background(if (isSelected) AppColors.Indigo.copy(alpha = 0.04f) else AppColors.Surface, RoundedCornerShape(10.dp))
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
                 color = if (isSelected) AppColors.Indigo else AppColors.BorderSoft,
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(10.dp)
             )
             .clickable(onClick = onClick)
-            .padding(14.dp)
+            .padding(10.dp)
     ) {
-        Row(verticalAlignment = Alignment.Top) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.size(10.dp).clip(CircleShape).background(AppColors.Online))
-                Box(Modifier.width(2.dp).height(28.dp).background(AppColors.BorderSoft))
-                Box(Modifier.size(10.dp).clip(CircleShape).background(AppColors.Offline))
+        // Header
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Sefer ${index + 1}", fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                color = if (isSelected) AppColors.Indigo else AppColors.TextMuted)
+            Spacer(Modifier.weight(1f))
+            Box(Modifier.size(6.dp).clip(CircleShape).background(if (isSelected) AppColors.Indigo else AppColors.BorderSoft))
+        }
+        Spacer(Modifier.height(3.dp))
+        // Time range
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(5.dp).clip(CircleShape).background(AppColors.Online))
+            Spacer(Modifier.width(3.dp))
+            Text(trip.startTime, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+            Text(" \u2192 ", fontSize = 9.sp, color = AppColors.TextMuted)
+            Text(trip.endTime, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        // Distance & Duration
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Route, null, tint = AppColors.Indigo, modifier = Modifier.size(10.dp))
+                Spacer(Modifier.width(2.dp))
+                Text(trip.distance, fontSize = 10.sp, color = AppColors.TextSecondary)
             }
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text(trip.startAddress, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    Text(trip.startTime, fontSize = 10.sp, color = AppColors.TextMuted)
-                }
-                Spacer(Modifier.height(14.dp))
-                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text(trip.endAddress, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    Text(trip.endTime, fontSize = 10.sp, color = AppColors.TextMuted)
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Schedule, null, tint = AppColors.Indigo, modifier = Modifier.size(10.dp))
+                Spacer(Modifier.width(2.dp))
+                Text(trip.duration, fontSize = 10.sp, color = AppColors.TextSecondary)
             }
         }
 
-        Spacer(Modifier.height(10.dp))
-        HorizontalDivider(color = AppColors.BorderSoft.copy(alpha = 0.5f))
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(3.dp))
 
-        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            TripMetricChip(Icons.Default.Route, trip.distance)
-            TripMetricChip(Icons.Default.Schedule, trip.duration)
-            TripMetricChip(Icons.Default.Speed, trip.maxSpeed)
-            TripMetricChip(Icons.Default.LocalGasStation, trip.fuelUsed)
+        // Max speed
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Speed, null, tint = AppColors.Indigo, modifier = Modifier.size(10.dp))
+            Spacer(Modifier.width(2.dp))
+            Text("Max: ${trip.maxSpeed}", fontSize = 9.sp, color = AppColors.TextMuted)
         }
     }
 }
 
+// MARK: - Speed Graph Bar (Canvas-based sparkline)
 @Composable
-private fun TripMetricChip(icon: androidx.compose.ui.graphics.vector.ImageVector, value: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .background(AppColors.Bg, RoundedCornerShape(20.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-    ) {
-        Icon(icon, null, tint = AppColors.Indigo, modifier = Modifier.size(11.dp))
-        Spacer(Modifier.width(4.dp))
-        Text(value, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+private fun SpeedGraphBar(
+    points: List<RoutePoint>,
+    playbackIndex: Int,
+    isActive: Boolean,
+    modifier: Modifier = Modifier
+) {
+    if (points.size < 2) return
+
+    val maxSpeed = points.maxOf { it.speed }.coerceAtLeast(1)
+    val progress = playbackIndex.toFloat() / (points.size - 1).coerceAtLeast(1).toFloat()
+
+    // Colors
+    val fillGradientTop = AppColors.Indigo.copy(alpha = 0.15f)
+    val fillGradientBottom = AppColors.Indigo.copy(alpha = 0.02f)
+    val lineGreen = Color(0xFF22C55E)
+    val lineAmber = Color(0xFFF59E0B)
+    val lineRed = Color(0xFFEF4444)
+    val indicatorColor = when {
+        !isActive -> Color.Transparent
+        else -> {
+            val spd = points.getOrNull(playbackIndex)?.speed ?: 0
+            when {
+                spd == 0 -> AppColors.Idle
+                spd < 30 -> AppColors.Online
+                spd < 80 -> AppColors.Indigo
+                spd < 120 -> Color(0xFFFF9800)
+                else -> AppColors.Offline
+            }
+        }
+    }
+
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val step = w / (points.size - 1).coerceAtLeast(1).toFloat()
+
+        // Helper: y from speed
+        fun yOf(speed: Int): Float = h - (speed.toFloat() / maxSpeed.toFloat()) * (h - 4f)
+
+        // 1) Fill gradient under curve
+        val fillPath = androidx.compose.ui.graphics.Path().apply {
+            moveTo(0f, h)
+            for (i in points.indices) {
+                val x = i * step
+                val y = yOf(points[i].speed)
+                if (i == 0) {
+                    lineTo(x, y)
+                } else {
+                    val prevX = (i - 1) * step
+                    val prevY = yOf(points[i - 1].speed)
+                    val midX = (prevX + x) / 2f
+                    cubicTo(midX, prevY, midX, y, x, y)
+                }
+            }
+            lineTo(w, h)
+            close()
+        }
+        drawPath(
+            path = fillPath,
+            brush = Brush.verticalGradient(listOf(fillGradientTop, fillGradientBottom))
+        )
+
+        // 2) Speed line — gradient green→amber→red from bottom→top
+        val linePath = androidx.compose.ui.graphics.Path().apply {
+            for (i in points.indices) {
+                val x = i * step
+                val y = yOf(points[i].speed)
+                if (i == 0) {
+                    moveTo(x, y)
+                } else {
+                    val prevX = (i - 1) * step
+                    val prevY = yOf(points[i - 1].speed)
+                    val midX = (prevX + x) / 2f
+                    cubicTo(midX, prevY, midX, y, x, y)
+                }
+            }
+        }
+        drawPath(
+            path = linePath,
+            brush = Brush.verticalGradient(listOf(lineRed, lineAmber, lineGreen)),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f)
+        )
+
+        // 3) Playback indicator — vertical line + dot
+        if (isActive) {
+            val posX = w * progress
+            val currentSpd = points.getOrNull(playbackIndex)?.speed ?: 0
+            val posY = yOf(currentSpd)
+
+            // Vertical line
+            drawLine(
+                color = indicatorColor.copy(alpha = 0.4f),
+                start = androidx.compose.ui.geometry.Offset(posX, 0f),
+                end = androidx.compose.ui.geometry.Offset(posX, h),
+                strokeWidth = 1.5f
+            )
+
+            // Dot
+            drawCircle(
+                color = indicatorColor,
+                radius = 4f,
+                center = androidx.compose.ui.geometry.Offset(posX, posY)
+            )
+            // Glow
+            drawCircle(
+                color = indicatorColor.copy(alpha = 0.3f),
+                radius = 7f,
+                center = androidx.compose.ui.geometry.Offset(posX, posY)
+            )
+        }
     }
 }

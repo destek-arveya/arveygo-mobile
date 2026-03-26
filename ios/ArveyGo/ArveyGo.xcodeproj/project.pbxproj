@@ -25,6 +25,7 @@
 		AA000018 /* LiveMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000018 /* LiveMapView.swift */; };
 		AA000019 /* VehiclesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000019 /* VehiclesListView.swift */; };
 		AA000020 /* RouteHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000020 /* RouteHistoryView.swift */; };
+		AA000032 /* AlarmsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000032 /* AlarmsView.swift */; };
 		AA000021 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000021 /* AppConfig.swift */; };
 		AA000022 /* JWTHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000022 /* JWTHelper.swift */; };
 		AA000023 /* WebSocketManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000023 /* WebSocketManager.swift */; };
@@ -57,6 +58,7 @@
 		BB000018 /* LiveMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveMapView.swift; sourceTree = "<group>"; };
 		BB000019 /* VehiclesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehiclesListView.swift; sourceTree = "<group>"; };
 		BB000020 /* RouteHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteHistoryView.swift; sourceTree = "<group>"; };
+		BB000032 /* AlarmsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlarmsView.swift; sourceTree = "<group>"; };
 		BB000021 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		BB000022 /* JWTHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JWTHelper.swift; sourceTree = "<group>"; };
 		BB000023 /* WebSocketManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketManager.swift; sourceTree = "<group>"; };
@@ -149,6 +151,7 @@
 			children = (
 				BB000019 /* VehiclesListView.swift */,
 				BB000020 /* RouteHistoryView.swift */,
+				BB000032 /* AlarmsView.swift */,
 			);
 			path = Fleet;
 			sourceTree = "<group>";
@@ -339,6 +342,7 @@
 				AA000018 /* LiveMapView.swift in Sources */,
 				AA000019 /* VehiclesListView.swift in Sources */,
 				AA000020 /* RouteHistoryView.swift in Sources */,
+				AA000032 /* AlarmsView.swift in Sources */,
 				AA000021 /* AppConfig.swift in Sources */,
 				AA000022 /* JWTHelper.swift in Sources */,
 				AA000023 /* WebSocketManager.swift in Sources */,

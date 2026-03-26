@@ -69,7 +69,7 @@ struct SideMenuView: View {
                         }
 
                         menuSection(title: "İZLEME") {
-                            menuItem(icon: "bell.fill", label: "Alarmlar")
+                            menuItem(icon: "bell.fill", label: "Alarmlar", page: .alarms)
                             menuItem(icon: "hexagon.fill", label: "Geofence")
                             menuItem(icon: "chart.bar.fill", label: "Raporlar")
                         }

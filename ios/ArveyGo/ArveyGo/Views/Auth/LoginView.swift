@@ -52,11 +52,22 @@ struct LoginView: View {
 
                     // Logo
                     VStack(spacing: 8) {
-                        Image("Logo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 64)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        AsyncImage(url: URL(string: "https://arveya.com/images/genel/logo.webp")) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFit()
+                            case .failure(_):
+                                Image(systemName: "car.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(AppTheme.indigo)
+                            default:
+                                ProgressView()
+                            }
+                        }
+                        .frame(height: 64)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
 
                         VStack(spacing: 2) {
                             Text("ArveyGo")

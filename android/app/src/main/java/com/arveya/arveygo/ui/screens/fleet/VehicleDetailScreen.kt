@@ -341,9 +341,6 @@ private fun TabSelector(selectedTab: DetailTab, onSelect: (DetailTab) -> Unit) {
 @Composable
 private fun OverviewTab(vehicle: Vehicle) {
     val infoItems = listOf(
-        Triple(Icons.Default.DirectionsCar, "MARKA / MODEL", vehicle.model),
-        Triple(Icons.Default.Tag, "PLAKA", vehicle.plate),
-        Triple(Icons.Default.Person, "SÜRÜCÜ", vehicle.driver),
         Triple(Icons.Default.Folder, "GRUP", vehicle.group),
         Triple(Icons.Default.Speed, "KİLOMETRE", vehicle.formattedTotalKm + " km"),
         Triple(Icons.Default.Speed, "HIZ", vehicle.formattedSpeed),
