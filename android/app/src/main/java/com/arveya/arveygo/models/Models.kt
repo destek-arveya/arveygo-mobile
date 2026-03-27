@@ -102,7 +102,16 @@ data class Vehicle(
     // Ignition timestamps (from WebSocket)
     var firstIgnitionOnAtToday: String? = null,
     var lastIgnitionOnAt: String? = null,
-    var lastIgnitionOffAt: String? = null
+    var lastIgnitionOffAt: String? = null,
+    // API-enriched fields (from /api/mobile/vehicles/{id})
+    var groupName: String = "",
+    var vehicleBrand: String = "",
+    var vehicleModel: String = "",
+    var address: String = "",
+    var dailyKm: Double = 0.0,
+    var fuelType: String = "",
+    var dailyFuelLiters: Double = 0.0,
+    var dailyFuelPer100km: Double = 0.0
 ) {
     val isMotorcycle: Boolean get() = vehicleCategory == "motorcycle"
 
@@ -112,7 +121,12 @@ data class Vehicle(
             return fmt.format(totalKm)
         }
 
-    val formattedTodayKm: String get() = "$todayKm km"
+    val formattedTodayKm: String
+        get() {
+            val km = if (dailyKm > 0) dailyKm.toInt() else todayKm
+            val fmt = NumberFormat.getNumberInstance(Locale("tr", "TR"))
+            return fmt.format(km) + " km"
+        }
 
     val formattedSpeed: String get() = "${speed.toInt()} km/h"
 
@@ -193,19 +207,26 @@ data class Vehicle(
         }
 
     val group: String
-        get() = when (city) {
-            "İstanbul" -> "İstanbul Filo"
-            "Ankara" -> "Ankara Filo"
-            "İzmir" -> "İzmir Filo"
-            else -> "Diğer"
-        }
+        get() = if (groupName.isNotEmpty()) groupName else "—"
 
     val vehicleType: String
-        get() = when {
-            vehicleCategory == "motorcycle" -> "Motosiklet"
-            model.contains("Transit") || model.contains("Sprinter") -> "Panelvan"
-            model.contains("Crafter") || model.contains("Master") -> "Kamyonet"
-            else -> "Ticari"
+        get() {
+            if (vehicleBrand.isNotEmpty() && vehicleModel.isNotEmpty()) return "$vehicleBrand $vehicleModel"
+            if (vehicleBrand.isNotEmpty()) return vehicleBrand
+            return when {
+                vehicleCategory == "motorcycle" -> "Motosiklet"
+                model.contains("Transit") || model.contains("Sprinter") -> "Panelvan"
+                model.contains("Crafter") || model.contains("Master") -> "Kamyonet"
+                else -> "Ticari"
+            }
+        }
+
+    val locationDisplay: String
+        get() {
+            if (address.isNotEmpty()) return address
+            if (city.isNotEmpty()) return city
+            if (lat != 0.0 && lng != 0.0) return String.format("%.4f, %.4f", lat, lng)
+            return "—"
         }
 
     val lastService: String
@@ -335,7 +356,7 @@ data class Vehicle(
 
             return Vehicle(
                 id = imei, plate = plate, model = name, status = status,
-                kontakOn = ignition, totalKm = odometer.toInt(), todayKm = speed.toInt(),
+                kontakOn = ignition, totalKm = odometer.toInt(), todayKm = 0,
                 driver = driverId ?: "", city = "", lat = lat, lng = lon,
                 vehicleCategory = vehicleCategory,
                 imei = imei, companyId = companyId, name = name,
@@ -366,7 +387,7 @@ data class Vehicle(
             kontakOn = patch.ignition, status = patch.status,
             totalKm = if (patch.odometer > 0) patch.odometer.toInt() else totalKm,
             odometer = if (patch.odometer > 0) patch.odometer else odometer,
-            todayKm = patch.speed.toInt(),
+            todayKm = if (patch.todayKm > 0) patch.todayKm else todayKm,
             deviceTime = patch.deviceTime ?: deviceTime,
             ts = if (patch.ts > 0) patch.ts else ts,
             fix = patch.fix, hdop = patch.hdop,
@@ -382,7 +403,16 @@ data class Vehicle(
             lastIgnitionOnAt = patch.lastIgnitionOnAt ?: lastIgnitionOnAt,
             lastIgnitionOffAt = patch.lastIgnitionOffAt ?: lastIgnitionOffAt,
             vehicleCategory = if (patch.vehicleCategory != "car") patch.vehicleCategory else vehicleCategory,
-            deviceId = if (patch.deviceId > 0) patch.deviceId else deviceId
+            deviceId = if (patch.deviceId > 0) patch.deviceId else deviceId,
+            // Preserve API-enriched fields (WS doesn't provide these)
+            groupName = if (patch.groupName.isNotEmpty()) patch.groupName else groupName,
+            vehicleBrand = if (patch.vehicleBrand.isNotEmpty()) patch.vehicleBrand else vehicleBrand,
+            vehicleModel = if (patch.vehicleModel.isNotEmpty()) patch.vehicleModel else vehicleModel,
+            address = if (patch.address.isNotEmpty()) patch.address else address,
+            dailyKm = if (patch.dailyKm > 0) patch.dailyKm else dailyKm,
+            fuelType = if (patch.fuelType.isNotEmpty()) patch.fuelType else fuelType,
+            dailyFuelLiters = if (patch.dailyFuelLiters > 0) patch.dailyFuelLiters else dailyFuelLiters,
+            dailyFuelPer100km = if (patch.dailyFuelPer100km > 0) patch.dailyFuelPer100km else dailyFuelPer100km
         )
     }
 }

@@ -68,6 +68,15 @@ struct Vehicle: Identifiable, Hashable {
     var firstIgnitionOnAtToday: String? = nil
     var lastIgnitionOnAt: String? = nil
     var lastIgnitionOffAt: String? = nil
+    // API-enriched fields (from /api/mobile/vehicles/{id})
+    var groupName: String = ""
+    var vehicleBrand: String = ""
+    var vehicleModel: String = ""
+    var address: String = ""
+    var dailyKm: Double = 0
+    var fuelType: String = ""
+    var dailyFuelLiters: Double = 0
+    var dailyFuelPer100km: Double = 0
 
     var isMotorcycle: Bool { vehicleCategory == "motorcycle" }
 
@@ -86,7 +95,11 @@ struct Vehicle: Identifiable, Hashable {
     }
 
     var formattedTodayKm: String {
-        return "\(todayKm) km"
+        let km = dailyKm > 0 ? Int(dailyKm) : todayKm
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = "."
+        return (formatter.string(from: NSNumber(value: km)) ?? "\(km)") + " km"
     }
 
     var formattedSpeed: String {
@@ -272,7 +285,7 @@ struct Vehicle: Identifiable, Hashable {
             status: status,
             kontakOn: ignition,
             totalKm: Int(odometer),
-            todayKm: Int(speed),
+            todayKm: 0,
             driver: driverId ?? "",
             city: "",
             lat: lat,
@@ -321,7 +334,7 @@ struct Vehicle: Identifiable, Hashable {
         kontakOn = patch.ignition
         status = patch.status
         if patch.odometer > 0 { odometer = patch.odometer; totalKm = Int(patch.odometer) }
-        todayKm = Int(patch.speed) // used as speed display in some contexts
+        if patch.todayKm > 0 { todayKm = patch.todayKm }
         if let dt = patch.deviceTime { deviceTime = dt }
         if patch.ts > 0 { ts = patch.ts }
         fix = patch.fix
@@ -340,6 +353,15 @@ struct Vehicle: Identifiable, Hashable {
         if let li = patch.lastIgnitionOnAt { lastIgnitionOnAt = li }
         if let lo = patch.lastIgnitionOffAt { lastIgnitionOffAt = lo }
         if patch.deviceId > 0 { deviceId = patch.deviceId }
+        // Preserve API-enriched fields (WS doesn't provide these)
+        if !patch.groupName.isEmpty { groupName = patch.groupName }
+        if !patch.vehicleBrand.isEmpty { vehicleBrand = patch.vehicleBrand }
+        if !patch.vehicleModel.isEmpty { vehicleModel = patch.vehicleModel }
+        if !patch.address.isEmpty { address = patch.address }
+        if patch.dailyKm > 0 { dailyKm = patch.dailyKm }
+        if !patch.fuelType.isEmpty { fuelType = patch.fuelType }
+        if patch.dailyFuelLiters > 0 { dailyFuelLiters = patch.dailyFuelLiters }
+        if patch.dailyFuelPer100km > 0 { dailyFuelPer100km = patch.dailyFuelPer100km }
     }
 }
 

@@ -30,10 +30,41 @@ class VehicleDetailObserver: ObservableObject {
                         self.driverPhone = phone
                     }
                 }
+                await MainActor.run {
+                    self.enrichVehicleFromDetail(detail)
+                }
             } catch {
                 print("[VehicleDetail] fetchDriverInfo error: \(error)")
             }
         }
+    }
+
+    func enrichVehicleFromDetail(_ detail: [String: Any]) {
+        let todayKmVal = (detail["todayKm"] as? Double) ?? (detail["todayKm"] as? Int).map { Double($0) } ?? 0
+        let todayDistanceM = (detail["todayDistanceM"] as? Double) ?? (detail["todayDistanceM"] as? Int).map { Double($0) } ?? 0
+        let dailyKmVal = todayKmVal > 0 ? todayKmVal : (todayDistanceM > 0 ? todayDistanceM / 1000.0 : 0)
+        let groupNameVal = detail["groupName"] as? String ?? ""
+        let vehicleBrandVal = detail["vehicleBrand"] as? String ?? ""
+        let vehicleModelVal = detail["vehicleModel"] as? String ?? ""
+        let addressVal = detail["address"] as? String ?? ""
+        let cityVal = detail["city"] as? String ?? ""
+        let fuelTypeVal = detail["fuelType"] as? String ?? ""
+        let dailyFuelLitersVal = (detail["dailyFuelLiters"] as? Double) ?? (detail["dailyFuelLiters"] as? Int).map { Double($0) } ?? 0
+        let dailyFuelPer100kmVal = (detail["dailyFuelPer100km"] as? Double) ?? (detail["dailyFuelPer100km"] as? Int).map { Double($0) } ?? 0
+        let odometerVal = (detail["odometer"] as? Double) ?? (detail["odometer"] as? Int).map { Double($0) } ?? 0
+        let kmVal = (detail["km"] as? Double) ?? (detail["km"] as? Int).map { Double($0) } ?? 0
+
+        if dailyKmVal > 0 { vehicle.todayKm = Int(dailyKmVal); vehicle.dailyKm = dailyKmVal }
+        if !groupNameVal.isEmpty && groupNameVal != "<null>" { vehicle.groupName = groupNameVal }
+        if !vehicleBrandVal.isEmpty && vehicleBrandVal != "<null>" { vehicle.vehicleBrand = vehicleBrandVal }
+        if !vehicleModelVal.isEmpty && vehicleModelVal != "<null>" { vehicle.vehicleModel = vehicleModelVal }
+        if !addressVal.isEmpty && addressVal != "<null>" { vehicle.address = addressVal }
+        if !cityVal.isEmpty && cityVal != "<null>" { vehicle.city = cityVal }
+        if !fuelTypeVal.isEmpty && fuelTypeVal != "<null>" { vehicle.fuelType = fuelTypeVal }
+        if dailyFuelLitersVal > 0 { vehicle.dailyFuelLiters = dailyFuelLitersVal }
+        if dailyFuelPer100kmVal > 0 { vehicle.dailyFuelPer100km = dailyFuelPer100kmVal }
+        if odometerVal > 0 { vehicle.totalKm = Int(odometerVal); vehicle.odometer = odometerVal }
+        else if kmVal > 0 { vehicle.totalKm = Int(kmVal); vehicle.odometer = kmVal }
     }
 
     private var hasFetchedDriverInfo = false
@@ -47,7 +78,8 @@ class VehicleDetailObserver: ObservableObject {
             .sink { [weak self] vehicles in
                 guard let self = self else { return }
                 if let updated = vehicles.first(where: { $0.id == targetId || (!targetImei.isEmpty && $0.imei == targetImei) }) {
-                    self.vehicle = updated
+                    // Merge WS update but preserve API-enriched fields
+                    self.vehicle.mergeUpdate(from: updated)
                     // Use enriched driverName from WS manager if available
                     if !updated.driverName.isEmpty && self.driverName.isEmpty {
                         self.driverName = updated.driverName
@@ -67,7 +99,7 @@ class VehicleDetailObserver: ObservableObject {
                 guard let self = self else { return }
                 if case .update(let updatedVehicle, _) = event,
                    updatedVehicle.id == targetId || (!targetImei.isEmpty && updatedVehicle.imei == targetImei) {
-                    self.vehicle = updatedVehicle
+                    self.vehicle.mergeUpdate(from: updatedVehicle)
                 }
             }
             .store(in: &cancellables)
@@ -270,7 +302,7 @@ struct VehicleDetailView: View {
                     return name.isEmpty ? "—" : (name.components(separatedBy: " ").first ?? "—")
                 }(), label: "Sürücü", color: AppTheme.online)
                 Divider().frame(height: 40)
-                quickStatItem(icon: "mappin.circle.fill", value: vehicle.city, label: "Konum", color: .orange)
+                quickStatItem(icon: "mappin.circle.fill", value: vehicle.locationDisplay, label: "Konum", color: .orange)
             }
             .padding(.vertical, 12)
         }
@@ -380,8 +412,9 @@ struct VehicleDetailView: View {
                     infoCell(icon: "folder.fill", label: "GRUP", value: vehicle.group)
                     infoCell(icon: "speedometer", label: "KİLOMETRE", value: vehicle.formattedTotalKm + " km")
                     infoCell(icon: "gauge.open.with.lines.needle.33percent", label: "HIZ", value: vehicle.formattedSpeed)
-                    infoCell(icon: "mappin.circle.fill", label: "KONUM", value: vehicle.city)
+                    infoCell(icon: "mappin.circle.fill", label: "KONUM", value: vehicle.locationDisplay)
                     infoCell(icon: "car.2.fill", label: "ARAÇ TİPİ", value: vehicle.vehicleType)
+                    infoCell(icon: "road.lanes", label: "BUGÜNKÜ KM", value: vehicle.formattedTodayKm)
                 }
             }
 

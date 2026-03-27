@@ -420,19 +420,24 @@ extension Vehicle {
     }
 
     var group: String {
-        switch city {
-        case "İstanbul": return "İstanbul Filo"
-        case "Ankara": return "Ankara Filo"
-        case "İzmir": return "İzmir Filo"
-        default: return "Diğer"
-        }
+        if !groupName.isEmpty { return groupName }
+        return "—"
     }
 
     var vehicleType: String {
+        if !vehicleBrand.isEmpty && !vehicleModel.isEmpty { return "\(vehicleBrand) \(vehicleModel)" }
+        if !vehicleBrand.isEmpty { return vehicleBrand }
         if vehicleCategory == "motorcycle" { return "Motosiklet" }
         if model.contains("Transit") || model.contains("Sprinter") { return "Panelvan" }
         if model.contains("Crafter") || model.contains("Master") { return "Kamyonet" }
         return "Ticari"
+    }
+
+    var locationDisplay: String {
+        if !address.isEmpty { return address }
+        if !city.isEmpty { return city }
+        if lat != 0 && lng != 0 { return String(format: "%.4f, %.4f", lat, lng) }
+        return "—"
     }
 
     var lastService: String {

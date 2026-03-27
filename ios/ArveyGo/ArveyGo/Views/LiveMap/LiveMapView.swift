@@ -391,7 +391,7 @@ struct LiveMapView: View {
                         return name.isEmpty ? "—" : (name.components(separatedBy: " ").first ?? "—")
                     }(), label: "Sürücü", color: AppTheme.online)
                     Divider().frame(height: 36)
-                    popupStatItem(icon: "mappin.circle.fill", value: vehicle.city, label: "Konum", color: .blue)
+                    popupStatItem(icon: "mappin.circle.fill", value: vehicle.locationDisplay, label: "Konum", color: .blue)
                 }
                 .padding(.vertical, 10)
             }

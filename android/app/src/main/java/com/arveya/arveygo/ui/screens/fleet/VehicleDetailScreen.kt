@@ -60,6 +60,37 @@ fun VehicleDetailScreen(
     var driverPhone by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
+    fun enrichVehicleFromDetail(detail: org.json.JSONObject) {
+        val todayKmVal = detail.optDouble("todayKm", 0.0)
+        val todayDistanceM = detail.optDouble("todayDistanceM", 0.0)
+        val dailyKmVal = if (todayKmVal > 0) todayKmVal else if (todayDistanceM > 0) todayDistanceM / 1000.0 else 0.0
+        val groupNameVal = detail.optString("groupName", "")
+        val vehicleBrandVal = detail.optString("vehicleBrand", "")
+        val vehicleModelVal = detail.optString("vehicleModel", "")
+        val addressVal = detail.optString("address", "")
+        val cityVal = detail.optString("city", "")
+        val fuelTypeVal = detail.optString("fuelType", "")
+        val dailyFuelLitersVal = detail.optDouble("dailyFuelLiters", 0.0)
+        val dailyFuelPer100kmVal = detail.optDouble("dailyFuelPer100km", 0.0)
+        val odometerVal = detail.optDouble("odometer", 0.0)
+        val kmVal = detail.optDouble("km", 0.0)
+
+        currentVehicle = currentVehicle.copy(
+            todayKm = dailyKmVal.toInt(),
+            dailyKm = dailyKmVal,
+            groupName = if (groupNameVal.isNotEmpty() && groupNameVal != "null") groupNameVal else currentVehicle.groupName,
+            vehicleBrand = if (vehicleBrandVal.isNotEmpty() && vehicleBrandVal != "null") vehicleBrandVal else currentVehicle.vehicleBrand,
+            vehicleModel = if (vehicleModelVal.isNotEmpty() && vehicleModelVal != "null") vehicleModelVal else currentVehicle.vehicleModel,
+            address = if (addressVal.isNotEmpty() && addressVal != "null") addressVal else currentVehicle.address,
+            city = if (cityVal.isNotEmpty() && cityVal != "null") cityVal else currentVehicle.city,
+            fuelType = if (fuelTypeVal.isNotEmpty() && fuelTypeVal != "null") fuelTypeVal else currentVehicle.fuelType,
+            dailyFuelLiters = if (dailyFuelLitersVal > 0) dailyFuelLitersVal else currentVehicle.dailyFuelLiters,
+            dailyFuelPer100km = if (dailyFuelPer100kmVal > 0) dailyFuelPer100kmVal else currentVehicle.dailyFuelPer100km,
+            totalKm = if (odometerVal > 0) odometerVal.toInt() else if (kmVal > 0) kmVal.toInt() else currentVehicle.totalKm,
+            odometer = if (odometerVal > 0) odometerVal else if (kmVal > 0) kmVal else currentVehicle.odometer
+        )
+    }
+
     fun refreshDriverInfo() {
         val deviceId = currentVehicle.deviceId
         if (deviceId > 0) {
@@ -71,27 +102,31 @@ fun VehicleDetailScreen(
                         driverName = driverObj.optString("name", "")
                         driverPhone = driverObj.optString("phone", "")
                     }
+                    enrichVehicleFromDetail(detail)
                 } catch (_: Exception) {}
             }
         }
     }
 
-    // Fetch driver info from API when deviceId becomes available
+    // Fetch driver info and enrich vehicle from API when deviceId becomes available
     LaunchedEffect(currentVehicle.deviceId) {
         // Use enriched driverName from WS manager if available
         if (currentVehicle.driverName.isNotEmpty() && driverName.isEmpty()) {
             driverName = currentVehicle.driverName
         }
-        if (currentVehicle.deviceId > 0 && driverName.isEmpty()) {
+        if (currentVehicle.deviceId > 0) {
             try {
                 val detail = APIService.fetchVehicleDetail(currentVehicle.deviceId)
-                val driverObj = detail.optJSONObject("driver")
-                if (driverObj != null) {
-                    driverName = driverObj.optString("name", "")
-                    driverPhone = driverObj.optString("phone", "")
+                if (driverName.isEmpty()) {
+                    val driverObj = detail.optJSONObject("driver")
+                    if (driverObj != null) {
+                        driverName = driverObj.optString("name", "")
+                        driverPhone = driverObj.optString("phone", "")
+                    }
                 }
+                enrichVehicleFromDetail(detail)
             } catch (e: Exception) {
-                android.util.Log.e("VehicleDetail", "fetchDriverInfo error", e)
+                android.util.Log.e("VehicleDetail", "fetchVehicleDetail error", e)
             }
         }
     }
@@ -113,7 +148,10 @@ fun VehicleDetailScreen(
     LaunchedEffect(vehicle.id, vehicle.imei) {
         WebSocketManager.vehicleList.collect { vehicles ->
             val updated = vehicles.firstOrNull { it.id == vehicle.id || (it.imei.isNotEmpty() && it.imei == vehicle.imei) }
-            if (updated != null) { currentVehicle = updated }
+            if (updated != null) {
+                // Merge WS update but preserve API-enriched fields
+                currentVehicle = currentVehicle.mergeUpdate(updated)
+            }
         }
     }
     LaunchedEffect(vehicle.id, vehicle.imei) {
@@ -121,7 +159,7 @@ fun VehicleDetailScreen(
             if (event is WSEvent.Update) {
                 val u = event.vehicle
                 if (u.id == vehicle.id || (u.imei.isNotEmpty() && u.imei == vehicle.imei)) {
-                    currentVehicle = u
+                    currentVehicle = currentVehicle.mergeUpdate(u)
                 }
             }
         }
@@ -352,7 +390,7 @@ private fun VehicleIdentityCard(vehicle: Vehicle) {
                 if (name.isEmpty()) "—" else name.split(" ").firstOrNull() ?: "—"
             }, Icons.Default.Person, AppColors.Online, Modifier.weight(1f))
             Box(Modifier.width(1.dp).height(40.dp).background(AppColors.BorderSoft))
-            QuickStatItem("Konum", vehicle.city, Icons.Default.LocationOn, Color(0xFFFF9800), Modifier.weight(1f))
+            QuickStatItem("Konum", vehicle.locationDisplay, Icons.Default.LocationOn, Color(0xFFFF9800), Modifier.weight(1f))
         }
     }
 }
@@ -434,8 +472,9 @@ private fun OverviewTab(
         Triple(Icons.Default.Folder, "GRUP", vehicle.group),
         Triple(Icons.Default.Speed, "KİLOMETRE", vehicle.formattedTotalKm + " km"),
         Triple(Icons.Default.Speed, "HIZ", vehicle.formattedSpeed),
-        Triple(Icons.Default.LocationOn, "KONUM", vehicle.city),
+        Triple(Icons.Default.LocationOn, "KONUM", vehicle.locationDisplay),
         Triple(Icons.Default.DirectionsCar, "ARAÇ TİPİ", vehicle.vehicleType),
+        Triple(Icons.Default.Route, "BUGÜNKÜ KM", vehicle.formattedTodayKm),
     )
 
     // Device Time card (matching vehicles list style)
@@ -717,7 +756,7 @@ private fun openMapsDirections(context: Context, lat: Double, lng: Double, label
 
 private fun shareVehicleLocation(context: Context, vehicle: Vehicle) {
     val mapsUrl = "https://www.google.com/maps?q=${vehicle.lat},${vehicle.lng}"
-    val shareText = "${vehicle.plate} konumu:\n${vehicle.city}\n\n$mapsUrl"
+    val shareText = "${vehicle.plate} konumu:\n${vehicle.locationDisplay}\n\n$mapsUrl"
     val sendIntent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
         putExtra(Intent.EXTRA_TEXT, shareText)
