@@ -749,7 +749,7 @@ private fun VehiclePopupCard(
     onNavigateToAlarms: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
     ModalBottomSheet(
         onDismissRequest = onClose,

@@ -327,34 +327,35 @@ struct LiveMapView: View {
 
     // MARK: - Vehicle Popup Sheet (clean flat-row design)
     func vehiclePopupSheet(_ vehicle: Vehicle) -> some View {
-        VStack(spacing: 0) {
-            // ── Header: Plate + Status + Model ──
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(vehicle.status.color.opacity(0.1))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: vehicle.isMotorcycle ? "bicycle" : "car.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(vehicle.status.color)
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 8) {
-                        Text(vehicle.plate)
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(AppTheme.navy)
-                        StatusBadge(status: vehicle.status)
+        ScrollView {
+            VStack(spacing: 0) {
+                // ── Header: Plate + Status + Model ──
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(vehicle.status.color.opacity(0.1))
+                            .frame(width: 44, height: 44)
+                        Image(systemName: vehicle.isMotorcycle ? "bicycle" : "car.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(vehicle.status.color)
                     }
-                    Text(vehicle.model)
-                        .font(.system(size: 12))
-                        .foregroundColor(AppTheme.textMuted)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 8) {
+                            Text(vehicle.plate)
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(AppTheme.navy)
+                            StatusBadge(status: vehicle.status)
+                        }
+                        Text(vehicle.model)
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.textMuted)
+                    }
+                    Spacer()
                 }
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 16)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
 
             // ── Info Rows ──
             VStack(spacing: 0) {
@@ -468,7 +469,9 @@ struct LiveMapView: View {
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 20)
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     func popupRow(icon: String, label: String, value: String, valueColor: Color? = nil) -> some View {
