@@ -1,4 +1,5 @@
 import SwiftUI
+import MapKit
 
 // MARK: - Alarm Model
 struct AlarmEvent: Identifiable, Hashable {
@@ -974,6 +975,48 @@ struct AlarmsView: View {
                         detailRow(icon: "calendar", title: "Tarih", value: alarm.createdAt)
                     }
                     .padding(.top, 8)
+
+                    // Harita - Alarm konumu
+                    if alarm.lat != 0 && alarm.lng != 0 {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "map.fill")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(AppTheme.indigo)
+                                Text("Alarm Konumu")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(AppTheme.textPrimary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+
+                            Map(initialPosition: .camera(MapCamera(
+                                centerCoordinate: CLLocationCoordinate2D(latitude: alarm.lat, longitude: alarm.lng),
+                                distance: 2000,
+                                heading: 0,
+                                pitch: 0
+                            ))) {
+                                Annotation(alarm.typeLabel, coordinate: CLLocationCoordinate2D(latitude: alarm.lat, longitude: alarm.lng)) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(alarm.color)
+                                            .frame(width: 36, height: 36)
+                                        Circle()
+                                            .stroke(Color.white, lineWidth: 2.5)
+                                            .frame(width: 36, height: 36)
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .font(.system(size: 16, weight: .bold))
+                                            .foregroundColor(.white)
+                                    }
+                                }
+                            }
+                            .mapStyle(.standard(elevation: .flat))
+                            .frame(height: 200)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .padding(.horizontal, 16)
+                        }
+                        .padding(.bottom, 8)
+                    }
                 }
             }
             .background(AppTheme.bg)

@@ -21,14 +21,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.arveya.arveygo.LocalAuthViewModel
 import com.arveya.arveygo.services.APIService
 import com.arveya.arveygo.ui.components.AvatarCircle
 import com.arveya.arveygo.ui.theme.AppColors
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 
 // MARK: - AlarmEvent Model
 data class AlarmEvent(
@@ -965,6 +972,88 @@ private fun AlarmDetailSheet(alarm: AlarmEvent, onDismiss: () -> Unit) {
             DetailRow(icon = Icons.Default.LocationOn, title = "Konum", value = String.format("%.4f, %.4f", alarm.lat, alarm.lng))
             HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.CalendarMonth, title = "Tarih", value = alarm.createdAt)
+
+            // Map - Alarm konumu
+            if (alarm.lat != 0.0 && alarm.lng != 0.0) {
+                Spacer(Modifier.height(12.dp))
+
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Map, null, tint = AppColors.Indigo, modifier = Modifier.size(16.dp))
+                        Text("Alarm Konumu", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                    }
+
+                    val context = LocalContext.current
+                    Configuration.getInstance().userAgentValue = context.packageName
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    ) {
+                        AndroidView(
+                            factory = { ctx ->
+                                MapView(ctx).apply {
+                                    setTileSource(TileSourceFactory.MAPNIK)
+                                    setMultiTouchControls(true)
+                                    controller.setZoom(15.0)
+                                    controller.setCenter(GeoPoint(alarm.lat, alarm.lng))
+                                    zoomController.setVisibility(
+                                        org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER
+                                    )
+
+                                    // Alarm marker
+                                    val marker = Marker(this)
+                                    marker.position = GeoPoint(alarm.lat, alarm.lng)
+                                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                    marker.title = alarm.typeLabel
+                                    marker.snippet = alarm.plate
+                                    marker.infoWindow = null
+
+                                    // Alarm renk ikonu
+                                    val alarmColor = when {
+                                        alarm.type.contains("overspeed", true) || alarm.type.contains("sos", true) -> android.graphics.Color.rgb(239, 68, 68)
+                                        alarm.type.contains("brake", true) || alarm.type.contains("disconnect", true) -> android.graphics.Color.rgb(249, 115, 22)
+                                        alarm.type.contains("idle", true) -> android.graphics.Color.rgb(245, 158, 11)
+                                        alarm.type.contains("geofence", true) -> android.graphics.Color.rgb(34, 197, 94)
+                                        else -> android.graphics.Color.rgb(99, 102, 241)
+                                    }
+
+                                    val density = ctx.resources.displayMetrics.density
+                                    val pinSize = (40 * density).toInt()
+                                    val bitmap = android.graphics.Bitmap.createBitmap(pinSize, pinSize, android.graphics.Bitmap.Config.ARGB_8888)
+                                    val canvas = android.graphics.Canvas(bitmap)
+                                    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = alarmColor }
+                                    val borderPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                                        color = android.graphics.Color.WHITE
+                                        style = android.graphics.Paint.Style.STROKE
+                                        strokeWidth = 3f * density
+                                    }
+                                    canvas.drawCircle(pinSize / 2f, pinSize / 2f, pinSize / 2f - 2f * density, paint)
+                                    canvas.drawCircle(pinSize / 2f, pinSize / 2f, pinSize / 2f - 2f * density, borderPaint)
+                                    // Alarm icon
+                                    val iconPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                                        color = android.graphics.Color.WHITE
+                                        textSize = 18f * density
+                                        textAlign = android.graphics.Paint.Align.CENTER
+                                    }
+                                    canvas.drawText("⚠", pinSize / 2f, pinSize / 2f + 7f * density, iconPaint)
+                                    marker.icon = android.graphics.drawable.BitmapDrawable(ctx.resources, bitmap)
+                                    overlays.add(marker)
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+            }
         }
     }
 }
