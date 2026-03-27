@@ -493,15 +493,6 @@ private fun OverviewTab(
     driverName: String = "",
     onDriverAssigned: (() -> Unit)? = null
 ) {
-    val infoItems = listOf(
-        Triple(Icons.Default.Folder, "GRUP", vehicle.group),
-        Triple(Icons.Default.DirectionsCar, "ARAÇ TİPİ", vehicle.vehicleType),
-        Triple(Icons.Default.Speed, "KİLOMETRE", vehicle.formattedTotalKm + " km"),
-        Triple(Icons.Default.Route, "BUGÜNKÜ KM", vehicle.formattedTodayKm),
-        Triple(Icons.Default.Speed, "HIZ", vehicle.formattedSpeed),
-        Triple(Icons.Default.LocationOn, "KONUM", vehicle.locationDisplay),
-    )
-
     fun formatVoltage(value: Double?): String {
         if (value == null) return "—"
         return String.format("%.2f V", value)
@@ -514,152 +505,131 @@ private fun OverviewTab(
 
     val vehicleBatteryDisplay = vehicle.batteryVoltage ?: vehicle.externalVoltage
 
-    // Device Time card (matching vehicles list style)
-    if (vehicle.deviceTime != null) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AppColors.Surface, RoundedCornerShape(12.dp))
-                .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
-            Icon(Icons.Default.Schedule, null, tint = AppColors.Indigo, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Son Bilgi Tarihi", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-            Spacer(Modifier.weight(1f))
-            Text(
-                "⏱ ${vehicle.formattedDeviceTime}",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = AppColors.TextMuted,
-                modifier = Modifier
-                    .background(AppColors.Bg, RoundedCornerShape(8.dp))
-                    .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-            )
-        }
-    }
-
-    SectionCard(title = "ARAÇ BİLGİLERİ", icon = Icons.Default.DirectionsCar) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (i in infoItems.indices step 2) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    InfoCell(infoItems[i].first, infoItems[i].second, infoItems[i].third, Modifier.weight(1f))
-                    if (i + 1 < infoItems.size) {
-                        InfoCell(infoItems[i + 1].first, infoItems[i + 1].second, infoItems[i + 1].third, Modifier.weight(1f))
-                    } else {
-                        Spacer(Modifier.weight(1f))
-                    }
+    // ── Quick Actions Row (top, prominent) ──
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AppColors.Surface, RoundedCornerShape(14.dp))
+            .padding(14.dp)
+    ) {
+        data class QuickAction(val icon: ImageVector, val label: String, val color: Color, val onClick: () -> Unit)
+        val actions = listOf(
+            QuickAction(Icons.Default.Navigation, "Yol Tarifi", Color(0xFF3B82F6)) {
+                openMapsDirections(context, vehicle.lat, vehicle.lng, vehicle.plate)
+            },
+            QuickAction(Icons.Default.History, "Rota Geçmişi", AppColors.Indigo) {
+                onBack()
+                onNavigateToRouteHistory?.invoke(vehicle)
+            },
+            QuickAction(Icons.Default.NotificationsActive, "Alarmlar", Color(0xFFFF9800)) {
+                onBack()
+                onNavigateToAlarms?.invoke()
+            },
+            QuickAction(Icons.Default.Share, "Paylaş", AppColors.TextMuted) {
+                shareVehicleLocation(context, vehicle)
+            },
+        )
+        actions.forEach { action ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f).clickable { action.onClick() }
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(42.dp)
+                        .background(action.color.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                ) {
+                    Icon(action.icon, null, tint = action.color, modifier = Modifier.size(18.dp))
                 }
+                Spacer(Modifier.height(6.dp))
+                Text(action.label, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted, textAlign = TextAlign.Center, maxLines = 1)
             }
         }
     }
 
-    // Ignition / Kontak Details
-    SectionCard(title = "KONTAK BİLGİLERİ", icon = Icons.Default.VpnKey) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                InfoCell(
-                    Icons.Default.VpnKey,
-                    "KONTAK DURUMU",
-                    vehicle.kontakLabel,
-                    Modifier.weight(1f),
-                    valueColor = if (vehicle.kontakOn) AppColors.Online else AppColors.Offline
-                )
-                InfoCell(Icons.Default.WbSunny, "İLK KONTAK (BUGÜN)", vehicle.formattedFirstIgnitionToday, Modifier.weight(1f))
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                InfoCell(Icons.Default.VpnKey, "SON KONTAK AÇMA", vehicle.formattedLastIgnitionOn, Modifier.weight(1f))
-                InfoCell(Icons.Default.VpnKey, "SON KONTAK KAPAMA", vehicle.formattedLastIgnitionOff, Modifier.weight(1f))
-            }
+    // ── Vehicle Info ──
+    CleanListCard {
+        DetailRow(Icons.Default.Speed, "Hız", vehicle.formattedSpeed)
+        ListDivider()
+        DetailRow(Icons.Default.LocationOn, "Konum", vehicle.locationDisplay)
+        if (vehicle.deviceTime != null) {
+            ListDivider()
+            DetailRow(Icons.Default.Schedule, "Son Güncelleme", vehicle.formattedDeviceTime)
         }
     }
 
-    SectionCard(title = "GÜÇ DURUMU", icon = Icons.Default.BatteryChargingFull) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                InfoCell(
-                    Icons.Default.BatteryChargingFull,
-                    "ARAÇ AKÜSÜ",
-                    formatVoltage(vehicleBatteryDisplay),
-                    Modifier.weight(1f)
-                )
-                InfoCell(
-                    Icons.Default.PhoneAndroid,
-                    "CİHAZ BATARYASI",
-                    formatDeviceBattery(vehicle.deviceBattery),
-                    Modifier.weight(1f)
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                InfoCell(
-                    Icons.Default.Bolt,
-                    "HARİCİ VOLTAJ",
-                    formatVoltage(vehicle.externalVoltage),
-                    Modifier.weight(1f)
-                )
-                InfoCell(
-                    Icons.Default.Schedule,
-                    "SON GÜNCELLEME",
-                    vehicle.formattedDeviceTime,
-                    Modifier.weight(1f)
-                )
-            }
+    // ── Kontak & Güç ──
+    CleanListCard {
+        DetailRow(
+            Icons.Default.VpnKey, "Kontak",
+            vehicle.kontakLabel,
+            valueColor = if (vehicle.kontakOn) AppColors.Online else AppColors.Offline
+        )
+        ListDivider()
+        DetailRow(Icons.Default.WbSunny, "İlk Kontak (Bugün)", vehicle.formattedFirstIgnitionToday)
+        ListDivider()
+        DetailRow(Icons.Default.VpnKey, "Son Kontak Açma", vehicle.formattedLastIgnitionOn)
+        ListDivider()
+        DetailRow(Icons.Default.VpnKey, "Son Kontak Kapama", vehicle.formattedLastIgnitionOff)
+        ListDivider()
+        DetailRow(Icons.Default.BatteryChargingFull, "Araç Aküsü", formatVoltage(vehicleBatteryDisplay))
+        if (vehicle.deviceBattery != null) {
+            ListDivider()
+            DetailRow(Icons.Default.PhoneAndroid, "Cihaz Bataryası", formatDeviceBattery(vehicle.deviceBattery))
+        }
+        if (vehicle.externalVoltage != null) {
+            ListDivider()
+            DetailRow(Icons.Default.Bolt, "Harici Voltaj", formatVoltage(vehicle.externalVoltage))
         }
     }
 
-    // Temperature & Sensor section
+    // ── Temperature & Sensors (conditional) ──
     if (vehicle.temperatureC != null || vehicle.humidityPct != null) {
-        SectionCard(title = "SICAKLIK & SENSÖR", icon = Icons.Default.Thermostat) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    InfoCell(
-                        Icons.Default.Thermostat,
-                        "SICAKLIK",
-                        vehicle.temperatureC?.let { String.format("%.1f°C", it) } ?: "—",
-                        Modifier.weight(1f)
-                    )
-                    InfoCell(
-                        Icons.Default.WaterDrop,
-                        "NEM",
-                        vehicle.humidityPct?.let { "%${it.toInt()}" } ?: "—",
-                        Modifier.weight(1f)
-                    )
-                }
+        CleanListCard {
+            vehicle.temperatureC?.let { temp ->
+                DetailRow(Icons.Default.Thermostat, "Sıcaklık", String.format("%.1f°C", temp))
+            }
+            if (vehicle.temperatureC != null && vehicle.humidityPct != null) { ListDivider() }
+            vehicle.humidityPct?.let { hum ->
+                DetailRow(Icons.Default.WaterDrop, "Nem", "%${hum.toInt()}")
             }
         }
     }
 
+    // ── Driver ──
     var showDriverAssign by remember { mutableStateOf(false) }
     val displayName = if (driverName.isNotEmpty()) driverName else if (vehicle.driverName.isNotEmpty()) vehicle.driverName else ""
 
-    SectionCard(title = "SÜRÜCÜ BİLGİLERİ", icon = Icons.Default.Person) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().background(AppColors.Bg, RoundedCornerShape(10.dp)).padding(14.dp)
-        ) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AppColors.Surface, RoundedCornerShape(14.dp))
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(50.dp).clip(CircleShape).background(AppColors.Indigo.copy(alpha = 0.1f))
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(AppColors.Indigo.copy(alpha = 0.08f))
             ) {
                 Text(
                     if (displayName.isEmpty()) "?" else displayName.take(1),
-                    fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Indigo
+                    fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AppColors.Indigo
                 )
             }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     if (displayName.isEmpty()) "Sürücü Atanmamış" else displayName,
-                    fontSize = 15.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy
+                    fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy
                 )
-                Text("Atanmış Sürücü", fontSize = 11.sp, color = AppColors.TextMuted)
+                Text("Sürücü", fontSize = 11.sp, color = AppColors.TextMuted)
             }
             TextButton(onClick = { showDriverAssign = true }) {
-                Icon(Icons.Default.Edit, null, modifier = Modifier.size(14.dp), tint = AppColors.Indigo)
+                Icon(Icons.Default.Edit, null, modifier = Modifier.size(13.dp), tint = AppColors.Indigo)
                 Spacer(Modifier.width(4.dp))
-                Text("Değiştir", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.Indigo)
+                Text("Değiştir", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AppColors.Indigo)
             }
         }
     }
@@ -672,30 +642,64 @@ private fun OverviewTab(
             onAssigned = { showDriverAssign = false; onDriverAssigned?.invoke() }
         )
     }
+}
 
-    SectionCard(title = "HIZLI İŞLEMLER", icon = Icons.Default.FlashOn) {
-        data class QuickAction(val icon: ImageVector, val label: String, val color: Color, val onClick: () -> Unit)
-        val actions = listOf(
-            QuickAction(Icons.Default.LocationOn, "Konuma\nGit", Color.Blue) {
-                openMapsDirections(context, vehicle.lat, vehicle.lng, vehicle.plate)
-            },
-            QuickAction(Icons.Default.History, "Rota\nGeçmişi", AppColors.Indigo) {
-                onBack()
-                onNavigateToRouteHistory?.invoke(vehicle)
-            },
-            QuickAction(Icons.Default.Notifications, "Alarm\nKur", Color(0xFFFF9800)) {
-                onBack()
-                onNavigateToAlarms?.invoke()
-            },
-            QuickAction(Icons.Default.Share, "Paylaş", AppColors.TextMuted) {
-                shareVehicleLocation(context, vehicle)
-            },
+// ── Clean List Card (no section header, just grouped rows) ──
+@Composable
+private fun CleanListCard(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AppColors.Surface, RoundedCornerShape(14.dp))
+            .padding(vertical = 4.dp),
+        content = content
+    )
+}
+
+@Composable
+private fun ListDivider() {
+    HorizontalDivider(
+        color = AppColors.BorderSoft,
+        modifier = Modifier.padding(start = 52.dp, end = 16.dp)
+    )
+}
+
+@Composable
+private fun DetailRow(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    valueColor: Color? = null
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Icon(
+            icon, null,
+            tint = AppColors.Indigo.copy(alpha = 0.7f),
+            modifier = Modifier.size(16.dp)
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            actions.forEach { action ->
-                ActionButton(action.icon, action.label, action.color, Modifier.weight(1f), action.onClick)
-            }
-        }
+        Spacer(Modifier.width(14.dp))
+        Text(
+            label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Normal,
+            color = AppColors.TextMuted,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            value,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = valueColor ?: AppColors.Navy,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End,
+            modifier = Modifier.widthIn(max = 180.dp)
+        )
     }
 }
 

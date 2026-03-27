@@ -395,144 +395,119 @@ struct VehicleDetailView: View {
     // MARK: - Overview Tab
     var overviewTab: some View {
         VStack(spacing: 16) {
-            // Device Time (matching vehicles list style)
-            if vehicle.deviceTime != nil {
-                HStack(spacing: 8) {
-                    Image(systemName: "clock.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(AppTheme.indigo)
-                    Text("Son Bilgi Tarihi")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(AppTheme.navy)
-                    Spacer()
-                    Text("⏱ \(vehicle.formattedDeviceTime)")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(AppTheme.textMuted)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(AppTheme.bg)
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(AppTheme.borderSoft, lineWidth: 1)
-                        )
+            // ── Quick Actions Row (top, prominent) ──
+            HStack(spacing: 10) {
+                quickActionButton(icon: "location.fill", label: "Yol Tarifi", color: Color(hex: "#3B82F6")) {
+                    openMapsDirections(lat: vehicle.lat, lng: vehicle.lng, label: vehicle.plate)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(AppTheme.surface)
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(AppTheme.borderSoft, lineWidth: 1)
+                quickActionButton(icon: "clock.arrow.circlepath", label: "Rota Geçmişi", color: AppTheme.indigo) {
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        onNavigateToRouteHistory?(vehicle)
+                    }
+                }
+                quickActionButton(icon: "bell.fill", label: "Alarmlar", color: .orange) {
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        onNavigateToAlarms?()
+                    }
+                }
+                quickActionButton(icon: "square.and.arrow.up", label: "Paylaş", color: AppTheme.textMuted) {
+                    shareVehicleLocation(vehicle: vehicle)
+                }
+            }
+            .padding(14)
+            .background(AppTheme.surface)
+            .cornerRadius(14)
+
+            // ── Vehicle Info ──
+            cleanListCard {
+                detailRow(icon: "gauge.open.with.lines.needle.33percent", label: "Hız", value: vehicle.formattedSpeed)
+                listDivider
+                detailRow(icon: "mappin.circle.fill", label: "Konum", value: vehicle.locationDisplay)
+                if vehicle.deviceTime != nil {
+                    listDivider
+                    detailRow(icon: "clock.fill", label: "Son Güncelleme", value: vehicle.formattedDeviceTime)
+                }
+            }
+
+            // ── Kontak & Güç ──
+            cleanListCard {
+                detailRow(
+                    icon: vehicle.kontakOn ? "key.fill" : "key",
+                    label: "Kontak",
+                    value: vehicle.kontakLabel,
+                    valueColor: vehicle.kontakOn ? AppTheme.online : AppTheme.offline
                 )
-            }
-
-            sectionCard(title: "ARAÇ BİLGİLERİ", icon: "car.fill") {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    infoCell(icon: "folder.fill", label: "GRUP", value: vehicle.group)
-                    infoCell(icon: "car.2.fill", label: "ARAÇ TİPİ", value: vehicle.vehicleType)
-                    infoCell(icon: "speedometer", label: "KİLOMETRE", value: vehicle.formattedTotalKm + " km")
-                    infoCell(icon: "road.lanes", label: "BUGÜNKÜ KM", value: vehicle.formattedTodayKm)
-                    infoCell(icon: "gauge.open.with.lines.needle.33percent", label: "HIZ", value: vehicle.formattedSpeed)
-                    infoCell(icon: "mappin.circle.fill", label: "KONUM", value: vehicle.locationDisplay)
+                listDivider
+                detailRow(icon: "sunrise.fill", label: "İlk Kontak (Bugün)", value: vehicle.formattedFirstIgnitionToday)
+                listDivider
+                detailRow(icon: "key.fill", label: "Son Kontak Açma", value: vehicle.formattedLastIgnitionOn)
+                listDivider
+                detailRow(icon: "key", label: "Son Kontak Kapama", value: vehicle.formattedLastIgnitionOff)
+                listDivider
+                detailRow(icon: "battery.100", label: "Araç Aküsü", value: formatVoltage(vehicle.batteryVoltage ?? vehicle.externalVoltage))
+                if vehicle.deviceBattery != nil {
+                    listDivider
+                    detailRow(icon: "iphone", label: "Cihaz Bataryası", value: formatDeviceBattery(vehicle.deviceBattery))
+                }
+                if vehicle.externalVoltage != nil {
+                    listDivider
+                    detailRow(icon: "bolt.fill", label: "Harici Voltaj", value: formatVoltage(vehicle.externalVoltage))
                 }
             }
 
-            // Kontak / Ignition Details
-            sectionCard(title: "KONTAK BİLGİLERİ", icon: "key.fill") {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    infoCell(
-                        icon: vehicle.kontakOn ? "key.fill" : "key",
-                        label: "KONTAK DURUMU",
-                        value: vehicle.kontakLabel,
-                        valueColor: vehicle.kontakOn ? AppTheme.online : AppTheme.offline
-                    )
-                    infoCell(icon: "sunrise.fill", label: "İLK KONTAK (BUGÜN)", value: vehicle.formattedFirstIgnitionToday)
-                    infoCell(icon: "key.fill", label: "SON KONTAK AÇMA", value: vehicle.formattedLastIgnitionOn)
-                    infoCell(icon: "key", label: "SON KONTAK KAPAMA", value: vehicle.formattedLastIgnitionOff)
-                }
-            }
-
-            sectionCard(title: "GÜÇ DURUMU", icon: "battery.100") {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    infoCell(
-                        icon: "battery.100",
-                        label: "ARAÇ AKÜSÜ",
-                        value: formatVoltage(vehicle.batteryVoltage ?? vehicle.externalVoltage)
-                    )
-                    infoCell(
-                        icon: "battery.75",
-                        label: "CİHAZ BATARYASI",
-                        value: formatDeviceBattery(vehicle.deviceBattery)
-                    )
-                    infoCell(
-                        icon: "bolt.horizontal.circle.fill",
-                        label: "HARİCİ VOLTAJ",
-                        value: formatVoltage(vehicle.externalVoltage)
-                    )
-                    infoCell(
-                        icon: "clock.fill",
-                        label: "SON GÜNCELLEME",
-                        value: vehicle.formattedDeviceTime
-                    )
-                }
-            }
-
-            // Sıcaklık & Sensör Bilgileri
+            // ── Temperature & Sensors (conditional) ──
             if vehicle.temperatureC != nil || vehicle.humidityPct != nil {
-                sectionCard(title: "SICAKLIK & SENSÖR", icon: "thermometer.medium") {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                        if let temp = vehicle.temperatureC {
-                            infoCell(icon: "thermometer.medium", label: "SICAKLIK", value: String(format: "%.1f°C", temp))
-                        }
-                        if let hum = vehicle.humidityPct {
-                            infoCell(icon: "humidity.fill", label: "NEM", value: "%\(Int(hum))")
-                        }
+                cleanListCard {
+                    if let temp = vehicle.temperatureC {
+                        detailRow(icon: "thermometer.medium", label: "Sıcaklık", value: String(format: "%.1f°C", temp))
+                    }
+                    if vehicle.temperatureC != nil && vehicle.humidityPct != nil {
+                        listDivider
+                    }
+                    if let hum = vehicle.humidityPct {
+                        detailRow(icon: "humidity.fill", label: "Nem", value: "%\(Int(hum))")
                     }
                 }
             }
 
-            sectionCard(title: "SÜRÜCÜ BİLGİLERİ", icon: "person.fill") {
-                let displayName = !observer.driverName.isEmpty ? observer.driverName : (!vehicle.driverName.isEmpty ? vehicle.driverName : "")
-                HStack(spacing: 14) {
-                    ZStack {
-                        Circle()
-                            .fill(AppTheme.indigo.opacity(0.1))
-                            .frame(width: 50, height: 50)
-                        Text(String(displayName.prefix(1)))
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(AppTheme.indigo)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(displayName.isEmpty ? "Sürücü Atanmamış" : displayName)
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundColor(AppTheme.navy)
-                        Text("Atanmış Sürücü")
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.textMuted)
-                    }
-
-                    Spacer()
-
-                    Button(action: { showDriverAssign = true }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "pencil")
-                                .font(.system(size: 11))
-                            Text("Değiştir")
-                                .font(.system(size: 11, weight: .semibold))
-                        }
+            // ── Driver ──
+            let displayName = !observer.driverName.isEmpty ? observer.driverName : (!vehicle.driverName.isEmpty ? vehicle.driverName : "")
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(AppTheme.indigo.opacity(0.08))
+                        .frame(width: 40, height: 40)
+                    Text(displayName.isEmpty ? "?" : String(displayName.prefix(1)))
+                        .font(.system(size: 17, weight: .bold))
                         .foregroundColor(AppTheme.indigo)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(AppTheme.indigo.opacity(0.1))
-                        .cornerRadius(8)
-                    }
                 }
-                .padding(14)
-                .background(AppTheme.bg)
-                .cornerRadius(10)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(displayName.isEmpty ? "Sürücü Atanmamış" : displayName)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppTheme.navy)
+                    Text("Sürücü")
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.textMuted)
+                }
+
+                Spacer()
+
+                Button(action: { showDriverAssign = true }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 11))
+                        Text("Değiştir")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundColor(AppTheme.indigo)
+                }
             }
+            .padding(16)
+            .background(AppTheme.surface)
+            .cornerRadius(14)
             .sheet(isPresented: $showDriverAssign) {
                 VehicleDriverAssignSheet(
                     vehicleId: vehicle.deviceId,
@@ -542,29 +517,60 @@ struct VehicleDetailView: View {
                     }
                 )
             }
+        }
+    }
 
-            sectionCard(title: "HIZLI İŞLEMLER", icon: "bolt.fill") {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    actionButton(icon: "location.fill", label: "Konuma\nGit", color: .blue) {
-                        openMapsDirections(lat: vehicle.lat, lng: vehicle.lng, label: vehicle.plate)
-                    }
-                    actionButton(icon: "clock.arrow.circlepath", label: "Rota\nGeçmişi", color: AppTheme.indigo) {
-                        dismiss()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                            onNavigateToRouteHistory?(vehicle)
-                        }
-                    }
-                    actionButton(icon: "bell.fill", label: "Alarm\nKur", color: .orange) {
-                        dismiss()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                            onNavigateToAlarms?()
-                        }
-                    }
-                    actionButton(icon: "square.and.arrow.up", label: "Paylaş", color: AppTheme.textMuted) {
-                        shareVehicleLocation(vehicle: vehicle)
-                    }
-                }
+    // ── Clean List Card ──
+    func cleanListCard(@ViewBuilder content: () -> some View) -> some View {
+        VStack(spacing: 0) {
+            content()
+        }
+        .background(AppTheme.surface)
+        .cornerRadius(14)
+    }
+
+    var listDivider: some View {
+        Divider()
+            .padding(.leading, 48)
+            .padding(.trailing, 16)
+    }
+
+    func detailRow(icon: String, label: String, value: String, valueColor: Color? = nil) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundColor(AppTheme.indigo.opacity(0.7))
+                .frame(width: 18)
+            Text(label)
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textMuted)
+            Spacer()
+            Text(value)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(valueColor ?? AppTheme.navy)
+                .lineLimit(1)
+                .frame(maxWidth: 180, alignment: .trailing)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    func quickActionButton(icon: String, label: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 18))
+                    .foregroundColor(color)
+                    .frame(width: 42, height: 42)
+                    .background(color.opacity(0.1))
+                    .cornerRadius(12)
+                Text(label)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(AppTheme.textMuted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
+            .frame(maxWidth: .infinity)
         }
     }
 
