@@ -34,6 +34,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.arveya.arveygo.LocalAuthViewModel
 import com.arveya.arveygo.models.Vehicle
 import com.arveya.arveygo.models.VehicleStatus
+import com.arveya.arveygo.services.APIService
 import com.arveya.arveygo.services.WSConnectionStatus
 import com.arveya.arveygo.ui.components.AvatarCircle
 import com.arveya.arveygo.ui.components.StatusBadge
@@ -607,20 +608,58 @@ fun LiveMapScreen(
                 selectedVehicle?.let { sel ->
                     // Look up latest vehicle data for real-time updates
                     val liveVehicle = vehicles.firstOrNull { it.id == sel.id } ?: sel
+
+                    // Enrich from API if missing key fields (offline vehicle or first open)
+                    var enrichedVehicle by remember(sel.id) { mutableStateOf(liveVehicle) }
+                    // Always sync live WS data
+                    LaunchedEffect(liveVehicle) { enrichedVehicle = enrichedVehicle.mergeUpdate(liveVehicle) }
+                    // Fetch API enrichment once per selection
+                    LaunchedEffect(sel.id) {
+                        if (liveVehicle.deviceId > 0 && (liveVehicle.groupName.isEmpty() || liveVehicle.address.isEmpty())) {
+                            try {
+                                val detail = APIService.fetchVehicleDetail(liveVehicle.deviceId)
+                                val todayKmVal = detail.optDouble("todayKm", 0.0)
+                                val todayDistanceM = detail.optDouble("todayDistanceM", 0.0)
+                                val dailyKmVal = if (todayKmVal > 0) todayKmVal else if (todayDistanceM > 0) todayDistanceM / 1000.0 else 0.0
+                                val apiGroupName = detail.optString("groupName", "")
+                                val apiVehicleBrand = detail.optString("vehicleBrand", "")
+                                val apiVehicleModel = detail.optString("vehicleModel", "")
+                                val apiAddress = detail.optString("address", "")
+                                val apiCity = detail.optString("city", "")
+                                val apiDailyKm = if (dailyKmVal > 0) dailyKmVal else enrichedVehicle.dailyKm
+                                val apiTodayKm = if (dailyKmVal > 0) dailyKmVal.toInt() else enrichedVehicle.todayKm
+                                val rawFirstIgnition = detail.optString("first_ignition_on_at_today", "")
+                                val rawLastIgnitionOn = detail.optString("last_ignition_on_at", "")
+                                val rawLastIgnitionOff = detail.optString("last_ignition_off_at", "")
+                                enrichedVehicle = enrichedVehicle.copy(
+                                    groupName = if (apiGroupName.isNotEmpty() && apiGroupName != "null") apiGroupName else enrichedVehicle.groupName,
+                                    vehicleBrand = if (apiVehicleBrand.isNotEmpty() && apiVehicleBrand != "null") apiVehicleBrand else enrichedVehicle.vehicleBrand,
+                                    vehicleModel = if (apiVehicleModel.isNotEmpty() && apiVehicleModel != "null") apiVehicleModel else enrichedVehicle.vehicleModel,
+                                    address = if (apiAddress.isNotEmpty() && apiAddress != "null") apiAddress else enrichedVehicle.address,
+                                    city = if (apiCity.isNotEmpty() && apiCity != "null") apiCity else enrichedVehicle.city,
+                                    dailyKm = apiDailyKm,
+                                    todayKm = apiTodayKm,
+                                    firstIgnitionOnAtToday = if (rawFirstIgnition.isNotEmpty() && rawFirstIgnition != "null") rawFirstIgnition else enrichedVehicle.firstIgnitionOnAtToday,
+                                    lastIgnitionOnAt = if (rawLastIgnitionOn.isNotEmpty() && rawLastIgnitionOn != "null") rawLastIgnitionOn else enrichedVehicle.lastIgnitionOnAt,
+                                    lastIgnitionOffAt = if (rawLastIgnitionOff.isNotEmpty() && rawLastIgnitionOff != "null") rawLastIgnitionOff else enrichedVehicle.lastIgnitionOffAt
+                                )
+                            } catch (_: Exception) {}
+                        }
+                    }
                     VehiclePopupCard(
-                        vehicle = liveVehicle,
+                        vehicle = enrichedVehicle,
                         onClose = { selectedVehicle = null },
                         onZoomTo = {
                             selectedVehicle = null
-                            mapViewRef.value?.controller?.animateTo(GeoPoint(liveVehicle.lat, liveVehicle.lng), 16.0, 600L)
+                            mapViewRef.value?.controller?.animateTo(GeoPoint(enrichedVehicle.lat, enrichedVehicle.lng), 16.0, 600L)
                         },
                         onLiveTrack = {
-                            trackingVehicleId = liveVehicle.id
+                            trackingVehicleId = enrichedVehicle.id
                             selectedVehicle = null
-                            mapViewRef.value?.controller?.animateTo(GeoPoint(liveVehicle.lat, liveVehicle.lng), 16.0, 600L)
+                            mapViewRef.value?.controller?.animateTo(GeoPoint(enrichedVehicle.lat, enrichedVehicle.lng), 16.0, 600L)
                         },
                         onDetail = {
-                            val vehicleToOpen = liveVehicle
+                            val vehicleToOpen = enrichedVehicle
                             selectedVehicle = null
                             detailVehicle = vehicleToOpen
                         },

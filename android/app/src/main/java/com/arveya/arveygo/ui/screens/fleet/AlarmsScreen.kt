@@ -420,7 +420,7 @@ fun AlarmsScreen(onMenuClick: () -> Unit) {
                                 color = AppColors.TextMuted
                             )
                             Spacer(Modifier.weight(1f))
-                            if (isLoading) {
+                            if (isLoading && searchText.isBlank()) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(14.dp),
                                     strokeWidth = 2.dp,
@@ -439,8 +439,8 @@ fun AlarmsScreen(onMenuClick: () -> Unit) {
                                 AlarmCard(alarm, onClick = { selectedAlarm = alarm })
                             }
 
-                            // Pagination
-                            if (currentPage < lastPage) {
+                            // Pagination — only when NOT searching
+                            if (currentPage < lastPage && searchText.isBlank()) {
                                 item {
                                     LaunchedEffect(Unit) {
                                         fetchAlarms(currentPage + 1, append = true)

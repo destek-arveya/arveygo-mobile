@@ -77,7 +77,9 @@ struct LiveMapView: View {
                 .sheet(item: $selectedVehicle) { selected in
                     // Look up latest vehicle data from ViewModel for real-time updates
                     let liveVehicle = vm.vehicles.first(where: { $0.id == selected.id }) ?? selected
-                    vehiclePopupSheet(liveVehicle)
+                    EnrichedPopupWrapper(initialVehicle: liveVehicle, liveVehicles: vm.vehicles) { enriched in
+                        vehiclePopupSheet(enriched)
+                    }
                         .presentationDetents([.fraction(0.50), .large])
                         .presentationDragIndicator(.visible)
                         .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.50)))
@@ -870,6 +872,62 @@ class LiveMapViewModel: ObservableObject {
     deinit {
         animationTimers.values.forEach { $0.invalidate() }
         animationTimers.removeAll()
+    }
+}
+
+// MARK: - Enriched Popup Wrapper (fetches API data for LiveMap popup)
+struct EnrichedPopupWrapper<Content: View>: View {
+    @State private var vehicle: Vehicle
+    let liveVehicles: [Vehicle]
+    let content: (Vehicle) -> Content
+
+    init(initialVehicle: Vehicle, liveVehicles: [Vehicle], @ViewBuilder content: @escaping (Vehicle) -> Content) {
+        self._vehicle = State(initialValue: initialVehicle)
+        self.liveVehicles = liveVehicles
+        self.content = content
+    }
+
+    var body: some View {
+        content(vehicle)
+            .task {
+                guard vehicle.deviceId > 0,
+                      vehicle.groupName.isEmpty || vehicle.address.isEmpty else { return }
+                do {
+                    let detail = try await APIService.shared.fetchVehicleDetail(deviceId: vehicle.deviceId)
+                    let todayKmVal = (detail["todayKm"] as? Double) ?? (detail["todayKm"] as? Int).map { Double($0) } ?? 0
+                    let todayDistanceM = (detail["todayDistanceM"] as? Double) ?? (detail["todayDistanceM"] as? Int).map { Double($0) } ?? 0
+                    let dailyKmVal = todayKmVal > 0 ? todayKmVal : (todayDistanceM > 0 ? todayDistanceM / 1000.0 : 0)
+
+                    var enriched = vehicle
+                    if let v = detail["groupName"] as? String, !v.isEmpty, v != "<null>" { enriched.groupName = v }
+                    if let v = detail["vehicleBrand"] as? String, !v.isEmpty, v != "<null>" { enriched.vehicleBrand = v }
+                    if let v = detail["vehicleModel"] as? String, !v.isEmpty, v != "<null>" { enriched.vehicleModel = v }
+                    if let v = detail["address"] as? String, !v.isEmpty, v != "<null>" { enriched.address = v }
+                    if let v = detail["city"] as? String, !v.isEmpty, v != "<null>" { enriched.city = v }
+                    if dailyKmVal > 0 { enriched.dailyKm = dailyKmVal; enriched.todayKm = Int(dailyKmVal) }
+                    if let v = detail["first_ignition_on_at_today"] as? String, !v.isEmpty, v != "<null>" { enriched.firstIgnitionOnAtToday = v }
+                    if let v = detail["last_ignition_on_at"] as? String, !v.isEmpty, v != "<null>" { enriched.lastIgnitionOnAt = v }
+                    if let v = detail["last_ignition_off_at"] as? String, !v.isEmpty, v != "<null>" { enriched.lastIgnitionOffAt = v }
+                    vehicle = enriched
+                } catch {
+                    print("[LiveMap] Popup enrichment error: \(error)")
+                }
+            }
+            .onChange(of: liveVehicles) { _, newVehicles in
+                // Keep live WS data synced while preserving enriched fields
+                guard let live = newVehicles.first(where: { $0.id == vehicle.id }) else { return }
+                var merged = live
+                if !vehicle.groupName.isEmpty { merged.groupName = vehicle.groupName }
+                if !vehicle.vehicleBrand.isEmpty { merged.vehicleBrand = vehicle.vehicleBrand }
+                if !vehicle.vehicleModel.isEmpty { merged.vehicleModel = vehicle.vehicleModel }
+                if !vehicle.address.isEmpty { merged.address = vehicle.address }
+                if !vehicle.city.isEmpty { merged.city = vehicle.city }
+                if vehicle.dailyKm > 0 { merged.dailyKm = vehicle.dailyKm; merged.todayKm = Int(vehicle.dailyKm) }
+                if vehicle.firstIgnitionOnAtToday != nil { merged.firstIgnitionOnAtToday = vehicle.firstIgnitionOnAtToday }
+                if vehicle.lastIgnitionOnAt != nil { merged.lastIgnitionOnAt = vehicle.lastIgnitionOnAt }
+                if vehicle.lastIgnitionOffAt != nil { merged.lastIgnitionOffAt = vehicle.lastIgnitionOffAt }
+                vehicle = merged
+            }
     }
 }
 

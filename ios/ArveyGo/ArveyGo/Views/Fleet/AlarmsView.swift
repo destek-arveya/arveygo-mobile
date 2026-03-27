@@ -683,7 +683,7 @@ struct AlarmsView: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(AppTheme.textMuted)
                     Spacer()
-                    if vm.isLoading {
+                    if vm.isLoading && searchText.isEmpty {
                         ProgressView()
                             .scaleEffect(0.7)
                     }
@@ -695,14 +695,14 @@ struct AlarmsView: View {
                     alarmCard(alarm)
                         .onTapGesture { selectedAlarm = alarm }
                         .onAppear {
-                            // Son öğeye gelince daha fazla yükle
-                            if alarm.id == vm.alarms.last?.id {
+                            // Son öğeye gelince daha fazla yükle — sadece arama yokken
+                            if searchText.isEmpty, alarm.id == vm.alarms.last?.id {
                                 Task { await vm.loadMore() }
                             }
                         }
                 }
 
-                if vm.currentPage < vm.lastPage {
+                if vm.currentPage < vm.lastPage && searchText.isEmpty {
                     HStack {
                         ProgressView()
                         Text("Yükleniyor...")
