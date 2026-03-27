@@ -598,7 +598,8 @@ data class Driver(
     val overspeedCount: Int = 0,
     val alarmCount: Int = 0,
     val hasTelemetry: Boolean = false,
-    val createdAt: String? = null
+    val createdAt: String? = null,
+    val vehicleStatus: String = ""
 ) {
     val initials: String get() {
         val parts = name.split(" ")
@@ -606,10 +607,22 @@ data class Driver(
         else name.take(2).uppercase()
     }
 
-    val statusColor: Color get() = when (status) {
-        "online" -> AppColors.Online
-        "idle" -> AppColors.Idle
-        else -> AppColors.Offline
+    /** Sürücüye atanmış aracın durumuna göre renk: araç online/idle ise yeşil/sarı, değilse sürücü statüsü */
+    val statusColor: Color get() {
+        // Araç durumu varsa onu kullan
+        if (vehicleStatus.isNotEmpty()) {
+            return when (vehicleStatus) {
+                "online" -> AppColors.Online
+                "idle" -> AppColors.Idle
+                else -> AppColors.Offline
+            }
+        }
+        // Fallback: sürücü kendi statüsü
+        return when (status) {
+            "online" -> AppColors.Online
+            "idle" -> AppColors.Idle
+            else -> AppColors.Offline
+        }
     }
 
     val scoreColor: Color get() = when {
@@ -662,7 +675,11 @@ data class Driver(
                 overspeedCount = json.optInt("overspeedCount", 0),
                 alarmCount = json.optInt("alarmCount", 0),
                 hasTelemetry = json.optBoolean("hasTelemetry", false),
-                createdAt = json.optString("created_at", null)
+                createdAt = json.optString("created_at", null),
+                vehicleStatus = run {
+                    val cv = json.optJSONArray("currentVehicles")
+                    if (cv != null && cv.length() > 0) cv.getJSONObject(0).optString("status", "") else ""
+                }
             )
         }
     }

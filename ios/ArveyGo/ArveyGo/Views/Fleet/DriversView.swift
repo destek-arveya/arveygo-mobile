@@ -98,7 +98,7 @@ struct DriversView: View {
                 }
             }
             .onAppear { vm.loadDrivers() }
-            .sheet(item: $selectedDriver) { driver in
+            .sheet(item: $selectedDriver, onDismiss: { vm.loadDrivers() }) { driver in
                 DriverDetailSheet(driver: driver, onRefresh: { vm.loadDrivers() })
             }
             .sheet(isPresented: $showAddDriver) {

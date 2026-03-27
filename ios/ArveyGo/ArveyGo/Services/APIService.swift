@@ -369,7 +369,13 @@ final class APIService {
                 overspeedCount: dict["overspeedCount"] as? Int ?? 0,
                 alarmCount: dict["alarmCount"] as? Int ?? 0,
                 hasTelemetry: dict["hasTelemetry"] as? Bool ?? false,
-                createdAt: dict["created_at"] as? String
+                createdAt: dict["created_at"] as? String,
+                vehicleStatus: {
+                    if let cv = dict["currentVehicles"] as? [[String: Any]], let first = cv.first {
+                        return first["status"] as? String ?? ""
+                    }
+                    return ""
+                }()
             )
         }
 
@@ -425,7 +431,13 @@ final class APIService {
             overspeedCount: dict["overspeedCount"] as? Int ?? 0,
             alarmCount: dict["alarmCount"] as? Int ?? 0,
             hasTelemetry: dict["hasTelemetry"] as? Bool ?? false,
-            createdAt: dict["created_at"] as? String
+            createdAt: dict["created_at"] as? String,
+            vehicleStatus: {
+                if let cv = dict["currentVehicles"] as? [[String: Any]], let first = cv.first {
+                    return first["status"] as? String ?? ""
+                }
+                return ""
+            }()
         )
     }
 
@@ -449,7 +461,8 @@ final class APIService {
             notes: dict["notes"] as? String ?? "", hiredAt: dict["hiredAt"] as? String,
             scoreGeneral: 0, scoreSpeed: 0, scoreBrake: 0, scoreFuel: 0, scoreSafety: 0,
             totalDistanceKm: 0, tripCount: 0, overspeedCount: 0, alarmCount: 0,
-            hasTelemetry: false, createdAt: nil
+            hasTelemetry: false, createdAt: nil,
+            vehicleStatus: ""
         )
     }
 
@@ -473,7 +486,8 @@ final class APIService {
             notes: dict["notes"] as? String ?? "", hiredAt: dict["hiredAt"] as? String,
             scoreGeneral: 0, scoreSpeed: 0, scoreBrake: 0, scoreFuel: 0, scoreSafety: 0,
             totalDistanceKm: 0, tripCount: 0, overspeedCount: 0, alarmCount: 0,
-            hasTelemetry: false, createdAt: nil
+            hasTelemetry: false, createdAt: nil,
+            vehicleStatus: ""
         )
     }
 

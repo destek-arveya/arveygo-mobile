@@ -177,7 +177,7 @@ fun DriversScreen(onMenuClick: () -> Unit) {
     }
 
     selectedDriver?.let { driver ->
-        DriverDetailSheet(driver = driver, onDismiss = { selectedDriver = null }, onRefresh = { refreshDrivers(); selectedDriver = null })
+        DriverDetailSheet(driver = driver, onDismiss = { selectedDriver = null; refreshDrivers() }, onRefresh = { refreshDrivers(); selectedDriver = null })
     }
 
     if (showAddDialog) {

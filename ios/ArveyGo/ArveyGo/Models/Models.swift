@@ -511,6 +511,7 @@ struct Driver: Identifiable, Hashable {
     let alarmCount: Int
     let hasTelemetry: Bool
     let createdAt: String?
+    let vehicleStatus: String
 
     var initials: String {
         let parts = name.split(separator: " ")
@@ -518,7 +519,15 @@ struct Driver: Identifiable, Hashable {
         return String(name.prefix(2)).uppercased()
     }
 
+    /// Sürücüye atanmış aracın durumuna göre renk: araç online/idle ise yeşil/sarı
     var statusColor: SwiftUI.Color {
+        if !vehicleStatus.isEmpty {
+            switch vehicleStatus {
+            case "online": return AppTheme.online
+            case "idle": return AppTheme.idle
+            default: return AppTheme.offline
+            }
+        }
         switch status {
         case "online": return AppTheme.online
         case "idle": return AppTheme.idle
