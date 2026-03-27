@@ -53,6 +53,18 @@ class VehicleDetailObserver: ObservableObject {
         let dailyFuelPer100kmVal = (detail["dailyFuelPer100km"] as? Double) ?? (detail["dailyFuelPer100km"] as? Int).map { Double($0) } ?? 0
         let odometerVal = (detail["odometer"] as? Double) ?? (detail["odometer"] as? Int).map { Double($0) } ?? 0
         let kmVal = (detail["km"] as? Double) ?? (detail["km"] as? Int).map { Double($0) } ?? 0
+        let batteryVal = (detail["battery"] as? Double)
+            ?? (detail["battery_voltage"] as? Double)
+            ?? (detail["battery"] as? Int).map { Double($0) }
+            ?? (detail["battery_voltage"] as? Int).map { Double($0) }
+        let externalVoltageVal = (detail["externalVoltage"] as? Double)
+            ?? (detail["external_voltage"] as? Double)
+            ?? (detail["externalVoltage"] as? Int).map { Double($0) }
+            ?? (detail["external_voltage"] as? Int).map { Double($0) }
+        let deviceBatteryVal = (detail["deviceBattery"] as? Double)
+            ?? (detail["device_battery"] as? Double)
+            ?? (detail["deviceBattery"] as? Int).map { Double($0) }
+            ?? (detail["device_battery"] as? Int).map { Double($0) }
 
         if dailyKmVal > 0 { vehicle.todayKm = Int(dailyKmVal); vehicle.dailyKm = dailyKmVal }
         if !groupNameVal.isEmpty && groupNameVal != "<null>" { vehicle.groupName = groupNameVal }
@@ -65,6 +77,9 @@ class VehicleDetailObserver: ObservableObject {
         if dailyFuelPer100kmVal > 0 { vehicle.dailyFuelPer100km = dailyFuelPer100kmVal }
         if odometerVal > 0 { vehicle.totalKm = Int(odometerVal); vehicle.odometer = odometerVal }
         else if kmVal > 0 { vehicle.totalKm = Int(kmVal); vehicle.odometer = kmVal }
+        if let v = batteryVal { vehicle.batteryVoltage = v }
+        if let v = externalVoltageVal { vehicle.externalVoltage = v }
+        if let v = deviceBatteryVal { vehicle.deviceBattery = v }
 
         // Ignition timestamps from API
         if let v = detail["first_ignition_on_at_today"] as? String, !v.isEmpty, v != "<null>" { vehicle.firstIgnitionOnAtToday = v }
@@ -415,11 +430,11 @@ struct VehicleDetailView: View {
             sectionCard(title: "ARAÇ BİLGİLERİ", icon: "car.fill") {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     infoCell(icon: "folder.fill", label: "GRUP", value: vehicle.group)
+                    infoCell(icon: "car.2.fill", label: "ARAÇ TİPİ", value: vehicle.vehicleType)
                     infoCell(icon: "speedometer", label: "KİLOMETRE", value: vehicle.formattedTotalKm + " km")
+                    infoCell(icon: "road.lanes", label: "BUGÜNKÜ KM", value: vehicle.formattedTodayKm)
                     infoCell(icon: "gauge.open.with.lines.needle.33percent", label: "HIZ", value: vehicle.formattedSpeed)
                     infoCell(icon: "mappin.circle.fill", label: "KONUM", value: vehicle.locationDisplay)
-                    infoCell(icon: "car.2.fill", label: "ARAÇ TİPİ", value: vehicle.vehicleType)
-                    infoCell(icon: "road.lanes", label: "BUGÜNKÜ KM", value: vehicle.formattedTodayKm)
                 }
             }
 
@@ -435,6 +450,31 @@ struct VehicleDetailView: View {
                     infoCell(icon: "sunrise.fill", label: "İLK KONTAK (BUGÜN)", value: vehicle.formattedFirstIgnitionToday)
                     infoCell(icon: "key.fill", label: "SON KONTAK AÇMA", value: vehicle.formattedLastIgnitionOn)
                     infoCell(icon: "key", label: "SON KONTAK KAPAMA", value: vehicle.formattedLastIgnitionOff)
+                }
+            }
+
+            sectionCard(title: "GÜÇ DURUMU", icon: "battery.100") {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    infoCell(
+                        icon: "battery.100",
+                        label: "ARAÇ AKÜSÜ",
+                        value: formatVoltage(vehicle.batteryVoltage ?? vehicle.externalVoltage)
+                    )
+                    infoCell(
+                        icon: "battery.75",
+                        label: "CİHAZ BATARYASI",
+                        value: formatDeviceBattery(vehicle.deviceBattery)
+                    )
+                    infoCell(
+                        icon: "bolt.horizontal.circle.fill",
+                        label: "HARİCİ VOLTAJ",
+                        value: formatVoltage(vehicle.externalVoltage)
+                    )
+                    infoCell(
+                        icon: "clock.fill",
+                        label: "SON GÜNCELLEME",
+                        value: vehicle.formattedDeviceTime
+                    )
                 }
             }
 
@@ -520,10 +560,6 @@ struct VehicleDetailView: View {
                             onNavigateToAlarms?()
                         }
                     }
-                    actionButton(icon: "lock.fill", label: "Blokaj\nGönder", color: .red) {}
-                    actionButton(icon: "wrench.fill", label: "Bakım\nEkle", color: AppTheme.online) {}
-                    actionButton(icon: "doc.text.fill", label: "Belge\nEkle", color: .purple) {}
-                    actionButton(icon: "fuelpump.fill", label: "Yakıt\nKayıt", color: .cyan) {}
                     actionButton(icon: "square.and.arrow.up", label: "Paylaş", color: AppTheme.textMuted) {
                         shareVehicleLocation(vehicle: vehicle)
                     }
@@ -633,6 +669,16 @@ struct VehicleDetailView: View {
     }
 
     // MARK: - Helper Views
+
+    func formatVoltage(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        return String(format: "%.2f V", value)
+    }
+
+    func formatDeviceBattery(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        return value <= 100 ? "%\(Int(value))" : String(format: "%.2f V", value)
+    }
 
     func sectionCard(title: String, icon: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 12) {

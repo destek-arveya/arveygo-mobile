@@ -74,6 +74,21 @@ fun VehicleDetailScreen(
         val dailyFuelPer100kmVal = detail.optDouble("dailyFuelPer100km", 0.0)
         val odometerVal = detail.optDouble("odometer", 0.0)
         val kmVal = detail.optDouble("km", 0.0)
+        val batteryVal = when {
+            detail.has("battery") -> detail.optDouble("battery", Double.NaN)
+            detail.has("battery_voltage") -> detail.optDouble("battery_voltage", Double.NaN)
+            else -> Double.NaN
+        }
+        val externalVoltageVal = when {
+            detail.has("externalVoltage") -> detail.optDouble("externalVoltage", Double.NaN)
+            detail.has("external_voltage") -> detail.optDouble("external_voltage", Double.NaN)
+            else -> Double.NaN
+        }
+        val deviceBatteryVal = when {
+            detail.has("deviceBattery") -> detail.optDouble("deviceBattery", Double.NaN)
+            detail.has("device_battery") -> detail.optDouble("device_battery", Double.NaN)
+            else -> Double.NaN
+        }
         // Ignition timestamps from API
         val firstIgnitionToday = detail.optString("first_ignition_on_at_today", "").let { if (it.isNotEmpty() && it != "null") it else null }
         val lastIgnitionOn = detail.optString("last_ignition_on_at", "").let { if (it.isNotEmpty() && it != "null") it else null }
@@ -92,6 +107,9 @@ fun VehicleDetailScreen(
             dailyFuelPer100km = if (dailyFuelPer100kmVal > 0) dailyFuelPer100kmVal else currentVehicle.dailyFuelPer100km,
             totalKm = if (odometerVal > 0) odometerVal.toInt() else if (kmVal > 0) kmVal.toInt() else currentVehicle.totalKm,
             odometer = if (odometerVal > 0) odometerVal else if (kmVal > 0) kmVal else currentVehicle.odometer,
+            batteryVoltage = if (!batteryVal.isNaN()) batteryVal else currentVehicle.batteryVoltage,
+            externalVoltage = if (!externalVoltageVal.isNaN()) externalVoltageVal else currentVehicle.externalVoltage,
+            deviceBattery = if (!deviceBatteryVal.isNaN()) deviceBatteryVal else currentVehicle.deviceBattery,
             firstIgnitionOnAtToday = firstIgnitionToday ?: currentVehicle.firstIgnitionOnAtToday,
             lastIgnitionOnAt = lastIgnitionOn ?: currentVehicle.lastIgnitionOnAt,
             lastIgnitionOffAt = lastIgnitionOff ?: currentVehicle.lastIgnitionOffAt
@@ -477,12 +495,24 @@ private fun OverviewTab(
 ) {
     val infoItems = listOf(
         Triple(Icons.Default.Folder, "GRUP", vehicle.group),
+        Triple(Icons.Default.DirectionsCar, "ARAÇ TİPİ", vehicle.vehicleType),
         Triple(Icons.Default.Speed, "KİLOMETRE", vehicle.formattedTotalKm + " km"),
+        Triple(Icons.Default.Route, "BUGÜNKÜ KM", vehicle.formattedTodayKm),
         Triple(Icons.Default.Speed, "HIZ", vehicle.formattedSpeed),
         Triple(Icons.Default.LocationOn, "KONUM", vehicle.locationDisplay),
-        Triple(Icons.Default.DirectionsCar, "ARAÇ TİPİ", vehicle.vehicleType),
-        Triple(Icons.Default.Route, "BUGÜNKÜ KM", vehicle.formattedTodayKm),
     )
+
+    fun formatVoltage(value: Double?): String {
+        if (value == null) return "—"
+        return String.format("%.2f V", value)
+    }
+
+    fun formatDeviceBattery(value: Double?): String {
+        if (value == null) return "—"
+        return if (value <= 100.0) "%${value.toInt()}" else String.format("%.2f V", value)
+    }
+
+    val vehicleBatteryDisplay = vehicle.batteryVoltage ?: vehicle.externalVoltage
 
     // Device Time card (matching vehicles list style)
     if (vehicle.deviceTime != null) {
@@ -542,6 +572,39 @@ private fun OverviewTab(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 InfoCell(Icons.Default.VpnKey, "SON KONTAK AÇMA", vehicle.formattedLastIgnitionOn, Modifier.weight(1f))
                 InfoCell(Icons.Default.VpnKey, "SON KONTAK KAPAMA", vehicle.formattedLastIgnitionOff, Modifier.weight(1f))
+            }
+        }
+    }
+
+    SectionCard(title = "GÜÇ DURUMU", icon = Icons.Default.BatteryChargingFull) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                InfoCell(
+                    Icons.Default.BatteryChargingFull,
+                    "ARAÇ AKÜSÜ",
+                    formatVoltage(vehicleBatteryDisplay),
+                    Modifier.weight(1f)
+                )
+                InfoCell(
+                    Icons.Default.PhoneAndroid,
+                    "CİHAZ BATARYASI",
+                    formatDeviceBattery(vehicle.deviceBattery),
+                    Modifier.weight(1f)
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                InfoCell(
+                    Icons.Default.Bolt,
+                    "HARİCİ VOLTAJ",
+                    formatVoltage(vehicle.externalVoltage),
+                    Modifier.weight(1f)
+                )
+                InfoCell(
+                    Icons.Default.Schedule,
+                    "SON GÜNCELLEME",
+                    vehicle.formattedDeviceTime,
+                    Modifier.weight(1f)
+                )
             }
         }
     }
@@ -624,26 +687,13 @@ private fun OverviewTab(
                 onBack()
                 onNavigateToAlarms?.invoke()
             },
-            QuickAction(Icons.Default.Lock, "Blokaj\nGönder", Color.Red) {},
-            QuickAction(Icons.Default.Build, "Bakım\nEkle", AppColors.Online) {},
-            QuickAction(Icons.Default.Description, "Belge\nEkle", Color(0xFF9C27B0)) {},
-            QuickAction(Icons.Default.LocalGasStation, "Yakıt\nKayıt", Color(0xFF00BCD4)) {},
             QuickAction(Icons.Default.Share, "Paylaş", AppColors.TextMuted) {
                 shareVehicleLocation(context, vehicle)
             },
         )
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            for (i in actions.indices step 4) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (j in 0 until 4) {
-                        val idx = i + j
-                        if (idx < actions.size) {
-                            ActionButton(actions[idx].icon, actions[idx].label, actions[idx].color, Modifier.weight(1f), actions[idx].onClick)
-                        } else {
-                            Spacer(Modifier.weight(1f))
-                        }
-                    }
-                }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            actions.forEach { action ->
+                ActionButton(action.icon, action.label, action.color, Modifier.weight(1f), action.onClick)
             }
         }
     }

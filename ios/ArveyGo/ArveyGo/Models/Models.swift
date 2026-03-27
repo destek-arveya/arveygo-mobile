@@ -53,6 +53,7 @@ struct Vehicle: Identifiable, Hashable {
     var output: Bool = false
     var batteryVoltage: Double? = nil
     var externalVoltage: Double? = nil
+    var deviceBattery: Double? = nil
     var odometer: Double = 0
     var speedLimit: Int = 0
     var temperatureC: Double? = nil
@@ -222,8 +223,18 @@ struct Vehicle: Identifiable, Hashable {
         let firstIgnitionOnAtToday = json["first_ignition_on_at_today"] as? String
         let lastIgnitionOnAt = json["last_ignition_on_at"] as? String
         let lastIgnitionOffAt = json["last_ignition_off_at"] as? String
-        let batteryVoltage = json["battery_voltage"] as? Double
-        let externalVoltage = json["external_voltage"] as? Double
+        let batteryVoltage = (json["battery_voltage"] as? Double)
+            ?? (json["battery"] as? Double)
+            ?? (json["battery_voltage"] as? NSNumber)?.doubleValue
+            ?? (json["battery"] as? NSNumber)?.doubleValue
+        let externalVoltage = (json["external_voltage"] as? Double)
+            ?? (json["externalVoltage"] as? Double)
+            ?? (json["external_voltage"] as? NSNumber)?.doubleValue
+            ?? (json["externalVoltage"] as? NSNumber)?.doubleValue
+        let deviceBattery = (json["device_battery"] as? Double)
+            ?? (json["deviceBattery"] as? Double)
+            ?? (json["device_battery"] as? NSNumber)?.doubleValue
+            ?? (json["deviceBattery"] as? NSNumber)?.doubleValue
 
         // Temperature: check top-level first (backend sends snake_case: temperature_c)
         var temperatureC: Double? = nil
@@ -305,6 +316,7 @@ struct Vehicle: Identifiable, Hashable {
             output: output,
             batteryVoltage: batteryVoltage,
             externalVoltage: externalVoltage,
+            deviceBattery: deviceBattery,
             odometer: odometer,
             speedLimit: speedLimit,
             temperatureC: temperatureC,
@@ -344,6 +356,7 @@ struct Vehicle: Identifiable, Hashable {
         output = patch.output
         if let bv = patch.batteryVoltage { batteryVoltage = bv }
         if let ev = patch.externalVoltage { externalVoltage = ev }
+        if let db = patch.deviceBattery { deviceBattery = db }
         if let tc = patch.temperatureC { temperatureC = tc }
         if let hp = patch.humidityPct { humidityPct = hp }
         if let di = patch.driverId { driverId = di }

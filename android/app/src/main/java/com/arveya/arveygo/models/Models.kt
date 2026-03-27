@@ -89,6 +89,7 @@ data class Vehicle(
     var output: Boolean = false,
     var batteryVoltage: Double? = null,
     var externalVoltage: Double? = null,
+    var deviceBattery: Double? = null,
     var temperatureC: Double? = null,
     var humidityPct: Double? = null,
     var odometer: Double = 0.0,
@@ -293,8 +294,21 @@ data class Vehicle(
             val firstIgnitionOnAtToday = if (json.has("first_ignition_on_at_today")) json.optString("first_ignition_on_at_today") else null
             val lastIgnitionOnAt = if (json.has("last_ignition_on_at")) json.optString("last_ignition_on_at") else null
             val lastIgnitionOffAt = if (json.has("last_ignition_off_at")) json.optString("last_ignition_off_at") else null
-            val batteryVoltage = if (json.has("battery_voltage")) json.optDouble("battery_voltage") else null
-            val externalVoltage = if (json.has("external_voltage")) json.optDouble("external_voltage") else null
+            val batteryVoltage = when {
+                json.has("battery_voltage") -> json.optDouble("battery_voltage")
+                json.has("battery") -> json.optDouble("battery")
+                else -> null
+            }
+            val externalVoltage = when {
+                json.has("external_voltage") -> json.optDouble("external_voltage")
+                json.has("externalVoltage") -> json.optDouble("externalVoltage")
+                else -> null
+            }
+            val deviceBattery = when {
+                json.has("device_battery") -> json.optDouble("device_battery")
+                json.has("deviceBattery") -> json.optDouble("deviceBattery")
+                else -> null
+            }
             val vehicleCategory = json.optString("vehicle_category", "car")
 
             // Temperature: check top-level first (backend sends snake_case: temperature_c)
@@ -363,7 +377,7 @@ data class Vehicle(
                 speed = speed, direction = direction, ignition = ignition,
                 isOnline = isOnline, fix = fix, hdop = hdop,
                 input1 = input1, input2 = input2, output = output,
-                batteryVoltage = batteryVoltage, externalVoltage = externalVoltage,
+                batteryVoltage = batteryVoltage, externalVoltage = externalVoltage, deviceBattery = deviceBattery,
                 temperatureC = temperatureC, humidityPct = humidityPct,
                 odometer = odometer, speedLimit = speedLimit,
                 driverId = driverId, alarmCode = alarmCode,
@@ -394,6 +408,7 @@ data class Vehicle(
             input1 = patch.input1, input2 = patch.input2, output = patch.output,
             batteryVoltage = patch.batteryVoltage ?: batteryVoltage,
             externalVoltage = patch.externalVoltage ?: externalVoltage,
+            deviceBattery = patch.deviceBattery ?: deviceBattery,
             temperatureC = patch.temperatureC ?: temperatureC,
             humidityPct = patch.humidityPct ?: humidityPct,
             driverId = patch.driverId ?: driverId,
