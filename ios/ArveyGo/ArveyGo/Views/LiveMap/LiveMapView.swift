@@ -325,248 +325,195 @@ struct LiveMapView: View {
         }
     }
 
-    // MARK: - Vehicle Popup Sheet (half screen with detail button)
+    // MARK: - Vehicle Popup Sheet (clean flat-row design)
     func vehiclePopupSheet(_ vehicle: Vehicle) -> some View {
         VStack(spacing: 0) {
-            // Identity Card (matching VehicleDetailView)
+            // ── Header: Plate + Status + Model ──
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(vehicle.status.color.opacity(0.1))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: vehicle.isMotorcycle ? "bicycle" : "car.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(vehicle.status.color)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 8) {
+                        Text(vehicle.plate)
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(AppTheme.navy)
+                        StatusBadge(status: vehicle.status)
+                    }
+                    Text(vehicle.model)
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.textMuted)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 16)
+
+            // ── Info Rows ──
             VStack(spacing: 0) {
-                HStack(spacing: 14) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(vehicle.status.color.opacity(0.1))
-                            .frame(width: 52, height: 52)
-                        Image(systemName: "car.fill")
-                            .font(.system(size: 22))
-                            .foregroundColor(vehicle.status.color)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Text(vehicle.plate)
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(AppTheme.navy)
-                            StatusBadge(status: vehicle.status)
-                        }
-                        Text(vehicle.model)
-                            .font(.system(size: 12))
-                            .foregroundColor(AppTheme.textMuted)
-                        HStack(spacing: 6) {
-                            HStack(spacing: 3) {
-                                Image(systemName: "folder.fill")
-                                    .font(.system(size: 7))
-                                Text(vehicle.group)
-                                    .font(.system(size: 9, weight: .semibold))
-                            }
-                            .foregroundColor(.blue)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.blue.opacity(0.08))
-                            .cornerRadius(20)
-
-                            HStack(spacing: 3) {
-                                Image(systemName: "car.2.fill")
-                                    .font(.system(size: 7))
-                                Text(vehicle.vehicleType)
-                                    .font(.system(size: 9, weight: .semibold))
-                            }
-                            .foregroundColor(.purple)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.purple.opacity(0.08))
-                            .cornerRadius(20)
-                        }
-                    }
-                    Spacer()
+                popupRow(icon: "gauge.open.with.lines.needle.33percent", label: "Hız", value: vehicle.formattedSpeed)
+                popupDivider
+                popupRow(icon: "road.lanes", label: "Bugünkü Km", value: vehicle.formattedTodayKm)
+                popupDivider
+                popupRow(icon: "mappin.circle.fill", label: "Konum", value: vehicle.locationDisplay)
+                popupDivider
+                popupRow(
+                    icon: vehicle.kontakOn ? "key.fill" : "key",
+                    label: "Kontak",
+                    value: vehicle.kontakOn ? "Açık" : "Kapalı",
+                    valueColor: vehicle.kontakOn ? AppTheme.online : AppTheme.offline
+                )
+                popupDivider
+                popupRow(icon: "speedometer", label: "Toplam Km", value: vehicle.formattedTotalKm + " km")
+                if vehicle.deviceTime != nil {
+                    popupDivider
+                    popupRow(icon: "clock.fill", label: "Son Güncelleme", value: vehicle.formattedDeviceTime)
                 }
-                .padding(16)
-
-                Divider()
-
-                // Quick stats row (like detail page)
-                HStack(spacing: 0) {
-                    popupStatItem(icon: "speedometer", value: vehicle.formattedSpeed, label: "Hız", color: .orange)
-                    Divider().frame(height: 36)
-                    popupStatItem(icon: "road.lanes", value: vehicle.formattedTodayKm, label: "Bugün", color: AppTheme.indigo)
-                    Divider().frame(height: 36)
-                    popupStatItem(icon: "person.fill", value: {
-                        let name = !vehicle.driverName.isEmpty ? vehicle.driverName : vehicle.driver
-                        return name.isEmpty ? "—" : (name.components(separatedBy: " ").first ?? "—")
-                    }(), label: "Sürücü", color: AppTheme.online)
-                    Divider().frame(height: 36)
-                    popupStatItem(icon: "mappin.circle.fill", value: vehicle.locationDisplay, label: "Konum", color: .blue)
+                if let temp = vehicle.temperatureC {
+                    popupDivider
+                    popupRow(
+                        icon: "thermometer.medium",
+                        label: "Sıcaklık",
+                        value: String(format: "%.1f°C", temp),
+                        valueColor: temp < 0 ? .blue : temp < 30 ? AppTheme.online : .red
+                    )
                 }
-                .padding(.vertical, 10)
+                if let hum = vehicle.humidityPct {
+                    popupDivider
+                    popupRow(icon: "humidity.fill", label: "Nem", value: "%\(Int(hum))")
+                }
             }
             .background(AppTheme.surface)
-            .cornerRadius(16)
-            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 2)
+            .cornerRadius(14)
+            .padding(.horizontal, 16)
+
+            // ── Quick Actions ──
+            HStack(spacing: 10) {
+                popupActionBtn(icon: "location.fill", label: "Yol Tarifi", color: Color(hex: "#3B82F6")) {
+                    openMapsDirections(lat: vehicle.lat, lng: vehicle.lng, label: vehicle.plate)
+                }
+                popupActionBtn(icon: "clock.arrow.circlepath", label: "Rota Geçmişi", color: AppTheme.indigo) {
+                    selectedVehicle = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        selectedPage = .routeHistory
+                    }
+                }
+                popupActionBtn(icon: "bell.fill", label: "Alarmlar", color: .orange) {
+                    selectedVehicle = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        selectedPage = .alarms
+                    }
+                }
+                popupActionBtn(icon: "lock.fill", label: "Blokaj", color: .red) {}
+            }
+            .padding(14)
+            .background(AppTheme.surface)
+            .cornerRadius(14)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+
+            // ── Canlı İzle Button ──
+            Button(action: {
+                trackingVehicleId = vehicle.id
+                selectedVehicle = nil
+                withAnimation(.easeInOut(duration: 0.6)) {
+                    mapCameraPosition = .region(MKCoordinateRegion(
+                        center: CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng),
+                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                    ))
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "location.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("Canlı İzle")
+                        .font(.system(size: 14, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(AppTheme.online)
+                .cornerRadius(14)
+            }
             .padding(.horizontal, 16)
             .padding(.top, 16)
 
-            ScrollView {
-                VStack(spacing: 12) {
-                    // Device Time (if available)
-                    if vehicle.deviceTime != nil {
-                        HStack(spacing: 8) {
-                            Image(systemName: "clock.fill")
-                                .font(.system(size: 11))
-                                .foregroundColor(AppTheme.indigo)
-                            Text("Son Bilgi Tarihi")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(AppTheme.navy)
-                            Spacer()
-                            Text("⏱ \(vehicle.formattedDeviceTime)")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(AppTheme.textMuted)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(AppTheme.bg)
-                                .cornerRadius(6)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(AppTheme.borderSoft, lineWidth: 1)
-                                )
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(AppTheme.surface)
-                        .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(AppTheme.borderSoft, lineWidth: 1)
-                        )
-                        .padding(.horizontal, 20)
-                    }
-
-                    // Detailed info grid
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                        infoCell(icon: "key.fill", label: "Kontak", value: vehicle.kontakOn ? "Açık" : "Kapalı", color: vehicle.kontakOn ? AppTheme.online : AppTheme.offline)
-                        infoCell(icon: "gauge.open.with.lines.needle.33percent", label: "Toplam Km", value: vehicle.formattedTotalKm + " km", color: AppTheme.navy)
-                        infoCell(icon: "antenna.radiowaves.left.and.right", label: "Sinyal", value: vehicle.status == .online ? "Güçlü" : "Yok", color: vehicle.status == .online ? AppTheme.online : AppTheme.textFaint)
-                        if let temp = vehicle.temperatureC {
-                            infoCell(icon: "thermometer.medium", label: "Sıcaklık", value: String(format: "%.1f°C", temp), color: temp < 0 ? .blue : temp < 30 ? AppTheme.online : .red)
-                        }
-                        if let hum = vehicle.humidityPct {
-                            infoCell(icon: "humidity.fill", label: "Nem", value: "%\(Int(hum))", color: Color(red: 0.05, green: 0.65, blue: 0.88))
-                        }
-                    }
-                    .padding(.horizontal, 20)
-
-                    // Quick actions row
-                    HStack(spacing: 10) {
-                        quickAction(icon: "location.fill", label: "Konuma Git", color: .blue) {
-                            openMapsDirections(lat: vehicle.lat, lng: vehicle.lng, label: vehicle.plate)
-                        }
-                        quickAction(icon: "clock.arrow.circlepath", label: "Rota Geçmişi", color: AppTheme.indigo) {
-                            selectedVehicle = nil
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                                selectedPage = .routeHistory
-                            }
-                        }
-                        quickAction(icon: "bell.fill", label: "Alarm Kur", color: .orange) {
-                            selectedVehicle = nil
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                                selectedPage = .alarms
-                            }
-                        }
-                        quickAction(icon: "lock.fill", label: "Blokaj", color: .red) {}
-                    }
-                    .padding(.horizontal, 20)
-
-                    // CANLI İZLE Button
-                    Button(action: {
-                        trackingVehicleId = vehicle.id
-                        selectedVehicle = nil
-                        withAnimation(.easeInOut(duration: 0.6)) {
-                            mapCameraPosition = .region(MKCoordinateRegion(
-                                center: CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng),
-                                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                            ))
-                        }
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "location.circle.fill")
-                                .font(.system(size: 14, weight: .semibold))
-                            Text("Canlı İzle")
-                                .font(.system(size: 14, weight: .bold))
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                        .background(AppTheme.online)
-                        .cornerRadius(14)
-                    }
-                    .padding(.horizontal, 20)
-
-                    // DETAY GÖR Button
-                    Button(action: {
-                        let v = vehicle
-                        selectedVehicle = nil
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                            detailVehicle = v
-                        }
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.system(size: 14, weight: .semibold))
-                            Text("Detay Gör")
-                                .font(.system(size: 15, weight: .bold))
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(AppTheme.buttonGradient)
-                        .cornerRadius(14)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
+            // ── Detay Gör Button ──
+            Button(action: {
+                let v = vehicle
+                selectedVehicle = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    detailVehicle = v
                 }
-                .padding(.top, 16)
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("Detay Gör")
+                        .font(.system(size: 14, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(AppTheme.buttonGradient)
+                .cornerRadius(14)
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 20)
         }
     }
 
-    func popupStatItem(icon: String, value: String, label: String, color: Color) -> some View {
-        VStack(spacing: 3) {
-            Image(systemName: icon)
-                .font(.system(size: 11))
-                .foregroundColor(color)
-            Text(value)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(AppTheme.navy)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Text(label)
-                .font(.system(size: 8))
-                .foregroundColor(AppTheme.textMuted)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    func infoCell(icon: String, label: String, value: String, color: Color) -> some View {
-        HStack(spacing: 10) {
+    func popupRow(icon: String, label: String, value: String, valueColor: Color? = nil) -> some View {
+        HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.system(size: 14))
-                .foregroundColor(color)
-                .frame(width: 32, height: 32)
-                .background(color.opacity(0.1))
-                .cornerRadius(8)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(AppTheme.textFaint)
-                    .textCase(.uppercase)
-                Text(value)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.navy)
-                    .lineLimit(1)
-            }
+                .foregroundColor(AppTheme.indigo.opacity(0.7))
+                .frame(width: 18)
+            Text(label)
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textMuted)
             Spacer()
+            Text(value)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(valueColor ?? AppTheme.navy)
+                .lineLimit(1)
+                .frame(maxWidth: 170, alignment: .trailing)
         }
-        .padding(12)
-        .background(AppTheme.bg)
-        .cornerRadius(10)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    var popupDivider: some View {
+        Divider()
+            .padding(.leading, 48)
+            .padding(.trailing, 16)
+    }
+
+    func popupActionBtn(icon: String, label: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                    .foregroundColor(color)
+                    .frame(width: 40, height: 40)
+                    .background(color.opacity(0.1))
+                    .cornerRadius(11)
+                Text(label)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(AppTheme.textMuted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity)
+        }
     }
 
     // MARK: - Open Maps Directions
@@ -575,24 +522,6 @@ struct LiveMapView: View {
         let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
         mapItem.name = label
         mapItem.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
-    }
-
-    func quickAction(icon: String, label: String, color: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 16))
-                    .foregroundColor(color)
-                    .frame(width: 42, height: 42)
-                    .background(color.opacity(0.1))
-                    .cornerRadius(12)
-                Text(label)
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(AppTheme.textMuted)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-        }
     }
 }
 

@@ -736,7 +736,7 @@ private fun openMapsDirectionsLiveMap(context: Context, lat: Double, lng: Double
     }
 }
 
-// Vehicle Popup Sheet (redesigned to match VehicleDetailScreen identity card)
+// Vehicle Popup Sheet (clean flat-row design matching VehicleDetailScreen)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun VehiclePopupCard(
@@ -754,7 +754,7 @@ private fun VehiclePopupCard(
     ModalBottomSheet(
         onDismissRequest = onClose,
         sheetState = sheetState,
-        containerColor = AppColors.Surface,
+        containerColor = AppColors.Bg,
         shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
         dragHandle = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -776,148 +776,104 @@ private fun VehiclePopupCard(
             .verticalScroll(rememberScrollState())
             .padding(top = 4.dp)
     ) {
-        // Identity Card (matching detail page)
+        // ── Header: Plate + Status + Model ──
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(vehicle.status.color.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+            ) {
+                Icon(
+                    if (vehicle.isMotorcycle) Icons.Default.TwoWheeler else Icons.Default.DirectionsCar,
+                    null, tint = vehicle.status.color, modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(vehicle.plate, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                    Spacer(Modifier.width(8.dp))
+                    StatusBadge(vehicle.status)
+                }
+                Text(vehicle.model, fontSize = 12.sp, color = AppColors.TextMuted)
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ── Info Rows ──
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .background(AppColors.Surface, RoundedCornerShape(14.dp))
+                .padding(vertical = 4.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(vehicle.status.color.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                ) {
-                    Icon(Icons.Default.DirectionsCar, null, tint = vehicle.status.color, modifier = Modifier.size(22.dp))
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(vehicle.plate, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
-                        Spacer(Modifier.width(8.dp))
-                        StatusBadge(vehicle.status)
-                    }
-                    Text(vehicle.model, fontSize = 11.sp, color = AppColors.TextMuted)
-                    Spacer(Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        // Group tag
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .background(Color.Blue.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Icon(Icons.Default.Folder, null, tint = Color.Blue, modifier = Modifier.size(8.dp))
-                            Spacer(Modifier.width(3.dp))
-                            Text(vehicle.group, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = Color.Blue)
-                        }
-                        // Type tag
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .background(Color(0xFF9C27B0).copy(alpha = 0.08f), RoundedCornerShape(20.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Icon(Icons.Default.DirectionsCar, null, tint = Color(0xFF9C27B0), modifier = Modifier.size(8.dp))
-                            Spacer(Modifier.width(3.dp))
-                            Text(vehicle.vehicleType, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF9C27B0))
-                        }
-                    }
-                }
+            PopupRow(Icons.Default.Speed, "Hız", vehicle.formattedSpeed)
+            PopupDivider()
+            PopupRow(Icons.Default.Route, "Bugünkü Km", vehicle.formattedTodayKm)
+            PopupDivider()
+            PopupRow(Icons.Default.LocationOn, "Konum", vehicle.locationDisplay)
+            PopupDivider()
+            PopupRow(
+                Icons.Default.VpnKey, "Kontak",
+                if (vehicle.kontakOn) "Açık" else "Kapalı",
+                valueColor = if (vehicle.kontakOn) AppColors.Online else AppColors.Offline
+            )
+            PopupDivider()
+            PopupRow(Icons.Default.Speed, "Toplam Km", vehicle.formattedTotalKm + " km")
+            if (vehicle.deviceTime != null) {
+                PopupDivider()
+                PopupRow(Icons.Default.Schedule, "Son Güncelleme", vehicle.formattedDeviceTime)
             }
-
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = AppColors.BorderSoft)
-
-            // Quick stats row (like detail page)
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                PopupStatItem(Icons.Default.Speed, vehicle.formattedSpeed, "H\u0131z", Color(0xFFFF9800))
-                PopupStatItem(Icons.Default.Route, vehicle.formattedTodayKm, "Bug\u00fcn", AppColors.Indigo)
-                PopupStatItem(Icons.Default.Person, run {
-                    val name = if (vehicle.driverName.isNotEmpty()) vehicle.driverName else vehicle.driver
-                    if (name.isEmpty()) "\u2014" else name.split(" ").firstOrNull() ?: "\u2014"
-                }, "S\u00fcr\u00fcc\u00fc", AppColors.Online)
-                PopupStatItem(Icons.Default.LocationOn, vehicle.locationDisplay, "Konum", Color.Blue)
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        // Device Time (if available)
-        if (vehicle.deviceTime != null) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .background(AppColors.Surface, RoundedCornerShape(10.dp))
-                    .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(10.dp))
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
-            ) {
-                Icon(Icons.Default.Schedule, null, tint = AppColors.Indigo, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Son Bilgi Tarihi", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "\u23f1 ${vehicle.formattedDeviceTime}",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = AppColors.TextMuted,
-                    modifier = Modifier
-                        .background(AppColors.Bg, RoundedCornerShape(6.dp))
-                        .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
+            vehicle.temperatureC?.let { temp ->
+                PopupDivider()
+                PopupRow(
+                    Icons.Default.Thermostat, "Sıcaklık",
+                    "${"%.1f".format(temp)}°C",
+                    valueColor = if (temp < 0) Color.Blue else if (temp < 30) AppColors.Online else Color.Red
                 )
             }
-            Spacer(Modifier.height(8.dp))
-        }
-
-        // Info grid (compact)
-        Column(
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.padding(horizontal = 16.dp)
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                PopupInfoCell(Icons.Default.VpnKey, "Kontak", if (vehicle.kontakOn) "A\u00e7\u0131k" else "Kapal\u0131", if (vehicle.kontakOn) AppColors.Online else AppColors.Offline, Modifier.weight(1f))
-                PopupInfoCell(Icons.Default.Speed, "Toplam Km", vehicle.formattedTotalKm + " km", AppColors.Navy, Modifier.weight(1f))
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                PopupInfoCell(Icons.Default.CellTower, "Sinyal", if (vehicle.status == VehicleStatus.ONLINE) "G\u00fc\u00e7l\u00fc" else "Yok", if (vehicle.status == VehicleStatus.ONLINE) AppColors.Online else AppColors.TextFaint, Modifier.weight(1f))
-                vehicle.temperatureC?.let { temp ->
-                    PopupInfoCell(Icons.Default.LocalFireDepartment, "S\u0131cakl\u0131k", "${"%.1f".format(temp)}\u00b0C", if (temp < 0) Color.Blue else if (temp < 30) AppColors.Online else Color.Red, Modifier.weight(1f))
-                } ?: Spacer(Modifier.weight(1f))
+            vehicle.humidityPct?.let { hum ->
+                PopupDivider()
+                PopupRow(Icons.Default.WaterDrop, "Nem", "%${hum.toInt()}")
             }
         }
 
         Spacer(Modifier.height(12.dp))
 
-        // Quick actions row
+        // ── Quick Actions ──
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 16.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .background(AppColors.Surface, RoundedCornerShape(14.dp))
+                .padding(14.dp)
         ) {
-            PopupQuickAction(Icons.Default.LocationOn, "Konuma Git", Color.Blue, Modifier.weight(1f)) {
+            PopupActionBtn(Icons.Default.Navigation, "Yol Tarifi", Color(0xFF3B82F6), Modifier.weight(1f)) {
                 openMapsDirectionsLiveMap(context, vehicle.lat, vehicle.lng, vehicle.plate)
             }
-            PopupQuickAction(Icons.Default.History, "Rota Ge\u00e7mi\u015fi", AppColors.Indigo, Modifier.weight(1f)) {
+            PopupActionBtn(Icons.Default.History, "Rota Geçmişi", AppColors.Indigo, Modifier.weight(1f)) {
                 onClose()
                 onNavigateToRouteHistory?.invoke(vehicle)
             }
-            PopupQuickAction(Icons.Default.Notifications, "Alarm Kur", Color(0xFFFF9800), Modifier.weight(1f)) {
+            PopupActionBtn(Icons.Default.NotificationsActive, "Alarmlar", Color(0xFFFF9800), Modifier.weight(1f)) {
                 onClose()
                 onNavigateToAlarms?.invoke()
             }
-            PopupQuickAction(Icons.Default.Lock, "Blokaj", Color.Red, Modifier.weight(1f)) {}
+            PopupActionBtn(Icons.Default.Lock, "Blokaj", Color.Red, Modifier.weight(1f)) {}
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(16.dp))
 
-        // CANLI İZLE Button
+        // ── Canlı İzle Button ──
         Button(
             onClick = onLiveTrack,
             shape = RoundedCornerShape(14.dp),
@@ -929,12 +885,12 @@ private fun VehiclePopupCard(
         ) {
             Icon(Icons.Default.MyLocation, null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Canl\u0131 \u0130zle", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text("Canlı İzle", fontSize = 14.sp, fontWeight = FontWeight.Bold)
         }
 
         Spacer(Modifier.height(8.dp))
 
-        // DETAY GÖR Button
+        // ── Detay Gör Button ──
         Button(
             onClick = onDetail,
             shape = RoundedCornerShape(14.dp),
@@ -942,11 +898,11 @@ private fun VehiclePopupCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .height(50.dp)
+                .height(48.dp)
         ) {
             Icon(Icons.Default.OpenInFull, null, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Detay G\u00f6r", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text("Detay Gör", fontSize = 14.sp, fontWeight = FontWeight.Bold)
         }
 
         Spacer(Modifier.height(16.dp))
@@ -955,47 +911,38 @@ private fun VehiclePopupCard(
 }
 
 @Composable
-private fun PopupStatItem(icon: ImageVector, value: String, label: String, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(icon, null, tint = color, modifier = Modifier.size(13.dp))
-        Spacer(Modifier.height(2.dp))
-        Text(value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(label, fontSize = 8.sp, color = AppColors.TextMuted)
-    }
-}
-
-@Composable
-private fun PopupInfoCell(
+private fun PopupRow(
     icon: ImageVector,
     label: String,
     value: String,
-    color: Color,
-    modifier: Modifier = Modifier
+    valueColor: Color? = null
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .background(AppColors.Bg, RoundedCornerShape(10.dp))
-            .padding(12.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(32.dp)
-                .background(color.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-        ) {
-            Icon(icon, null, tint = color, modifier = Modifier.size(14.dp))
-        }
-        Spacer(Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f, fill = false)) {
-            Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = AppColors.TextFaint, letterSpacing = 0.3.sp)
-            Text(value, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
+        Icon(icon, null, tint = AppColors.Indigo.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(14.dp))
+        Text(label, fontSize = 13.sp, color = AppColors.TextMuted, modifier = Modifier.weight(1f))
+        Text(
+            value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+            color = valueColor ?: AppColors.Navy,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End,
+            modifier = Modifier.widthIn(max = 170.dp)
+        )
     }
 }
 
 @Composable
-private fun PopupQuickAction(
+private fun PopupDivider() {
+    HorizontalDivider(color = AppColors.BorderSoft, modifier = Modifier.padding(start = 48.dp, end = 16.dp))
+}
+
+@Composable
+private fun PopupActionBtn(
     icon: ImageVector,
     label: String,
     color: Color,
@@ -1009,13 +956,13 @@ private fun PopupQuickAction(
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(42.dp)
-                .background(color.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                .size(40.dp)
+                .background(color.copy(alpha = 0.1f), RoundedCornerShape(11.dp))
         ) {
             Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
         }
         Spacer(Modifier.height(4.dp))
-        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted, textAlign = TextAlign.Center, maxLines = 2, lineHeight = 11.sp)
+        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted, textAlign = TextAlign.Center, maxLines = 1)
     }
 }
 
