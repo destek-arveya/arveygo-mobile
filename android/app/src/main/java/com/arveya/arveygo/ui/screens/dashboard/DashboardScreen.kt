@@ -39,6 +39,8 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}, o
     val alerts by vm.alerts.collectAsState()
     val selectedPeriod by vm.selectedPeriod.collectAsState()
     val isRefreshing by vm.isRefreshing.collectAsState()
+    val isLoadingDrivers by vm.isLoadingDrivers.collectAsState()
+    val isLoadingAlerts by vm.isLoadingAlerts.collectAsState()
     var selectedVehicle by remember { mutableStateOf<Vehicle?>(null) }
     val dlLang by DashboardStrings.currentLang.collectAsState()
     val DL = DashboardStrings
@@ -136,10 +138,23 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}, o
                 onAction = onNavigateToDrivers,
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {
+                if (isLoadingDrivers && drivers.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = AppColors.Indigo)
+                            Spacer(Modifier.height(8.dp))
+                            Text("Sürücüler yükleniyor...", fontSize = 11.sp, color = AppColors.TextMuted)
+                        }
+                    }
+                } else {
                 Column {
                     drivers.take(5).forEach { d ->
                         DriverRow(d)
                     }
+                }
                 }
             }
 
@@ -153,10 +168,23 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}, o
                 onAction = onNavigateToAlarms,
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {
+                if (isLoadingAlerts && alerts.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = AppColors.Indigo)
+                            Spacer(Modifier.height(8.dp))
+                            Text("Alarmlar yükleniyor...", fontSize = 11.sp, color = AppColors.TextMuted)
+                        }
+                    }
+                } else {
                 Column {
                     alerts.take(4).forEach { a ->
                         AlertRow(a)
                     }
+                }
                 }
             }
 

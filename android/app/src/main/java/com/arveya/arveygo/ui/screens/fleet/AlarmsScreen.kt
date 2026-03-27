@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,18 +94,22 @@ data class AlarmEvent(
     }
 
     companion object {
-        fun from(json: JSONObject): AlarmEvent = AlarmEvent(
-            id = json.optInt("id", 0),
-            imei = json.optString("imei", ""),
-            plate = json.optString("plate", ""),
-            vehicleName = json.optString("vehicle_name", ""),
-            type = json.optString("type", ""),
-            code = json.optString("code", ""),
-            lat = json.optDouble("lat", 0.0),
-            lng = json.optDouble("lng", 0.0),
-            speed = json.optInt("speed", 0),
-            createdAt = json.optString("created_at", "")
-        )
+        fun from(json: JSONObject): AlarmEvent = try {
+            AlarmEvent(
+                id = json.optInt("id", 0),
+                imei = json.optString("imei", ""),
+                plate = json.optString("plate", ""),
+                vehicleName = json.optString("vehicle_name", ""),
+                type = json.optString("type", ""),
+                code = json.optString("code", ""),
+                lat = json.optDouble("lat", 0.0),
+                lng = json.optDouble("lng", 0.0),
+                speed = json.optInt("speed", 0),
+                createdAt = json.optString("created_at", "")
+            )
+        } catch (e: Exception) {
+            AlarmEvent(0, "", "", "", "unknown", "", 0.0, 0.0, 0, "")
+        }
     }
 }
 

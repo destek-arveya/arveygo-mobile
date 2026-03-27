@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -606,30 +607,109 @@ fun DriverFormDialog(editDriver: Driver?, onDismiss: () -> Unit, onSave: (Map<St
                             Text("Araçlar yükleniyor...", fontSize = 12.sp, color = AppColors.TextMuted)
                         }
                     } else {
+                        var vehicleSearchText by remember { mutableStateOf("") }
+                        val filteredVehicles = remember(vehicles, vehicleSearchText) {
+                            if (vehicleSearchText.isEmpty()) vehicles
+                            else vehicles.filter {
+                                it.plate.contains(vehicleSearchText, ignoreCase = true) ||
+                                it.name.contains(vehicleSearchText, ignoreCase = true)
+                            }
+                        }
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("Araç Seç", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted)
-                            ExposedDropdownMenuBox(expanded = vehicleExpanded, onExpandedChange = { vehicleExpanded = it }) {
-                                OutlinedTextField(
-                                    value = selectedVehicleId?.let { id -> vehicles.find { it.id == id }?.let { "${it.plate} — ${it.name}" } } ?: "Araç atanmamış",
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    leadingIcon = { Icon(Icons.Default.DirectionsCar, null, tint = AppColors.Indigo, modifier = Modifier.size(16.dp)) },
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = vehicleExpanded) },
-                                    modifier = Modifier.fillMaxWidth().menuAnchor(),
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = AppColors.Indigo,
-                                        unfocusedBorderColor = AppColors.BorderSoft,
-                                        focusedContainerColor = AppColors.Bg,
-                                        unfocusedContainerColor = AppColors.Bg
-                                    )
+
+                            // Selected vehicle display
+                            selectedVehicleId?.let { id ->
+                                vehicles.find { it.id == id }?.let { v ->
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(AppColors.Indigo.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
+                                            .border(1.dp, AppColors.Indigo.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                                    ) {
+                                        Icon(Icons.Default.DirectionsCar, null, tint = AppColors.Indigo, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("${v.plate} — ${v.name}", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy, modifier = Modifier.weight(1f))
+                                        IconButton(onClick = { selectedVehicleId = null }, modifier = Modifier.size(24.dp)) {
+                                            Icon(Icons.Default.Close, null, tint = AppColors.TextMuted, modifier = Modifier.size(14.dp))
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Search field
+                            OutlinedTextField(
+                                value = vehicleSearchText,
+                                onValueChange = { vehicleSearchText = it; vehicleExpanded = true },
+                                placeholder = { Text("Plaka veya araç adı ara...", fontSize = 13.sp, color = AppColors.TextFaint) },
+                                leadingIcon = { Icon(Icons.Default.Search, null, tint = AppColors.TextMuted, modifier = Modifier.size(16.dp)) },
+                                trailingIcon = {
+                                    if (vehicleSearchText.isNotEmpty()) {
+                                        IconButton(onClick = { vehicleSearchText = "" }) {
+                                            Icon(Icons.Default.Close, null, tint = AppColors.TextMuted, modifier = Modifier.size(14.dp))
+                                        }
+                                    }
+                                },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = AppColors.Indigo,
+                                    unfocusedBorderColor = AppColors.BorderSoft,
+                                    focusedContainerColor = AppColors.Bg,
+                                    unfocusedContainerColor = AppColors.Bg
                                 )
-                                ExposedDropdownMenu(expanded = vehicleExpanded, onDismissRequest = { vehicleExpanded = false }) {
-                                    DropdownMenuItem(text = { Text("Araç atanmamış") }, onClick = { selectedVehicleId = null; vehicleExpanded = false })
-                                    vehicles.forEach { v ->
-                                        DropdownMenuItem(
-                                            text = { Text("${v.plate} — ${v.name}", fontSize = 13.sp) },
-                                            onClick = { selectedVehicleId = v.id; vehicleExpanded = false }
+                            )
+
+                            // Vehicle list (show when searching or expanded)
+                            if (vehicleSearchText.isNotEmpty() || vehicleExpanded) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 200.dp)
+                                        .background(AppColors.Surface, RoundedCornerShape(10.dp))
+                                        .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(10.dp))
+                                        .verticalScroll(rememberScrollState())
+                                ) {
+                                    // Unassign option
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { selectedVehicleId = null; vehicleExpanded = false; vehicleSearchText = "" }
+                                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                                    ) {
+                                        Icon(Icons.Default.RemoveCircleOutline, null, tint = AppColors.TextMuted, modifier = Modifier.size(14.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Araç atanmamış", fontSize = 13.sp, color = AppColors.TextMuted)
+                                    }
+                                    HorizontalDivider(color = AppColors.BorderSoft.copy(alpha = 0.5f))
+
+                                    filteredVehicles.forEach { v ->
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { selectedVehicleId = v.id; vehicleExpanded = false; vehicleSearchText = "" }
+                                                .background(if (selectedVehicleId == v.id) AppColors.Indigo.copy(alpha = 0.06f) else Color.Transparent)
+                                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                                        ) {
+                                            Icon(Icons.Default.DirectionsCar, null, tint = AppColors.Indigo, modifier = Modifier.size(14.dp))
+                                            Spacer(Modifier.width(8.dp))
+                                            Text("${v.plate} — ${v.name}", fontSize = 13.sp, color = AppColors.Navy)
+                                        }
+                                        HorizontalDivider(color = AppColors.BorderSoft.copy(alpha = 0.3f))
+                                    }
+
+                                    if (filteredVehicles.isEmpty() && vehicleSearchText.isNotEmpty()) {
+                                        Text(
+                                            "Araç bulunamadı",
+                                            fontSize = 12.sp,
+                                            color = AppColors.TextMuted,
+                                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                            textAlign = TextAlign.Center
                                         )
                                     }
                                 }

@@ -10,6 +10,8 @@ class DashboardViewModel: ObservableObject {
     @Published var selectedPeriod: String = "today"
     @Published var isLoading = false
     @Published var isRefreshing = false
+    @Published var isLoadingDrivers = false
+    @Published var isLoadingAlerts = false
 
     private var cancellables = Set<AnyCancellable>()
     private let wsManager = WebSocketManager.shared
@@ -84,7 +86,7 @@ class DashboardViewModel: ObservableObject {
     init() {
         subscribeToWebSocket()
         loadDriversFromAPI()
-        loadDummyAlerts()
+        loadAlertsFromAPI()
     }
 
     // MARK: - WebSocket Subscription
@@ -149,6 +151,7 @@ class DashboardViewModel: ObservableObject {
 
     /// Load drivers from API and convert to DriverScore for dashboard display
     func loadDriversFromAPI() {
+        isLoadingDrivers = true
         Task {
             do {
                 let response = try await APIService.shared.fetchDrivers()
@@ -172,12 +175,93 @@ class DashboardViewModel: ObservableObject {
                     }
                 await MainActor.run {
                     self.drivers = scores
+                    self.isLoadingDrivers = false
                 }
             } catch {
                 print("[DashboardVM] fetchDrivers error: \(error)")
-                // Fallback: keep empty (no dummy data)
+                await MainActor.run {
+                    self.isLoadingDrivers = false
+                }
             }
         }
+    }
+
+    /// Load alerts from API
+    func loadAlertsFromAPI() {
+        isLoadingAlerts = true
+        Task {
+            do {
+                let json = try await APIService.shared.get("/api/mobile/alarms?per_page=5")
+                if let dataArr = json["data"] as? [[String: Any]], !dataArr.isEmpty {
+                    let alertList: [FleetAlert] = dataArr.compactMap { a in
+                        let type = a["type"] as? String ?? ""
+                        let severity: AlertSeverity = {
+                            if type.contains("overspeed") || type.contains("sos") || type.contains("power") { return .red }
+                            if type.contains("brake") || type.contains("disconnect") || type.contains("idle") { return .amber }
+                            if type.contains("geofence") { return .green }
+                            return .blue
+                        }()
+                        let typeLabel: String = {
+                            switch type.lowercased() {
+                            case "overspeed": return "Hız Aşımı"
+                            case "harsh_brake": return "Sert Fren"
+                            case "harsh_acceleration": return "Sert Hızlanma"
+                            case "idle": return "Rölanti"
+                            case "geofence_enter": return "Bölgeye Giriş"
+                            case "geofence_exit": return "Bölgeden Çıkış"
+                            case "disconnect": return "Bağlantı Koptu"
+                            case "sos": return "SOS / Panik"
+                            case "power_cut": return "Güç Kesildi"
+                            default: return type.replacingOccurrences(of: "_", with: " ").prefix(1).uppercased() + type.replacingOccurrences(of: "_", with: " ").dropFirst()
+                            }
+                        }()
+                        let plate = a["plate"] as? String ?? ""
+                        let vehicleName = a["vehicle_name"] as? String ?? ""
+                        let code = a["code"] as? String ?? ""
+                        let desc = !plate.isEmpty ? "\(plate) — \(code)" : !vehicleName.isEmpty ? "\(vehicleName) — \(code)" : code
+                        let createdAt = a["created_at"] as? String ?? ""
+                        let timeAgo = self.formatTimeAgo(createdAt)
+                        let id = "\(a["id"] ?? 0)"
+                        return FleetAlert(id: id, title: typeLabel, description: desc, time: timeAgo, severity: severity)
+                    }
+                    await MainActor.run {
+                        self.alerts = alertList
+                        self.isLoadingAlerts = false
+                    }
+                } else {
+                    await MainActor.run {
+                        self.loadDummyAlerts()
+                        self.isLoadingAlerts = false
+                    }
+                }
+            } catch {
+                print("[DashboardVM] fetchAlarms error: \(error)")
+                await MainActor.run {
+                    self.loadDummyAlerts()
+                    self.isLoadingAlerts = false
+                }
+            }
+        }
+    }
+
+    private func formatTimeAgo(_ dateStr: String) -> String {
+        guard dateStr.count >= 16 else { return dateStr }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.locale = Locale(identifier: "tr_TR")
+        guard let date = formatter.date(from: dateStr) else { return dateStr }
+        let diff = Date().timeIntervalSince(date)
+        let minutes = Int(diff / 60)
+        let hours = minutes / 60
+        let days = hours / 24
+        if minutes < 1 { return "Az önce" }
+        if minutes < 60 { return "\(minutes) dk" }
+        if hours < 24 { return "\(hours) sa" }
+        if days < 7 { return "\(days) gün" }
+        let shortFormatter = DateFormatter()
+        shortFormatter.dateFormat = "d MMM"
+        shortFormatter.locale = Locale(identifier: "tr_TR")
+        return shortFormatter.string(from: date)
     }
 
     /// Load dummy alerts (alerts API not yet available)
@@ -202,6 +286,7 @@ class DashboardViewModel: ObservableObject {
         isRefreshing = true
         wsManager.reconnect()
         loadDriversFromAPI()
+        loadAlertsFromAPI()
         // 2 saniye sonra refreshing durumunu kapat
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
             self?.isRefreshing = false

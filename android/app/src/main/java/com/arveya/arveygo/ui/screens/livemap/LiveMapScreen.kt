@@ -237,7 +237,6 @@ fun LiveMapScreen(
     val wsStatus by vm.wsStatus.collectAsState()
     var selectedVehicle by remember { mutableStateOf<Vehicle?>(null) }
     var detailVehicle by remember { mutableStateOf<Vehicle?>(null) }
-    var showVehicleList by remember { mutableStateOf(true) }
     var trackingVehicleId by remember { mutableStateOf<String?>(null) }
 
     // Trail history: keep last 20 positions per vehicle (persists through idle/rölanti)
@@ -602,32 +601,6 @@ fun LiveMapScreen(
                     horizontalArrangement = Arrangement.End,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
                 ) {
-                    FloatingActionButton(
-                        onClick = { showVehicleList = !showVehicleList },
-                        containerColor = AppColors.Surface,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            if (showVehicleList) Icons.Default.KeyboardArrowDown else Icons.Default.FormatListBulleted,
-                            null, tint = AppColors.Navy, modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-
-                // Vehicle list bottom sheet
-                AnimatedVisibility(
-                    visible = showVehicleList && selectedVehicle == null,
-                    enter = slideInVertically(initialOffsetY = { it }),
-                    exit = slideOutVertically(targetOffsetY = { it })
-                ) {
-                    VehicleListSheet(
-                        vehicles = filteredVehicles,
-                        onSelect = { v ->
-                            selectedVehicle = v
-                            mapViewRef.value?.controller?.animateTo(GeoPoint(v.lat, v.lng), 15.0, 800L)
-                        },
-                        onClose = { showVehicleList = false }
-                    )
                 }
 
                 // Selected vehicle popup
@@ -725,6 +698,7 @@ private fun openMapsDirectionsLiveMap(context: Context, lat: Double, lng: Double
 }
 
 // Vehicle Popup Sheet (redesigned to match VehicleDetailScreen identity card)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun VehiclePopupCard(
     vehicle: Vehicle,
@@ -736,13 +710,32 @@ private fun VehiclePopupCard(
     onNavigateToAlarms: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = sheetState,
+        containerColor = AppColors.Surface,
+        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+        dragHandle = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(Modifier.height(8.dp))
+                Box(
+                    Modifier
+                        .width(36.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(AppColors.BorderSoft)
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-            .background(AppColors.Surface, RoundedCornerShape(18.dp))
-            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(18.dp))
-            .padding(top = 16.dp)
+            .verticalScroll(rememberScrollState())
+            .padding(top = 4.dp)
     ) {
         // Identity Card (matching detail page)
         Column(
@@ -919,6 +912,7 @@ private fun VehiclePopupCard(
 
         Spacer(Modifier.height(16.dp))
     }
+    } // ModalBottomSheet
 }
 
 @Composable

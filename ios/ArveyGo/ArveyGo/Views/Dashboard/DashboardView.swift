@@ -282,6 +282,17 @@ struct DashboardView: View {
         CardView(title: DL.driverScores, count: "\(DL.avgPrefix): \(dashVM.avgScore)", actionLabel: DL.detailLabel) {
             selectedPage = .drivers
         } content: {
+            if dashVM.isLoadingDrivers && dashVM.drivers.isEmpty {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Sürücüler yükleniyor...")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.textMuted)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+            } else {
             VStack(spacing: 0) {
                 ForEach(Array(dashVM.drivers.enumerated()), id: \.element.id) { index, driver in
                     HStack(spacing: 10) {
@@ -335,6 +346,7 @@ struct DashboardView: View {
                     }
                 }
             }
+            } // else
         }
     }
 
@@ -390,6 +402,17 @@ struct DashboardView: View {
         CardView(title: DL.recentAlarms, count: "\(dashVM.alerts.count)", actionLabel: DL.allLabel) {
             selectedPage = .alarms
         } content: {
+            if dashVM.isLoadingAlerts && dashVM.alerts.isEmpty {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Alarmlar yükleniyor...")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.textMuted)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+            } else {
             VStack(spacing: 0) {
                 ForEach(dashVM.alerts) { alert in
                     HStack(spacing: 10) {
@@ -422,6 +445,7 @@ struct DashboardView: View {
                     }
                 }
             }
+            } // else
         }
     }
 

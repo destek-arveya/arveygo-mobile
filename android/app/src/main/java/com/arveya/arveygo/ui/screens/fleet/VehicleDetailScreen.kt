@@ -34,6 +34,7 @@ import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 
 // Tab enum matching iOS
 private enum class DetailTab(val label: String) {
@@ -208,6 +209,42 @@ private fun MapHeader(vehicle: Vehicle, context: Context) {
                     zoomController.setVisibility(
                         org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER
                     )
+                    // Add vehicle marker
+                    val marker = Marker(this)
+                    marker.position = GeoPoint(vehicle.lat, vehicle.lng)
+                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    marker.title = vehicle.plate
+                    marker.snippet = vehicle.model
+                    marker.infoWindow = null
+                    // Create colored marker icon
+                    val statusColor = when (vehicle.status) {
+                        VehicleStatus.ONLINE -> android.graphics.Color.rgb(34, 197, 94)
+                        VehicleStatus.OFFLINE -> android.graphics.Color.rgb(239, 68, 68)
+                        VehicleStatus.IDLE -> android.graphics.Color.rgb(245, 158, 11)
+                    }
+                    val density = ctx.resources.displayMetrics.density
+                    val pinSize = (36 * density).toInt()
+                    val bitmap = android.graphics.Bitmap.createBitmap(pinSize, pinSize, android.graphics.Bitmap.Config.ARGB_8888)
+                    val canvas = android.graphics.Canvas(bitmap)
+                    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                        color = statusColor
+                    }
+                    val borderPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                        color = android.graphics.Color.WHITE
+                        style = android.graphics.Paint.Style.STROKE
+                        strokeWidth = 3f * density
+                    }
+                    canvas.drawCircle(pinSize / 2f, pinSize / 2f, pinSize / 2f - 2f * density, paint)
+                    canvas.drawCircle(pinSize / 2f, pinSize / 2f, pinSize / 2f - 2f * density, borderPaint)
+                    // Draw car icon
+                    val iconPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                        color = android.graphics.Color.WHITE
+                        textSize = 16f * density
+                        textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                    canvas.drawText("🚗", pinSize / 2f, pinSize / 2f + 6f * density, iconPaint)
+                    marker.icon = android.graphics.drawable.BitmapDrawable(ctx.resources, bitmap)
+                    overlays.add(marker)
                 }
             },
             modifier = Modifier.fillMaxSize()

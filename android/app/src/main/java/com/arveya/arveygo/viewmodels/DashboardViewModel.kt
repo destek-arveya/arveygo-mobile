@@ -24,6 +24,12 @@ class DashboardViewModel : ViewModel() {
     private val _alerts = MutableStateFlow<List<FleetAlert>>(emptyList())
     val alerts: StateFlow<List<FleetAlert>> = _alerts
 
+    private val _isLoadingDrivers = MutableStateFlow(false)
+    val isLoadingDrivers: StateFlow<Boolean> = _isLoadingDrivers
+
+    private val _isLoadingAlerts = MutableStateFlow(false)
+    val isLoadingAlerts: StateFlow<Boolean> = _isLoadingAlerts
+
     private val _selectedPeriod = MutableStateFlow("today")
     val selectedPeriod: StateFlow<String> = _selectedPeriod
 
@@ -49,6 +55,7 @@ class DashboardViewModel : ViewModel() {
             _isRefreshing.value = true
             WebSocketManager.reconnect()
             loadDriversFromAPI()
+            loadAlertsFromAPI()
             delay(2000)
             _isRefreshing.value = false
         }
@@ -69,7 +76,7 @@ class DashboardViewModel : ViewModel() {
     init {
         subscribeToWebSocket()
         loadDriversFromAPI()
-        loadDummyAlerts()
+        loadAlertsFromAPI()
     }
 
     private fun subscribeToWebSocket() {
@@ -92,6 +99,7 @@ class DashboardViewModel : ViewModel() {
 
     private fun loadDriversFromAPI() {
         viewModelScope.launch {
+            _isLoadingDrivers.value = true
             try {
                 val response = APIService.fetchDrivers()
                 val avatarColors = listOf(
@@ -115,7 +123,82 @@ class DashboardViewModel : ViewModel() {
             } catch (e: Exception) {
                 android.util.Log.e("DashboardVM", "fetchDrivers error", e)
             }
+            _isLoadingDrivers.value = false
         }
+    }
+
+    private fun loadAlertsFromAPI() {
+        viewModelScope.launch {
+            _isLoadingAlerts.value = true
+            try {
+                val json = APIService.get("/api/mobile/alarms?per_page=5")
+                val dataArr = json.optJSONArray("data")
+                if (dataArr != null && dataArr.length() > 0) {
+                    val alertList = mutableListOf<FleetAlert>()
+                    for (i in 0 until dataArr.length()) {
+                        val a = dataArr.getJSONObject(i)
+                        val type = a.optString("type", "")
+                        val severity = when {
+                            type.contains("overspeed", true) || type.contains("sos", true) || type.contains("power", true) -> AlertSeverity.RED
+                            type.contains("brake", true) || type.contains("disconnect", true) || type.contains("idle", true) -> AlertSeverity.AMBER
+                            type.contains("geofence", true) -> AlertSeverity.GREEN
+                            else -> AlertSeverity.BLUE
+                        }
+                        val typeLabel = when (type.lowercase()) {
+                            "overspeed" -> "Hız Aşımı"
+                            "harsh_brake" -> "Sert Fren"
+                            "harsh_acceleration" -> "Sert Hızlanma"
+                            "idle" -> "Rölanti"
+                            "geofence_enter" -> "Bölgeye Giriş"
+                            "geofence_exit" -> "Bölgeden Çıkış"
+                            "disconnect" -> "Bağlantı Koptu"
+                            "sos" -> "SOS / Panik"
+                            "power_cut" -> "Güç Kesildi"
+                            else -> type.replace("_", " ").replaceFirstChar { it.uppercase() }
+                        }
+                        val plate = a.optString("plate", "")
+                        val vehicleName = a.optString("vehicle_name", "")
+                        val code = a.optString("code", "")
+                        val desc = if (plate.isNotEmpty()) "$plate — $code" else if (vehicleName.isNotEmpty()) "$vehicleName — $code" else code
+                        val createdAt = a.optString("created_at", "")
+                        val timeAgo = formatTimeAgo(createdAt)
+                        alertList.add(FleetAlert("${a.optInt("id", i)}", typeLabel, desc, timeAgo, severity))
+                    }
+                    _alerts.value = alertList
+                } else {
+                    loadDummyAlerts()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("DashboardVM", "fetchAlarms error", e)
+                loadDummyAlerts()
+            }
+            _isLoadingAlerts.value = false
+        }
+    }
+
+    private fun formatTimeAgo(dateStr: String): String {
+        if (dateStr.length < 16) return dateStr
+        return try {
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale("tr", "TR"))
+            val date = sdf.parse(dateStr) ?: return dateStr
+            val diff = System.currentTimeMillis() - date.time
+            val minutes = diff / 60000
+            val hours = minutes / 60
+            val days = hours / 24
+            when {
+                minutes < 1 -> "Az önce"
+                minutes < 60 -> "$minutes dk"
+                hours < 24 -> "$hours sa"
+                days < 7 -> "$days gün"
+                else -> {
+                    val parts = dateStr.split(" ")
+                    val dateParts = parts[0].split("-")
+                    val months = arrayOf("", "Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara")
+                    val month = dateParts[1].toIntOrNull() ?: 0
+                    "${dateParts[2]} ${months[month.coerceIn(0, 12)]}"
+                }
+            }
+        } catch (_: Exception) { dateStr }
     }
 
     private fun loadDummyAlerts() {

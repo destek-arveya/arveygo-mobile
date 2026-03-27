@@ -562,33 +562,38 @@ struct DriverFormSheet: View {
                                 Text("Araç Seç")
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundColor(AppTheme.textMuted)
-                                Menu {
-                                    Button("Araç atanmamış") { selectedVehicleId = nil }
-                                    ForEach(vehicles) { v in
-                                        Button("\(v.plate) — \(v.name)") { selectedVehicleId = v.id }
-                                    }
-                                } label: {
-                                    HStack {
+
+                                // Selected vehicle display
+                                if let id = selectedVehicleId, let v = vehicles.first(where: { $0.id == id }) {
+                                    HStack(spacing: 8) {
                                         Image(systemName: "car.fill")
                                             .font(.system(size: 13))
                                             .foregroundColor(AppTheme.indigo)
-                                        Text(selectedVehicleId.flatMap { id in vehicles.first(where: { $0.id == id }).map { "\($0.plate) — \($0.name)" } } ?? "Araç atanmamış")
-                                            .font(.system(size: 14))
-                                            .foregroundColor(selectedVehicleId != nil ? AppTheme.navy : AppTheme.textMuted)
+                                        Text("\(v.plate) — \(v.name)")
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundColor(AppTheme.navy)
                                         Spacer()
-                                        Image(systemName: "chevron.up.chevron.down")
-                                            .font(.system(size: 11))
-                                            .foregroundColor(AppTheme.textFaint)
+                                        Button { selectedVehicleId = nil } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.system(size: 14))
+                                                .foregroundColor(AppTheme.textMuted)
+                                        }
                                     }
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 10)
-                                    .background(AppTheme.bgAlt)
+                                    .background(AppTheme.indigo.opacity(0.06))
                                     .cornerRadius(10)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 10)
-                                            .stroke(AppTheme.borderSoft, lineWidth: 1)
+                                            .stroke(AppTheme.indigo.opacity(0.2), lineWidth: 1)
                                     )
                                 }
+
+                                // Search field
+                                SearchableVehiclePicker(
+                                    vehicles: vehicles,
+                                    selectedVehicleId: $selectedVehicleId
+                                )
                             }
                         }
                     }
@@ -779,6 +784,123 @@ struct DriverFormSheet: View {
                 } catch {
                     print("[DriverForm] Assign vehicle error: \(error)")
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Searchable Vehicle Picker
+struct SearchableVehiclePicker: View {
+    let vehicles: [CatalogVehicle]
+    @Binding var selectedVehicleId: Int?
+    @State private var searchText = ""
+    @State private var isExpanded = false
+
+    var filteredVehicles: [CatalogVehicle] {
+        if searchText.isEmpty { return vehicles }
+        return vehicles.filter {
+            $0.plate.localizedCaseInsensitiveContains(searchText) ||
+            $0.name.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            // Search field
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textMuted)
+                TextField("Plaka veya araç adı ara...", text: $searchText)
+                    .font(.system(size: 13))
+                    .onTapGesture { isExpanded = true }
+                if !searchText.isEmpty {
+                    Button { searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.textMuted)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(AppTheme.bgAlt)
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(AppTheme.borderSoft, lineWidth: 1)
+            )
+
+            // Vehicle list
+            if isExpanded || !searchText.isEmpty {
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Unassign option
+                        Button {
+                            selectedVehicleId = nil
+                            isExpanded = false
+                            searchText = ""
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "minus.circle")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppTheme.textMuted)
+                                Text("Araç atanmamış")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(AppTheme.textMuted)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+
+                        Divider()
+
+                        ForEach(filteredVehicles) { v in
+                            Button {
+                                selectedVehicleId = v.id
+                                isExpanded = false
+                                searchText = ""
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "car.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(AppTheme.indigo)
+                                    Text("\(v.plate) — \(v.name)")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(AppTheme.navy)
+                                    Spacer()
+                                    if selectedVehicleId == v.id {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundColor(AppTheme.indigo)
+                                    }
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .background(selectedVehicleId == v.id ? AppTheme.indigo.opacity(0.06) : Color.clear)
+                            }
+                            .buttonStyle(.plain)
+
+                            Divider()
+                        }
+
+                        if filteredVehicles.isEmpty && !searchText.isEmpty {
+                            Text("Araç bulunamadı")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.textMuted)
+                                .padding(16)
+                        }
+                    }
+                }
+                .frame(maxHeight: 200)
+                .background(AppTheme.surface)
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(AppTheme.borderSoft, lineWidth: 1)
+                )
             }
         }
     }
