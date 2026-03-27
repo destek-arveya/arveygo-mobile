@@ -138,28 +138,33 @@ class DashboardViewModel : ViewModel() {
                     for (i in 0 until dataArr.length()) {
                         val a = dataArr.getJSONObject(i)
                         val type = a.optString("type", "")
+                        val code = a.optString("code", "")
+                        val description = a.optString("description", "")
+                        val key = "$code $type $description".lowercase()
                         val severity = when {
-                            type.contains("overspeed", true) || type.contains("sos", true) || type.contains("power", true) -> AlertSeverity.RED
-                            type.contains("brake", true) || type.contains("disconnect", true) || type.contains("idle", true) -> AlertSeverity.AMBER
-                            type.contains("geofence", true) -> AlertSeverity.GREEN
+                            key.contains("overspeed") || key.contains("sos") || key.contains("power") || key.contains("t_towing") || key.contains("çekme") -> AlertSeverity.RED
+                            key.contains("brake") || key.contains("disconnect") || key.contains("idle") || key.contains("t_movement") || key.contains("hareket") -> AlertSeverity.AMBER
+                            key.contains("geofence") || key.contains("gf_") -> AlertSeverity.GREEN
                             else -> AlertSeverity.BLUE
                         }
-                        val typeLabel = when (type.lowercase()) {
-                            "overspeed" -> "Hız Aşımı"
-                            "harsh_brake" -> "Sert Fren"
-                            "harsh_acceleration" -> "Sert Hızlanma"
-                            "idle" -> "Rölanti"
-                            "geofence_enter" -> "Bölgeye Giriş"
-                            "geofence_exit" -> "Bölgeden Çıkış"
-                            "disconnect" -> "Bağlantı Koptu"
-                            "sos" -> "SOS / Panik"
-                            "power_cut" -> "Güç Kesildi"
+                        val typeLabel = when {
+                            key.contains("t_movement") || key.contains("hareket") -> "Hareket Algılandı"
+                            key.contains("t_towing") || key.contains("çekme") || key.contains("taşıma") -> "Çekme/Taşıma Alarmı"
+                            key.contains("gf_exit") -> "Bölgeden Çıkış"
+                            key.contains("gf_enter") -> "Bölgeye Giriş"
+                            key.contains("overspeed") || key.contains("hız") -> "Hız Aşımı"
+                            key.contains("harsh_brake") || key.contains("fren") -> "Sert Fren"
+                            key.contains("idle") || key.contains("rölanti") -> "Rölanti"
+                            key.contains("disconnect") -> "Bağlantı Koptu"
+                            key.contains("sos") || key.contains("panik") -> "SOS / Panik"
+                            key.contains("power_cut") -> "Güç Kesildi"
+                            description.isNotEmpty() -> description
                             else -> type.replace("_", " ").replaceFirstChar { it.uppercase() }
                         }
                         val plate = a.optString("plate", "")
                         val vehicleName = a.optString("vehicle_name", "")
-                        val code = a.optString("code", "")
-                        val desc = if (plate.isNotEmpty()) "$plate — $code" else if (vehicleName.isNotEmpty()) "$vehicleName — $code" else code
+                        val descText = description.ifEmpty { code }
+                        val desc = if (plate.isNotEmpty()) "$plate — $descText" else if (vehicleName.isNotEmpty()) "$vehicleName — $descText" else descText
                         val createdAt = a.optString("created_at", "")
                         val timeAgo = formatTimeAgo(createdAt)
                         alertList.add(FleetAlert("${a.optInt("id", i)}", typeLabel, desc, timeAgo, severity))

@@ -74,6 +74,10 @@ fun VehicleDetailScreen(
         val dailyFuelPer100kmVal = detail.optDouble("dailyFuelPer100km", 0.0)
         val odometerVal = detail.optDouble("odometer", 0.0)
         val kmVal = detail.optDouble("km", 0.0)
+        // Ignition timestamps from API
+        val firstIgnitionToday = detail.optString("first_ignition_on_at_today", "").let { if (it.isNotEmpty() && it != "null") it else null }
+        val lastIgnitionOn = detail.optString("last_ignition_on_at", "").let { if (it.isNotEmpty() && it != "null") it else null }
+        val lastIgnitionOff = detail.optString("last_ignition_off_at", "").let { if (it.isNotEmpty() && it != "null") it else null }
 
         currentVehicle = currentVehicle.copy(
             todayKm = dailyKmVal.toInt(),
@@ -87,7 +91,10 @@ fun VehicleDetailScreen(
             dailyFuelLiters = if (dailyFuelLitersVal > 0) dailyFuelLitersVal else currentVehicle.dailyFuelLiters,
             dailyFuelPer100km = if (dailyFuelPer100kmVal > 0) dailyFuelPer100kmVal else currentVehicle.dailyFuelPer100km,
             totalKm = if (odometerVal > 0) odometerVal.toInt() else if (kmVal > 0) kmVal.toInt() else currentVehicle.totalKm,
-            odometer = if (odometerVal > 0) odometerVal else if (kmVal > 0) kmVal else currentVehicle.odometer
+            odometer = if (odometerVal > 0) odometerVal else if (kmVal > 0) kmVal else currentVehicle.odometer,
+            firstIgnitionOnAtToday = firstIgnitionToday ?: currentVehicle.firstIgnitionOnAtToday,
+            lastIgnitionOnAt = lastIgnitionOn ?: currentVehicle.lastIgnitionOnAt,
+            lastIgnitionOffAt = lastIgnitionOff ?: currentVehicle.lastIgnitionOffAt
         )
     }
 
@@ -706,21 +713,66 @@ private fun CostsTab(vehicle: Vehicle) {
 // MARK: - Events Tab
 @Composable
 private fun EventsTab(vehicle: Vehicle) {
+    var alarms by remember { mutableStateOf<List<AlarmEvent>>(emptyList()) }
+    var isLoadingAlarms by remember { mutableStateOf(true) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(vehicle.imei) {
+        isLoadingAlarms = true
+        try {
+            // Fetch all alarms and filter client-side by this vehicle's imei
+            val json = APIService.get("/api/mobile/alarms?page=1&per_page=50")
+            val dataArr = json.optJSONArray("data")
+            val results = mutableListOf<AlarmEvent>()
+            if (dataArr != null) {
+                for (i in 0 until dataArr.length()) {
+                    val a = AlarmEvent.from(dataArr.getJSONObject(i), i)
+                    if (a.imei == vehicle.imei || a.plate == vehicle.plate) {
+                        results.add(a)
+                    }
+                }
+            }
+            alarms = results.take(20)
+        } catch (_: Exception) {
+            alarms = emptyList()
+        }
+        isLoadingAlarms = false
+    }
+
     SectionCard(title = "SON OLAYLAR", icon = Icons.Default.Schedule) {
-        Column {
-            EventRow(Icons.Default.LocationOn, "Geofence Çıkışı", "İstanbul → Ankara yolu", "Bugün 14:32", AlertSeverity.AMBER)
-            HorizontalDivider(modifier = Modifier.padding(start = 48.dp), color = AppColors.BorderSoft)
-            EventRow(Icons.Default.Speed, "Hız İhlali", "132 km/h (Limit: 110 km/h)", "Bugün 11:45", AlertSeverity.RED)
-            HorizontalDivider(modifier = Modifier.padding(start = 48.dp), color = AppColors.BorderSoft)
-            EventRow(Icons.Default.VpnKey, "Kontak Açıldı", vehicle.city, "Bugün 08:15", AlertSeverity.GREEN)
-            HorizontalDivider(modifier = Modifier.padding(start = 48.dp), color = AppColors.BorderSoft)
-            EventRow(Icons.Default.VpnKey, "Kontak Kapatıldı", vehicle.city, "Dün 19:30", AlertSeverity.BLUE)
-            HorizontalDivider(modifier = Modifier.padding(start = 48.dp), color = AppColors.BorderSoft)
-            EventRow(Icons.Default.PauseCircle, "5 dk Rölanti", "Ankara - Çankaya", "Dün 15:12", AlertSeverity.AMBER)
-            HorizontalDivider(modifier = Modifier.padding(start = 48.dp), color = AppColors.BorderSoft)
-            EventRow(Icons.Default.LocalGasStation, "Yakıt Doldurma", "45 Lt Dizel", "Dün 09:40", AlertSeverity.BLUE)
-            HorizontalDivider(modifier = Modifier.padding(start = 48.dp), color = AppColors.BorderSoft)
-            EventRow(Icons.Default.Warning, "Ani Fren", "E-5 Karayolu", "22.03.2026 16:20", AlertSeverity.RED)
+        if (isLoadingAlarms) {
+            Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = AppColors.Indigo, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+            }
+        } else if (alarms.isEmpty()) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().padding(24.dp)
+            ) {
+                Icon(Icons.Default.NotificationsOff, null, tint = AppColors.TextFaint, modifier = Modifier.size(32.dp))
+                Spacer(Modifier.height(8.dp))
+                Text("Bu araç için alarm bulunamadı", fontSize = 13.sp, color = AppColors.TextMuted)
+            }
+        } else {
+            Column {
+                alarms.forEachIndexed { index, alarm ->
+                    EventRow(
+                        alarm.icon,
+                        alarm.typeLabel,
+                        alarm.description.ifEmpty { alarm.plate },
+                        alarm.formattedDate,
+                        when {
+                            alarm.alarmKey.contains("GF_", true) || alarm.alarmKey.contains("geofence", true) -> AlertSeverity.GREEN
+                            alarm.alarmKey.contains("T_TOWING", true) || alarm.alarmKey.contains("sos", true) -> AlertSeverity.RED
+                            alarm.alarmKey.contains("T_MOVEMENT", true) -> AlertSeverity.AMBER
+                            else -> AlertSeverity.BLUE
+                        }
+                    )
+                    if (index < alarms.size - 1) {
+                        HorizontalDivider(modifier = Modifier.padding(start = 48.dp), color = AppColors.BorderSoft)
+                    }
+                }
+            }
         }
     }
 }

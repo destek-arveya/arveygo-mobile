@@ -49,43 +49,66 @@ data class AlarmEvent(
     val lat: Double,
     val lng: Double,
     val speed: Int,
-    val createdAt: String
+    val createdAt: String,
+    val isActive: Boolean = true
 ) {
+    val statusLabel: String get() = if (isActive) "Aktif" else "Kapandı"
+    val statusColor: Color get() = if (isActive) Color(0xFFEF4444) else Color(0xFF22C55E)
+    // Use code + type + description to determine icon/color/label (type can be device brand like "teltonika")
+    val alarmKey: String get() = "${code.lowercase()} ${type.lowercase()} ${description.lowercase()}"
+
     val icon: ImageVector get() = when {
-        type.contains("overspeed", true) || type.contains("hız", true) -> Icons.Default.Speed
-        type.contains("brake", true) || type.contains("fren", true) -> Icons.Default.Warning
-        type.contains("idle", true) || type.contains("rölanti", true) -> Icons.Default.HourglassBottom
-        type.contains("geofence", true) || type.contains("bölge", true) -> Icons.Default.LocationOn
-        type.contains("disconnect", true) || type.contains("bağlantı", true) -> Icons.Default.WifiOff
-        type.contains("sos", true) || type.contains("panik", true) -> Icons.Default.Emergency
-        type.contains("tow", true) || type.contains("çekici", true) -> Icons.Default.CarCrash
-        type.contains("power", true) || type.contains("güç", true) -> Icons.Default.PowerOff
-        type.contains("battery", true) || type.contains("batarya", true) -> Icons.Default.BatteryAlert
+        alarmKey.contains("overspeed") || alarmKey.contains("hız") -> Icons.Default.Speed
+        alarmKey.contains("brake") || alarmKey.contains("fren") -> Icons.Default.Warning
+        alarmKey.contains("idle") || alarmKey.contains("rölanti") -> Icons.Default.HourglassBottom
+        alarmKey.contains("geofence") || alarmKey.contains("gf_") || alarmKey.contains("bölge") -> Icons.Default.LocationOn
+        alarmKey.contains("disconnect") || alarmKey.contains("bağlantı") -> Icons.Default.WifiOff
+        alarmKey.contains("sos") || alarmKey.contains("panik") -> Icons.Default.Emergency
+        alarmKey.contains("tow") || alarmKey.contains("çek") || alarmKey.contains("taşı") -> Icons.Default.CarCrash
+        alarmKey.contains("power") || alarmKey.contains("güç") -> Icons.Default.PowerOff
+        alarmKey.contains("battery") || alarmKey.contains("batarya") -> Icons.Default.BatteryAlert
+        alarmKey.contains("movement") || alarmKey.contains("hareket") -> Icons.Default.DirectionsCar
         else -> Icons.Default.Notifications
     }
 
     val color: Color get() = when {
-        type.contains("overspeed", true) || type.contains("sos", true) -> Color(0xFFEF4444)
-        type.contains("brake", true) || type.contains("disconnect", true) -> Color(0xFFF97316)
-        type.contains("idle", true) || type.contains("rölanti", true) -> Color(0xFFF59E0B)
-        type.contains("geofence", true) || type.contains("enter", true) -> Color(0xFF22C55E)
+        alarmKey.contains("overspeed") || alarmKey.contains("sos") -> Color(0xFFEF4444)
+        alarmKey.contains("tow") || alarmKey.contains("çek") || alarmKey.contains("taşı") -> Color(0xFFEF4444)
+        alarmKey.contains("brake") || alarmKey.contains("disconnect") -> Color(0xFFF97316)
+        alarmKey.contains("idle") || alarmKey.contains("rölanti") -> Color(0xFFF59E0B)
+        alarmKey.contains("geofence") || alarmKey.contains("gf_") -> Color(0xFF22C55E)
+        alarmKey.contains("movement") || alarmKey.contains("hareket") -> AppColors.Indigo
         else -> AppColors.Indigo
     }
 
-    val typeLabel: String get() = when (type.lowercase()) {
-        "overspeed" -> "Hız Aşımı"
-        "harsh_brake" -> "Sert Fren"
-        "harsh_acceleration" -> "Sert Hızlanma"
-        "idle" -> "Rölanti"
-        "geofence_enter" -> "Bölgeye Giriş"
-        "geofence_exit" -> "Bölgeden Çıkış"
-        "disconnect" -> "Bağlantı Koptu"
-        "sos" -> "SOS / Panik"
-        "tow" -> "Çekici Algılandı"
-        "power_cut" -> "Güç Kesildi"
-        "low_battery" -> "Düşük Batarya"
-        "tampering" -> "Cihaz Müdahalesi"
-        else -> type.replace("_", " ").replaceFirstChar { it.uppercase() }
+    val typeLabel: String get() {
+        // If we have a Turkish description from API, use it directly
+        if (description.isNotEmpty() && !description.equals(code, true)) return description
+        // Map known codes to Turkish labels
+        return when (code.lowercase()) {
+            "t_movement" -> "Hareket Algılandı"
+            "t_towing" -> "Çekme/Taşıma Alarmı"
+            "t_idle" -> "Rölanti"
+            "t_overspeed" -> "Hız Aşımı"
+            "t_harsh_brake", "t_brake" -> "Sert Fren"
+            "t_harsh_acceleration" -> "Sert Hızlanma"
+            "t_power_cut" -> "Güç Kesilmesi"
+            "t_sos" -> "SOS / Panik"
+            "t_jamming" -> "Sinyal Karıştırma"
+            "gf_enter", "geofence_enter" -> "Bölgeye Giriş"
+            "gf_exit", "geofence_exit" -> "Bölgeden Çıkış"
+            "overspeed" -> "Hız Aşımı"
+            "harsh_brake" -> "Sert Fren"
+            "harsh_acceleration" -> "Sert Hızlanma"
+            "idle" -> "Rölanti"
+            "disconnect" -> "Bağlantı Koptu"
+            "sos" -> "SOS / Panik"
+            "tow" -> "Çekici Algılandı"
+            "power_cut" -> "Güç Kesildi"
+            "low_battery" -> "Düşük Batarya"
+            "tampering" -> "Cihaz Müdahalesi"
+            else -> description.ifEmpty { code.replace("_", " ").replaceFirstChar { it.uppercase() } }
+        }
     }
 
     val formattedDate: String get() {
@@ -114,7 +137,8 @@ data class AlarmEvent(
                 lat = json.optString("lat", "0").toDoubleOrNull() ?: 0.0,
                 lng = json.optString("lng", "0").toDoubleOrNull() ?: 0.0,
                 speed = json.optInt("speed", 0),
-                createdAt = json.optString("created_at", "")
+                createdAt = json.optString("created_at", ""),
+                isActive = json.optBoolean("is_active", true)
             )
         } catch (e: Exception) {
             AlarmEvent("fallback_$index", "", "", "", "unknown", "", "", 0.0, 0.0, 0, "")
@@ -798,16 +822,31 @@ private fun AlarmCard(alarm: AlarmEvent, onClick: () -> Unit = {}) {
                 }
             }
 
-            val displayText = alarm.code.ifEmpty { alarm.description }
-            if (displayText.isNotEmpty()) {
-                Spacer(Modifier.height(2.dp))
+            // Status badge + description
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Aktif/Kapandı badge
                 Text(
-                    displayText,
-                    fontSize = 10.sp,
-                    color = AppColors.TextMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    alarm.statusLabel,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = alarm.statusColor,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(alarm.statusColor.copy(alpha = 0.10f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
+
+                val displayText = alarm.description.ifEmpty { alarm.code }
+                if (displayText.isNotEmpty()) {
+                    Text(
+                        displayText,
+                        fontSize = 10.sp,
+                        color = AppColors.TextMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
             }
         }
 
@@ -967,7 +1006,9 @@ private fun AlarmDetailSheet(alarm: AlarmEvent, onDismiss: () -> Unit) {
             HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.Speed, title = "Hız", value = if (alarm.speed > 0) "${alarm.speed} km/s" else "—")
             HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
-            DetailRow(icon = Icons.Default.Description, title = "Açıklama", value = alarm.code.ifEmpty { alarm.description }.ifEmpty { "—" })
+            DetailRow(icon = Icons.Default.Description, title = "Açıklama", value = alarm.description.ifEmpty { alarm.code }.ifEmpty { "—" })
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            DetailRow(icon = Icons.Default.Circle, title = "Durum", value = alarm.statusLabel)
             HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.LocationOn, title = "Konum", value = String.format("%.4f, %.4f", alarm.lat, alarm.lng))
             HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
@@ -1016,11 +1057,14 @@ private fun AlarmDetailSheet(alarm: AlarmEvent, onDismiss: () -> Unit) {
                                     marker.infoWindow = null
 
                                     // Alarm renk ikonu
+                                    val key = alarm.alarmKey
                                     val alarmColor = when {
-                                        alarm.type.contains("overspeed", true) || alarm.type.contains("sos", true) -> android.graphics.Color.rgb(239, 68, 68)
-                                        alarm.type.contains("brake", true) || alarm.type.contains("disconnect", true) -> android.graphics.Color.rgb(249, 115, 22)
-                                        alarm.type.contains("idle", true) -> android.graphics.Color.rgb(245, 158, 11)
-                                        alarm.type.contains("geofence", true) -> android.graphics.Color.rgb(34, 197, 94)
+                                        key.contains("overspeed", true) || key.contains("sos", true) -> android.graphics.Color.rgb(239, 68, 68)
+                                        key.contains("brake", true) || key.contains("disconnect", true) -> android.graphics.Color.rgb(249, 115, 22)
+                                        key.contains("idle", true) -> android.graphics.Color.rgb(245, 158, 11)
+                                        key.contains("geofence", true) || key.contains("GF_", false) -> android.graphics.Color.rgb(34, 197, 94)
+                                        key.contains("T_MOVEMENT", true) || key.contains("hareket", true) -> android.graphics.Color.rgb(249, 115, 22)
+                                        key.contains("T_TOWING", true) || key.contains("çekme", true) || key.contains("taşıma", true) -> android.graphics.Color.rgb(239, 68, 68)
                                         else -> android.graphics.Color.rgb(99, 102, 241)
                                     }
 

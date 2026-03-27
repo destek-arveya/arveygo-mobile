@@ -14,62 +14,57 @@ struct AlarmEvent: Identifiable, Hashable {
     let lng: Double
     let speed: Int
     let createdAt: String
+    let isActive: Bool
 
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: AlarmEvent, rhs: AlarmEvent) -> Bool { lhs.id == rhs.id }
 
+    /// Combined key for matching: code + type + description
+    var alarmKey: String { "\(code) \(type) \(description)" }
+
+    var statusLabel: String { isActive ? "Aktif" : "Kapandı" }
+    var statusColor: Color { isActive ? .green : .gray }
+
     var icon: String {
-        switch type.lowercased() {
-        case let t where t.contains("overspeed") || t.contains("hız"):
-            return "gauge.with.dots.needle.33percent"
-        case let t where t.contains("brake") || t.contains("fren"):
-            return "exclamationmark.octagon.fill"
-        case let t where t.contains("idle") || t.contains("rölanti"):
-            return "clock.fill"
-        case let t where t.contains("geofence") || t.contains("bölge"):
-            return "mappin.and.ellipse"
-        case let t where t.contains("disconnect") || t.contains("bağlantı"):
-            return "antenna.radiowaves.left.and.right.slash"
-        case let t where t.contains("sos") || t.contains("panik"):
-            return "sos"
-        case let t where t.contains("tow") || t.contains("çekici"):
-            return "car.side.rear.and.collision.and.car.side.front"
-        default:
-            return "bell.fill"
-        }
+        let key = alarmKey.lowercased()
+        if key.contains("overspeed") || key.contains("hız") { return "gauge.with.dots.needle.33percent" }
+        if key.contains("brake") || key.contains("fren") { return "exclamationmark.octagon.fill" }
+        if key.contains("idle") || key.contains("rölanti") { return "clock.fill" }
+        if key.contains("gf_exit") || key.contains("geofence") || key.contains("bölge") { return "mappin.and.ellipse" }
+        if key.contains("disconnect") || key.contains("bağlantı") { return "antenna.radiowaves.left.and.right.slash" }
+        if key.contains("sos") || key.contains("panik") { return "sos" }
+        if key.contains("t_towing") || key.contains("çekici") || key.contains("taşıma") || key.contains("çekme") { return "car.side.rear.and.collision.and.car.side.front" }
+        if key.contains("t_movement") || key.contains("hareket") { return "figure.walk.motion" }
+        return "bell.fill"
     }
 
     var color: Color {
-        switch type.lowercased() {
-        case let t where t.contains("overspeed") || t.contains("hız") || t.contains("sos") || t.contains("panik"):
-            return .red
-        case let t where t.contains("brake") || t.contains("fren") || t.contains("disconnect"):
-            return .orange
-        case let t where t.contains("idle") || t.contains("rölanti"):
-            return Color(red: 245/255, green: 158/255, blue: 11/255)
-        case let t where t.contains("geofence") || t.contains("enter"):
-            return .green
-        default:
-            return AppTheme.indigo
-        }
+        let key = alarmKey.lowercased()
+        if key.contains("overspeed") || key.contains("hız") || key.contains("sos") || key.contains("panik") { return .red }
+        if key.contains("t_towing") || key.contains("çekme") || key.contains("taşıma") { return .red }
+        if key.contains("brake") || key.contains("fren") || key.contains("disconnect") { return .orange }
+        if key.contains("t_movement") || key.contains("hareket") { return .orange }
+        if key.contains("idle") || key.contains("rölanti") { return Color(red: 245/255, green: 158/255, blue: 11/255) }
+        if key.contains("geofence") || key.contains("gf_") { return .green }
+        return AppTheme.indigo
     }
 
     var typeLabel: String {
-        switch type.lowercased() {
-        case "overspeed": return "Hız Aşımı"
-        case "harsh_brake": return "Sert Fren"
-        case "harsh_acceleration": return "Sert Hızlanma"
-        case "idle": return "Rölanti"
-        case "geofence_enter": return "Bölgeye Giriş"
-        case "geofence_exit": return "Bölgeden Çıkış"
-        case "disconnect": return "Bağlantı Koptu"
-        case "sos": return "SOS / Panik"
-        case "tow": return "Çekici Algılandı"
-        case "power_cut": return "Güç Kesildi"
-        case "low_battery": return "Düşük Batarya"
-        case "tampering": return "Cihaz Müdahalesi"
-        default: return type.replacingOccurrences(of: "_", with: " ").capitalized
-        }
+        let key = alarmKey.lowercased()
+        if key.contains("t_movement") || key.contains("hareket") { return "Hareket Algılandı" }
+        if key.contains("t_towing") || key.contains("çekme") || key.contains("taşıma") { return "Çekme/Taşıma Alarmı" }
+        if key.contains("gf_exit") { return "Bölgeden Çıkış" }
+        if key.contains("gf_enter") { return "Bölgeye Giriş" }
+        if key.contains("overspeed") || key.contains("hız") { return "Hız Aşımı" }
+        if key.contains("harsh_brake") || key.contains("fren") { return "Sert Fren" }
+        if key.contains("idle") || key.contains("rölanti") { return "Rölanti" }
+        if key.contains("disconnect") { return "Bağlantı Koptu" }
+        if key.contains("sos") || key.contains("panik") { return "SOS / Panik" }
+        if key.contains("power_cut") { return "Güç Kesildi" }
+        if key.contains("low_battery") { return "Düşük Batarya" }
+        // Fallback: use description if available
+        if !description.isEmpty { return description }
+        return type.replacingOccurrences(of: "_", with: " ").capitalized
     }
 
     var formattedDate: String {
@@ -108,7 +103,8 @@ struct AlarmEvent: Identifiable, Hashable {
             lat: latVal,
             lng: lngVal,
             speed: json["speed"] as? Int ?? 0,
-            createdAt: json["created_at"] as? String ?? ""
+            createdAt: json["created_at"] as? String ?? "",
+            isActive: json["is_active"] as? Bool ?? true
         )
     }
 }
@@ -205,16 +201,16 @@ class AlarmsViewModel: ObservableObject {
 
     // MARK: - Dummy Data
     private static let dummyAlarms: [AlarmEvent] = [
-        AlarmEvent(id: "d1", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "overspeed", code: "Hız limiti: 120 km/s, Anlık: 138 km/s", description: "", lat: 39.9208, lng: 32.8541, speed: 138, createdAt: "2026-03-26 14:22:00"),
-        AlarmEvent(id: "d2", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "harsh_brake", code: "Ani fren algılandı", description: "", lat: 41.0082, lng: 28.9784, speed: 67, createdAt: "2026-03-26 13:45:00"),
-        AlarmEvent(id: "d3", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "geofence_exit", code: "Ankara Merkez bölgesinden çıkış", description: "", lat: 39.9334, lng: 32.8597, speed: 45, createdAt: "2026-03-26 12:30:00"),
-        AlarmEvent(id: "d4", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "idle", code: "15 dk rölanti - Kontak açık, araç durağan", description: "", lat: 41.0136, lng: 28.9550, speed: 0, createdAt: "2026-03-26 11:15:00"),
-        AlarmEvent(id: "d5", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "sos", code: "Panik butonu basıldı", description: "", lat: 39.9248, lng: 32.8662, speed: 0, createdAt: "2026-03-26 10:50:00"),
-        AlarmEvent(id: "d6", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "harsh_acceleration", code: "Ani hızlanma algılandı", description: "", lat: 41.0210, lng: 28.9390, speed: 82, createdAt: "2026-03-26 10:05:00"),
-        AlarmEvent(id: "d7", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "disconnect", code: "Cihaz bağlantısı kesildi", description: "", lat: 39.9180, lng: 32.8450, speed: 0, createdAt: "2026-03-26 09:30:00"),
-        AlarmEvent(id: "d8", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "overspeed", code: "Hız limiti: 50 km/s, Anlık: 73 km/s", description: "", lat: 41.0350, lng: 28.9850, speed: 73, createdAt: "2026-03-26 08:45:00"),
-        AlarmEvent(id: "d9", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "geofence_enter", code: "Ankara Merkez bölgesine giriş", description: "", lat: 39.9255, lng: 32.8540, speed: 35, createdAt: "2026-03-26 08:00:00"),
-        AlarmEvent(id: "d10", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "power_cut", code: "Harici güç kaynağı kesildi", description: "", lat: 41.0082, lng: 28.9784, speed: 0, createdAt: "2026-03-25 23:10:00"),
+        AlarmEvent(id: "d1", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "overspeed", code: "Hız limiti: 120 km/s, Anlık: 138 km/s", description: "", lat: 39.9208, lng: 32.8541, speed: 138, createdAt: "2026-03-26 14:22:00", isActive: false),
+        AlarmEvent(id: "d2", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "harsh_brake", code: "Ani fren algılandı", description: "", lat: 41.0082, lng: 28.9784, speed: 67, createdAt: "2026-03-26 13:45:00", isActive: false),
+        AlarmEvent(id: "d3", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "geofence_exit", code: "Ankara Merkez bölgesinden çıkış", description: "", lat: 39.9334, lng: 32.8597, speed: 45, createdAt: "2026-03-26 12:30:00", isActive: true),
+        AlarmEvent(id: "d4", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "idle", code: "15 dk rölanti - Kontak açık, araç durağan", description: "", lat: 41.0136, lng: 28.9550, speed: 0, createdAt: "2026-03-26 11:15:00", isActive: false),
+        AlarmEvent(id: "d5", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "sos", code: "Panik butonu basıldı", description: "", lat: 39.9248, lng: 32.8662, speed: 0, createdAt: "2026-03-26 10:50:00", isActive: true),
+        AlarmEvent(id: "d6", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "harsh_acceleration", code: "Ani hızlanma algılandı", description: "", lat: 41.0210, lng: 28.9390, speed: 82, createdAt: "2026-03-26 10:05:00", isActive: false),
+        AlarmEvent(id: "d7", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "disconnect", code: "Cihaz bağlantısı kesildi", description: "", lat: 39.9180, lng: 32.8450, speed: 0, createdAt: "2026-03-26 09:30:00", isActive: true),
+        AlarmEvent(id: "d8", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "overspeed", code: "Hız limiti: 50 km/s, Anlık: 73 km/s", description: "", lat: 41.0350, lng: 28.9850, speed: 73, createdAt: "2026-03-26 08:45:00", isActive: false),
+        AlarmEvent(id: "d9", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "geofence_enter", code: "Ankara Merkez bölgesine giriş", description: "", lat: 39.9255, lng: 32.8540, speed: 35, createdAt: "2026-03-26 08:00:00", isActive: false),
+        AlarmEvent(id: "d10", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "power_cut", code: "Harici güç kaynağı kesildi", description: "", lat: 41.0082, lng: 28.9784, speed: 0, createdAt: "2026-03-25 23:10:00", isActive: true),
     ]
 }
 
@@ -770,10 +766,21 @@ struct AlarmsView: View {
                 }
 
                 if !alarm.code.isEmpty || !alarm.description.isEmpty {
-                    Text(alarm.code.isEmpty ? alarm.description : alarm.code)
-                        .font(.system(size: 10))
-                        .foregroundColor(AppTheme.textMuted)
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        // Status badge
+                        Text(alarm.statusLabel)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(alarm.statusColor)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(alarm.statusColor.opacity(0.10))
+                            .cornerRadius(4)
+
+                        Text(alarm.description.isEmpty ? alarm.code : alarm.description)
+                            .font(.system(size: 10))
+                            .foregroundColor(AppTheme.textMuted)
+                            .lineLimit(1)
+                    }
                 }
             }
 
@@ -968,7 +975,9 @@ struct AlarmsView: View {
                         Divider().padding(.leading, 44)
                         detailRow(icon: "speedometer", title: "Hız", value: alarm.speed > 0 ? "\(alarm.speed) km/s" : "—")
                         Divider().padding(.leading, 44)
-                        detailRow(icon: "doc.text.fill", title: "Açıklama", value: { let t = alarm.code.isEmpty ? alarm.description : alarm.code; return t.isEmpty ? "—" : t }())
+                        detailRow(icon: "doc.text.fill", title: "Açıklama", value: { let t = alarm.description.isEmpty ? alarm.code : alarm.description; return t.isEmpty ? "—" : t }())
+                        Divider().padding(.leading, 52)
+                        detailRow(icon: "circle.fill", title: "Durum", value: alarm.statusLabel)
                         Divider().padding(.leading, 44)
                         detailRow(icon: "mappin.circle.fill", title: "Konum", value: String(format: "%.4f, %.4f", alarm.lat, alarm.lng))
                         Divider().padding(.leading, 44)

@@ -39,6 +39,11 @@ class AuthViewModel: ObservableObject {
 
     // MARK: - Init — auto-login if token exists
     init() {
+        APIService.shared.onSessionExpired = { [weak self] in
+            Task { @MainActor in
+                self?.logout()
+            }
+        }
         if APIService.shared.hasStoredToken {
             attemptAutoLogin()
         }

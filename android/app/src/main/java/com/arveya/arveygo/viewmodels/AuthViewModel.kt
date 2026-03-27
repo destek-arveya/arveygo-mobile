@@ -60,6 +60,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     // MARK: - Init — restore token & auto-login
     init {
         APIService.initialize(ctx)
+        // Register global 401 handler — any API call that returns 401 will auto-logout
+        APIService.onSessionExpired = { logout() }
         if (APIService.hasStoredToken) {
             attemptAutoLogin()
         }

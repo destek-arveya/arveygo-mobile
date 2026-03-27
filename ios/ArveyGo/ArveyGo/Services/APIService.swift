@@ -52,6 +52,9 @@ final class APIService {
 
     static let shared = APIService()
 
+    /// Callback invoked on main thread when a 401 is detected — triggers auto-logout
+    var onSessionExpired: (() -> Void)?
+
     private let baseURL: String
     private let session: URLSession
 
@@ -285,6 +288,9 @@ final class APIService {
         case 200...299: return
         case 401:
             self.accessToken = nil
+            DispatchQueue.main.async { [weak self] in
+                self?.onSessionExpired?()
+            }
             throw APIError.unauthorized
         case 422:
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

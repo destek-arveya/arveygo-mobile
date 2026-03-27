@@ -65,6 +65,11 @@ class VehicleDetailObserver: ObservableObject {
         if dailyFuelPer100kmVal > 0 { vehicle.dailyFuelPer100km = dailyFuelPer100kmVal }
         if odometerVal > 0 { vehicle.totalKm = Int(odometerVal); vehicle.odometer = odometerVal }
         else if kmVal > 0 { vehicle.totalKm = Int(kmVal); vehicle.odometer = kmVal }
+
+        // Ignition timestamps from API
+        if let v = detail["first_ignition_on_at_today"] as? String, !v.isEmpty, v != "<null>" { vehicle.firstIgnitionOnAtToday = v }
+        if let v = detail["last_ignition_on_at"] as? String, !v.isEmpty, v != "<null>" { vehicle.lastIgnitionOnAt = v }
+        if let v = detail["last_ignition_off_at"] as? String, !v.isEmpty, v != "<null>" { vehicle.lastIgnitionOffAt = v }
     }
 
     private var hasFetchedDriverInfo = false
@@ -624,25 +629,7 @@ struct VehicleDetailView: View {
 
     // MARK: - Events Tab
     var eventsTab: some View {
-        VStack(spacing: 16) {
-            sectionCard(title: "SON OLAYLAR", icon: "clock.fill") {
-                VStack(spacing: 0) {
-                    eventRow(icon: "location.fill", title: "Geofence Çıkışı", subtitle: "İstanbul → Ankara yolu", time: "Bugün 14:32", severity: .amber)
-                    Divider().padding(.leading, 48)
-                    eventRow(icon: "speedometer", title: "Hız İhlali", subtitle: "132 km/h (Limit: 110 km/h)", time: "Bugün 11:45", severity: .red)
-                    Divider().padding(.leading, 48)
-                    eventRow(icon: "key.fill", title: "Kontak Açıldı", subtitle: vehicle.city, time: "Bugün 08:15", severity: .green)
-                    Divider().padding(.leading, 48)
-                    eventRow(icon: "key", title: "Kontak Kapatıldı", subtitle: vehicle.city, time: "Dün 19:30", severity: .blue)
-                    Divider().padding(.leading, 48)
-                    eventRow(icon: "pause.circle.fill", title: "5 dk Rölanti", subtitle: "Ankara - Çankaya", time: "Dün 15:12", severity: .amber)
-                    Divider().padding(.leading, 48)
-                    eventRow(icon: "fuelpump.fill", title: "Yakıt Doldurma", subtitle: "45 Lt Dizel", time: "Dün 09:40", severity: .blue)
-                    Divider().padding(.leading, 48)
-                    eventRow(icon: "exclamationmark.triangle.fill", title: "Ani Fren", subtitle: "E-5 Karayolu", time: "22.03.2026 16:20", severity: .red)
-                }
-            }
-        }
+        EventsTabContent(vehicle: observer.vehicle)
     }
 
     // MARK: - Helper Views
@@ -946,6 +933,132 @@ struct VehicleMapPinDetail: View {
                 .cornerRadius(4)
                 .offset(y: 2)
         }
+    }
+}
+
+// MARK: - Events Tab Content (fetches real alarms)
+struct EventsTabContent: View {
+    let vehicle: Vehicle
+    @State private var alarms: [AlarmEvent] = []
+    @State private var isLoading = true
+
+    var body: some View {
+        VStack(spacing: 16) {
+            sectionCard(title: "SON OLAYLAR", icon: "clock.fill") {
+                if isLoading {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .padding(24)
+                        Spacer()
+                    }
+                } else if alarms.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "bell.slash")
+                            .font(.system(size: 28))
+                            .foregroundColor(AppTheme.textFaint)
+                        Text("Bu araç için alarm bulunamadı")
+                            .font(.system(size: 13))
+                            .foregroundColor(AppTheme.textMuted)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(24)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(Array(alarms.enumerated()), id: \.element.id) { index, alarm in
+                            eventRow(
+                                icon: alarm.icon,
+                                title: alarm.typeLabel,
+                                subtitle: alarm.description.isEmpty ? alarm.plate : alarm.description,
+                                time: alarm.formattedDate,
+                                severity: alarmSeverity(alarm)
+                            )
+                            if index < alarms.count - 1 {
+                                Divider().padding(.leading, 48)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .task {
+            await fetchAlarms()
+        }
+    }
+
+    private func alarmSeverity(_ alarm: AlarmEvent) -> AlertSeverity {
+        let key = alarm.alarmKey.lowercased()
+        if key.contains("gf_") || key.contains("geofence") { return .green }
+        if key.contains("t_towing") || key.contains("sos") { return .red }
+        if key.contains("t_movement") { return .amber }
+        return .blue
+    }
+
+    private func fetchAlarms() async {
+        do {
+            let json = try await APIService.shared.get("/api/mobile/alarms?page=1&per_page=50")
+            let dataArr = json["data"] as? [[String: Any]] ?? []
+            let results = dataArr.enumerated().compactMap { (i, dict) -> AlarmEvent? in
+                let a = AlarmEvent.from(json: dict, index: i)
+                guard a.imei == vehicle.imei || a.plate == vehicle.plate else { return nil }
+                return a
+            }
+            alarms = Array(results.prefix(20))
+        } catch {
+            alarms = []
+        }
+        isLoading = false
+    }
+
+    func sectionCard(title: String, icon: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.indigo)
+                Text(title)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(AppTheme.textMuted)
+                    .tracking(0.5)
+                Spacer()
+            }
+            content()
+        }
+        .padding(16)
+        .background(AppTheme.surface)
+        .cornerRadius(14)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(AppTheme.borderSoft, lineWidth: 1)
+        )
+    }
+
+    func eventRow(icon: String, title: String, subtitle: String, time: String, severity: AlertSeverity) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(severity.color.opacity(0.1))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundColor(severity.color)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.navy)
+                Text(subtitle)
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.textMuted)
+            }
+            Spacer()
+            Text(time)
+                .font(.system(size: 10))
+                .foregroundColor(AppTheme.textFaint)
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
     }
 }
 

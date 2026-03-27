@@ -29,6 +29,9 @@ object APIService {
     var accessToken: String? = null
         private set
 
+    /// Global callback invoked on 401 Unauthorized — set by AuthViewModel to trigger logout
+    var onSessionExpired: (() -> Unit)? = null
+
     // MARK: - Init from stored token
     fun initialize(context: Context) {
         accessToken = TokenStore.load(context)
@@ -346,6 +349,9 @@ object APIService {
             in 200..299 -> return
             401 -> {
                 accessToken = null
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    onSessionExpired?.invoke()
+                }
                 throw APIException.Unauthorized
             }
             422 -> {
