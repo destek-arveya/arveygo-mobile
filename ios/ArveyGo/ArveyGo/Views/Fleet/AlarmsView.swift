@@ -2,12 +2,13 @@ import SwiftUI
 
 // MARK: - Alarm Model
 struct AlarmEvent: Identifiable, Hashable {
-    let id: Int
+    let id: String
     let imei: String
     let plate: String
     let vehicleName: String
     let type: String
     let code: String
+    let description: String
     let lat: Double
     let lng: Double
     let speed: Int
@@ -84,16 +85,27 @@ struct AlarmEvent: Identifiable, Hashable {
         return "\(day) \(months[min(month, 12)]) \(time)"
     }
 
-    static func from(json: [String: Any]) -> AlarmEvent {
-        AlarmEvent(
-            id: json["id"] as? Int ?? 0,
+    static func from(json: [String: Any], index: Int = 0) -> AlarmEvent {
+        let latVal: Double
+        if let d = json["lat"] as? Double { latVal = d }
+        else if let s = json["lat"] as? String, let d = Double(s) { latVal = d }
+        else { latVal = 0 }
+
+        let lngVal: Double
+        if let d = json["lng"] as? Double { lngVal = d }
+        else if let s = json["lng"] as? String, let d = Double(s) { lngVal = d }
+        else { lngVal = 0 }
+
+        return AlarmEvent(
+            id: "\(json["id"] ?? "alarm_\(index)")",
             imei: json["imei"] as? String ?? "",
             plate: json["plate"] as? String ?? "",
             vehicleName: json["vehicle_name"] as? String ?? "",
             type: json["type"] as? String ?? "",
             code: json["code"] as? String ?? "",
-            lat: json["lat"] as? Double ?? 0,
-            lng: json["lng"] as? Double ?? 0,
+            description: json["description"] as? String ?? "",
+            lat: latVal,
+            lng: lngVal,
             speed: json["speed"] as? Int ?? 0,
             createdAt: json["created_at"] as? String ?? ""
         )
@@ -142,7 +154,7 @@ class AlarmsViewModel: ObservableObject {
             let dataArr = json["data"] as? [[String: Any]] ?? []
             let pagination = json["pagination"] as? [String: Any] ?? [:]
 
-            let newAlarms = dataArr.map { AlarmEvent.from(json: $0) }
+            let newAlarms = dataArr.enumerated().map { (i, item) in AlarmEvent.from(json: item, index: i) }
 
             if append {
                 alarms.append(contentsOf: newAlarms)
@@ -192,16 +204,16 @@ class AlarmsViewModel: ObservableObject {
 
     // MARK: - Dummy Data
     private static let dummyAlarms: [AlarmEvent] = [
-        AlarmEvent(id: 1, imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "overspeed", code: "Hız limiti: 120 km/s, Anlık: 138 km/s", lat: 39.9208, lng: 32.8541, speed: 138, createdAt: "2026-03-26 14:22:00"),
-        AlarmEvent(id: 2, imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "harsh_brake", code: "Ani fren algılandı", lat: 41.0082, lng: 28.9784, speed: 67, createdAt: "2026-03-26 13:45:00"),
-        AlarmEvent(id: 3, imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "geofence_exit", code: "Ankara Merkez bölgesinden çıkış", lat: 39.9334, lng: 32.8597, speed: 45, createdAt: "2026-03-26 12:30:00"),
-        AlarmEvent(id: 4, imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "idle", code: "15 dk rölanti - Kontak açık, araç durağan", lat: 41.0136, lng: 28.9550, speed: 0, createdAt: "2026-03-26 11:15:00"),
-        AlarmEvent(id: 5, imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "sos", code: "Panik butonu basıldı", lat: 39.9248, lng: 32.8662, speed: 0, createdAt: "2026-03-26 10:50:00"),
-        AlarmEvent(id: 6, imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "harsh_acceleration", code: "Ani hızlanma algılandı", lat: 41.0210, lng: 28.9390, speed: 82, createdAt: "2026-03-26 10:05:00"),
-        AlarmEvent(id: 7, imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "disconnect", code: "Cihaz bağlantısı kesildi", lat: 39.9180, lng: 32.8450, speed: 0, createdAt: "2026-03-26 09:30:00"),
-        AlarmEvent(id: 8, imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "overspeed", code: "Hız limiti: 50 km/s, Anlık: 73 km/s", lat: 41.0350, lng: 28.9850, speed: 73, createdAt: "2026-03-26 08:45:00"),
-        AlarmEvent(id: 9, imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "geofence_enter", code: "Ankara Merkez bölgesine giriş", lat: 39.9255, lng: 32.8540, speed: 35, createdAt: "2026-03-26 08:00:00"),
-        AlarmEvent(id: 10, imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "power_cut", code: "Harici güç kaynağı kesildi", lat: 41.0082, lng: 28.9784, speed: 0, createdAt: "2026-03-25 23:10:00"),
+        AlarmEvent(id: "d1", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "overspeed", code: "Hız limiti: 120 km/s, Anlık: 138 km/s", description: "", lat: 39.9208, lng: 32.8541, speed: 138, createdAt: "2026-03-26 14:22:00"),
+        AlarmEvent(id: "d2", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "harsh_brake", code: "Ani fren algılandı", description: "", lat: 41.0082, lng: 28.9784, speed: 67, createdAt: "2026-03-26 13:45:00"),
+        AlarmEvent(id: "d3", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "geofence_exit", code: "Ankara Merkez bölgesinden çıkış", description: "", lat: 39.9334, lng: 32.8597, speed: 45, createdAt: "2026-03-26 12:30:00"),
+        AlarmEvent(id: "d4", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "idle", code: "15 dk rölanti - Kontak açık, araç durağan", description: "", lat: 41.0136, lng: 28.9550, speed: 0, createdAt: "2026-03-26 11:15:00"),
+        AlarmEvent(id: "d5", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "sos", code: "Panik butonu basıldı", description: "", lat: 39.9248, lng: 32.8662, speed: 0, createdAt: "2026-03-26 10:50:00"),
+        AlarmEvent(id: "d6", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "harsh_acceleration", code: "Ani hızlanma algılandı", description: "", lat: 41.0210, lng: 28.9390, speed: 82, createdAt: "2026-03-26 10:05:00"),
+        AlarmEvent(id: "d7", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "disconnect", code: "Cihaz bağlantısı kesildi", description: "", lat: 39.9180, lng: 32.8450, speed: 0, createdAt: "2026-03-26 09:30:00"),
+        AlarmEvent(id: "d8", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "overspeed", code: "Hız limiti: 50 km/s, Anlık: 73 km/s", description: "", lat: 41.0350, lng: 28.9850, speed: 73, createdAt: "2026-03-26 08:45:00"),
+        AlarmEvent(id: "d9", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "geofence_enter", code: "Ankara Merkez bölgesine giriş", description: "", lat: 39.9255, lng: 32.8540, speed: 35, createdAt: "2026-03-26 08:00:00"),
+        AlarmEvent(id: "d10", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "power_cut", code: "Harici güç kaynağı kesildi", description: "", lat: 41.0082, lng: 28.9784, speed: 0, createdAt: "2026-03-25 23:10:00"),
     ]
 }
 
@@ -756,8 +768,8 @@ struct AlarmsView: View {
                     }
                 }
 
-                if !alarm.code.isEmpty {
-                    Text(alarm.code)
+                if !alarm.code.isEmpty || !alarm.description.isEmpty {
+                    Text(alarm.code.isEmpty ? alarm.description : alarm.code)
                         .font(.system(size: 10))
                         .foregroundColor(AppTheme.textMuted)
                         .lineLimit(1)
@@ -955,7 +967,7 @@ struct AlarmsView: View {
                         Divider().padding(.leading, 44)
                         detailRow(icon: "speedometer", title: "Hız", value: alarm.speed > 0 ? "\(alarm.speed) km/s" : "—")
                         Divider().padding(.leading, 44)
-                        detailRow(icon: "doc.text.fill", title: "Açıklama", value: alarm.code.isEmpty ? "—" : alarm.code)
+                        detailRow(icon: "doc.text.fill", title: "Açıklama", value: { let t = alarm.code.isEmpty ? alarm.description : alarm.code; return t.isEmpty ? "—" : t }())
                         Divider().padding(.leading, 44)
                         detailRow(icon: "mappin.circle.fill", title: "Konum", value: String(format: "%.4f, %.4f", alarm.lat, alarm.lng))
                         Divider().padding(.leading, 44)

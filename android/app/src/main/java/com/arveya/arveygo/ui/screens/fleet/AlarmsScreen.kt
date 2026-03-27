@@ -32,12 +32,13 @@ import org.json.JSONObject
 
 // MARK: - AlarmEvent Model
 data class AlarmEvent(
-    val id: Int,
+    val id: String,
     val imei: String,
     val plate: String,
     val vehicleName: String,
     val type: String,
     val code: String,
+    val description: String,
     val lat: Double,
     val lng: Double,
     val speed: Int,
@@ -94,21 +95,22 @@ data class AlarmEvent(
     }
 
     companion object {
-        fun from(json: JSONObject): AlarmEvent = try {
+        fun from(json: JSONObject, index: Int = 0): AlarmEvent = try {
             AlarmEvent(
-                id = json.optInt("id", 0),
+                id = json.optString("id", "alarm_$index"),
                 imei = json.optString("imei", ""),
                 plate = json.optString("plate", ""),
                 vehicleName = json.optString("vehicle_name", ""),
                 type = json.optString("type", ""),
                 code = json.optString("code", ""),
-                lat = json.optDouble("lat", 0.0),
-                lng = json.optDouble("lng", 0.0),
+                description = json.optString("description", ""),
+                lat = json.optString("lat", "0").toDoubleOrNull() ?: 0.0,
+                lng = json.optString("lng", "0").toDoubleOrNull() ?: 0.0,
                 speed = json.optInt("speed", 0),
                 createdAt = json.optString("created_at", "")
             )
         } catch (e: Exception) {
-            AlarmEvent(0, "", "", "", "unknown", "", 0.0, 0.0, 0, "")
+            AlarmEvent("fallback_$index", "", "", "", "unknown", "", "", 0.0, 0.0, 0, "")
         }
     }
 }
@@ -233,7 +235,7 @@ fun AlarmsScreen(onMenuClick: () -> Unit) {
             val newAlarms = mutableListOf<AlarmEvent>()
             if (dataArr != null) {
                 for (i in 0 until dataArr.length()) {
-                    newAlarms.add(AlarmEvent.from(dataArr.getJSONObject(i)))
+                    newAlarms.add(AlarmEvent.from(dataArr.getJSONObject(i), i))
                 }
             }
 
@@ -789,10 +791,11 @@ private fun AlarmCard(alarm: AlarmEvent, onClick: () -> Unit = {}) {
                 }
             }
 
-            if (alarm.code.isNotEmpty()) {
+            val displayText = alarm.code.ifEmpty { alarm.description }
+            if (displayText.isNotEmpty()) {
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    alarm.code,
+                    displayText,
                     fontSize = 10.sp,
                     color = AppColors.TextMuted,
                     maxLines = 1,
@@ -957,7 +960,7 @@ private fun AlarmDetailSheet(alarm: AlarmEvent, onDismiss: () -> Unit) {
             HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.Speed, title = "Hız", value = if (alarm.speed > 0) "${alarm.speed} km/s" else "—")
             HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
-            DetailRow(icon = Icons.Default.Description, title = "Açıklama", value = alarm.code.ifEmpty { "—" })
+            DetailRow(icon = Icons.Default.Description, title = "Açıklama", value = alarm.code.ifEmpty { alarm.description }.ifEmpty { "—" })
             HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.LocationOn, title = "Konum", value = String.format("%.4f, %.4f", alarm.lat, alarm.lng))
             HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
@@ -1075,14 +1078,14 @@ private fun DetailRow(icon: ImageVector, title: String, value: String) {
 
 // MARK: - Dummy Alarm Data
 private val DUMMY_ALARMS = listOf(
-    AlarmEvent(1, "353742378104285", "06 ATS 001", "Beyaz Sprinter", "overspeed", "Hız limiti: 120 km/s, Anlık: 138 km/s", 39.9208, 32.8541, 138, "2026-03-26 14:22:00"),
-    AlarmEvent(2, "353742379713316", "34 ARV 34", "Siyah Vito", "harsh_brake", "Ani fren algılandı", 41.0082, 28.9784, 67, "2026-03-26 13:45:00"),
-    AlarmEvent(3, "353742378104285", "06 ATS 001", "Beyaz Sprinter", "geofence_exit", "Ankara Merkez bölgesinden çıkış", 39.9334, 32.8597, 45, "2026-03-26 12:30:00"),
-    AlarmEvent(4, "353742379713316", "34 ARV 34", "Siyah Vito", "idle", "15 dk rölanti - Kontak açık, araç durağan", 41.0136, 28.9550, 0, "2026-03-26 11:15:00"),
-    AlarmEvent(5, "353742378104285", "06 ATS 001", "Beyaz Sprinter", "sos", "Panik butonu basıldı", 39.9248, 32.8662, 0, "2026-03-26 10:50:00"),
-    AlarmEvent(6, "353742379713316", "34 ARV 34", "Siyah Vito", "harsh_acceleration", "Ani hızlanma algılandı", 41.0210, 28.9390, 82, "2026-03-26 10:05:00"),
-    AlarmEvent(7, "353742378104285", "06 ATS 001", "Beyaz Sprinter", "disconnect", "Cihaz bağlantısı kesildi", 39.9180, 32.8450, 0, "2026-03-26 09:30:00"),
-    AlarmEvent(8, "353742379713316", "34 ARV 34", "Siyah Vito", "overspeed", "Hız limiti: 50 km/s, Anlık: 73 km/s", 41.0350, 28.9850, 73, "2026-03-26 08:45:00"),
-    AlarmEvent(9, "353742378104285", "06 ATS 001", "Beyaz Sprinter", "geofence_enter", "Ankara Merkez bölgesine giriş", 39.9255, 32.8540, 35, "2026-03-26 08:00:00"),
-    AlarmEvent(10, "353742379713316", "34 ARV 34", "Siyah Vito", "power_cut", "Harici güç kaynağı kesildi", 41.0082, 28.9784, 0, "2026-03-25 23:10:00"),
+    AlarmEvent("d1", "353742378104285", "06 ATS 001", "Beyaz Sprinter", "overspeed", "Hız limiti: 120 km/s, Anlık: 138 km/s", "", 39.9208, 32.8541, 138, "2026-03-26 14:22:00"),
+    AlarmEvent("d2", "353742379713316", "34 ARV 34", "Siyah Vito", "harsh_brake", "Ani fren algılandı", "", 41.0082, 28.9784, 67, "2026-03-26 13:45:00"),
+    AlarmEvent("d3", "353742378104285", "06 ATS 001", "Beyaz Sprinter", "geofence_exit", "Ankara Merkez bölgesinden çıkış", "", 39.9334, 32.8597, 45, "2026-03-26 12:30:00"),
+    AlarmEvent("d4", "353742379713316", "34 ARV 34", "Siyah Vito", "idle", "15 dk rölanti - Kontak açık, araç durağan", "", 41.0136, 28.9550, 0, "2026-03-26 11:15:00"),
+    AlarmEvent("d5", "353742378104285", "06 ATS 001", "Beyaz Sprinter", "sos", "Panik butonu basıldı", "", 39.9248, 32.8662, 0, "2026-03-26 10:50:00"),
+    AlarmEvent("d6", "353742379713316", "34 ARV 34", "Siyah Vito", "harsh_acceleration", "Ani hızlanma algılandı", "", 41.0210, 28.9390, 82, "2026-03-26 10:05:00"),
+    AlarmEvent("d7", "353742378104285", "06 ATS 001", "Beyaz Sprinter", "disconnect", "Cihaz bağlantısı kesildi", "", 39.9180, 32.8450, 0, "2026-03-26 09:30:00"),
+    AlarmEvent("d8", "353742379713316", "34 ARV 34", "Siyah Vito", "overspeed", "Hız limiti: 50 km/s, Anlık: 73 km/s", "", 41.0350, 28.9850, 73, "2026-03-26 08:45:00"),
+    AlarmEvent("d9", "353742378104285", "06 ATS 001", "Beyaz Sprinter", "geofence_enter", "Ankara Merkez bölgesine giriş", "", 39.9255, 32.8540, 35, "2026-03-26 08:00:00"),
+    AlarmEvent("d10", "353742379713316", "34 ARV 34", "Siyah Vito", "power_cut", "Harici güç kaynağı kesildi", "", 41.0082, 28.9784, 0, "2026-03-25 23:10:00"),
 )
