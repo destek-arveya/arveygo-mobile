@@ -5,54 +5,90 @@ struct SideMenuView: View {
     @Binding var selectedPage: AppPage
     @EnvironmentObject var authVM: AuthViewModel
 
-    private let menuWidth: CGFloat = 280
+    private let menuWidth: CGFloat = 300
 
     var body: some View {
         HStack(spacing: 0) {
             // Menu content
             VStack(alignment: .leading, spacing: 0) {
-                // Header
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 12) {
-                        AvatarCircle(
-                            initials: authVM.currentUser?.avatar ?? "A",
-                            size: 44
-                        )
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(authVM.currentUser?.name ?? "Admin")
-                                .font(.system(size: 15, weight: .semibold))
+                // ── Premium Header ──
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 14) {
+                        // Avatar with gradient ring
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [AppTheme.indigo, AppTheme.lavender],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 52, height: 52)
+
+                            Circle()
+                                .fill(Color(red: 26/255, green: 32/255, blue: 96/255))
+                                .frame(width: 48, height: 48)
+
+                            Text(authVM.currentUser?.avatar ?? "A")
+                                .font(.system(size: 18, weight: .bold))
                                 .foregroundColor(.white)
-                            Text(authVM.currentUser?.role ?? "Süper Yönetici")
-                                .font(.system(size: 11))
-                                .foregroundColor(.white.opacity(0.6))
                         }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(authVM.currentUser?.name ?? "Admin")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+
+                            // Role badge
+                            Text(authVM.currentUser?.role ?? "Süper Yönetici")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(AppTheme.lavender)
+                                .tracking(0.5)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.white.opacity(0.12))
+                                .cornerRadius(6)
+                        }
+
+                        Spacer()
                     }
 
-                    HStack(spacing: 6) {
+                    Spacer().frame(height: 16)
+
+                    // Company info card
+                    HStack(spacing: 8) {
                         Image(systemName: "building.2")
-                            .font(.system(size: 10))
+                            .font(.system(size: 12))
                         Text("Arveya Teknoloji")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                     }
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(.white.opacity(0.6))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.white.opacity(0.08))
+                    .cornerRadius(10)
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
                 .padding(.top, 56)
-                .padding(.bottom, 20)
+                .padding(.bottom, 24)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     LinearGradient(
                         colors: [
-                            Color(red: 13/255, green: 21/255, blue: 80/255),
-                            AppTheme.navy
+                            Color(red: 10/255, green: 17/255, blue: 88/255),
+                            Color(red: 9/255, green: 15/255, blue: 65/255),
+                            Color(red: 6/255, green: 11/255, blue: 48/255)
                         ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                        startPoint: .top,
+                        endPoint: .bottom
                     )
                 )
 
-                // Menu items
-                ScrollView {
+                // ── Menu items ──
+                ScrollView(showsIndicators: false) {
                     VStack(spacing: 2) {
                         menuSection(title: "ANA MENÜ") {
                             menuItem(icon: "square.grid.2x2", label: "Dashboard", page: .dashboard)
@@ -80,11 +116,15 @@ struct SideMenuView: View {
                             menuItem(icon: "questionmark.circle.fill", label: "Destek Talebi", page: .support)
                         }
 
-                        Divider()
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 16)
+                        Spacer().frame(height: 8)
 
-                        // Logout button
+                        Divider()
+                            .padding(.horizontal, 20)
+                            .opacity(0.6)
+
+                        Spacer().frame(height: 4)
+
+                        // Logout button — modern style
                         Button(action: {
                             withAnimation {
                                 isShowing = false
@@ -93,32 +133,46 @@ struct SideMenuView: View {
                                 authVM.logout()
                             }
                         }) {
-                            HStack(spacing: 10) {
-                                Image(systemName: "rectangle.portrait.and.arrow.right")
-                                    .font(.system(size: 15))
-                                    .frame(width: 24)
+                            HStack(spacing: 12) {
+                                RoundedRectangle(cornerRadius: 9)
+                                    .fill(Color.red.opacity(0.08))
+                                    .frame(width: 34, height: 34)
+                                    .overlay(
+                                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(.red.opacity(0.8))
+                                    )
+
                                 Text("Çıkış Yap")
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.red.opacity(0.8))
+
                                 Spacer()
                             }
-                            .foregroundColor(.red)
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, 14)
                             .padding(.vertical, 14)
                         }
+                        .padding(.horizontal, 12)
                     }
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 12)
                 }
 
-                // Version
-                HStack {
+                // ── Version Footer ──
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(AppTheme.online)
+                        .frame(width: 6, height: 6)
                     Text("ArveyGo iOS v1.0.0")
                         .font(.system(size: 10))
                         .foregroundColor(AppTheme.textFaint)
+                        .tracking(0.3)
                 }
-                .padding(16)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
             }
             .frame(width: menuWidth)
             .background(AppTheme.surface)
+            .shadow(color: .black.opacity(0.15), radius: 24, x: 8, y: 0)
 
             Spacer()
         }
@@ -130,17 +184,18 @@ struct SideMenuView: View {
     func menuSection(title: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(AppTheme.textFaint)
-                .tracking(1)
-                .padding(.horizontal, 16)
-                .padding(.top, 14)
-                .padding(.bottom, 4)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(AppTheme.textFaint.opacity(0.7))
+                .tracking(1.2)
+                .padding(.leading, 24)
+                .padding(.top, 20)
+                .padding(.bottom, 8)
 
             content()
         }
     }
 
+    // MARK: - Menu Item
     @ViewBuilder
     func menuItem(icon: String, label: String, page: AppPage? = nil) -> some View {
         let isActive = page != nil && selectedPage == page
@@ -156,29 +211,43 @@ struct SideMenuView: View {
                 }
             }
         }) {
-            HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.system(size: 15))
-                    .frame(width: 24)
-                    .foregroundColor(isActive ? AppTheme.indigo : AppTheme.textMuted)
+            HStack(spacing: 12) {
+                // Icon with background box
+                RoundedRectangle(cornerRadius: 9)
+                    .fill(isActive ? AppTheme.indigo.opacity(0.12) : AppTheme.bg)
+                    .frame(width: 34, height: 34)
+                    .overlay(
+                        Image(systemName: icon)
+                            .font(.system(size: 14))
+                            .foregroundColor(isActive ? AppTheme.indigo : AppTheme.textMuted)
+                    )
 
                 Text(label)
-                    .font(.system(size: 13, weight: isActive ? .semibold : .regular))
+                    .font(.system(size: 14, weight: isActive ? .semibold : .regular))
                     .foregroundColor(isActive ? AppTheme.navy : AppTheme.textSecondary)
+                    .lineLimit(1)
 
                 Spacer()
 
                 if isActive {
-                    Circle()
+                    RoundedRectangle(cornerRadius: 2)
                         .fill(AppTheme.indigo)
-                        .frame(width: 6, height: 6)
+                        .frame(width: 3, height: 20)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(isActive ? AppTheme.indigo.opacity(0.06) : Color.clear)
-            .cornerRadius(8)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .background(
+                isActive
+                    ? LinearGradient(
+                        colors: [AppTheme.indigo.opacity(0.10), AppTheme.indigo.opacity(0.04)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                      )
+                    : LinearGradient(colors: [.clear, .clear], startPoint: .leading, endPoint: .trailing)
+            )
+            .cornerRadius(12)
+            .padding(.horizontal, 12)
         }
     }
 }

@@ -114,10 +114,13 @@ struct Vehicle: Identifiable, Equatable {
     }
 
     var formattedTotalKm: String {
+        // Odometer metre cinsinden gelebilir, km'ye çevir (noktadan sonrası metre olduğu için sadece km kısmı)
+        let kmValue = totalKm > 10000 ? totalKm / 1000 : totalKm
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.groupingSeparator = "."
-        return formatter.string(from: NSNumber(value: totalKm)) ?? "\(totalKm)"
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: kmValue)) ?? "\(kmValue)"
     }
 
     var formattedTodayKm: String {

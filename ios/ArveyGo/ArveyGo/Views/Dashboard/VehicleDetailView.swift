@@ -279,18 +279,7 @@ struct VehicleDetailView: View {
                 .padding(.vertical, 5)
                 .background(.ultraThinMaterial)
                 .cornerRadius(20)
-
-                HStack(spacing: 5) {
-                    Image(systemName: vehicle.kontakOn ? "key.fill" : "key")
-                        .font(.system(size: 9))
-                    Text(vehicle.kontakOn ? "Kontak Açık" : "Kontak Kapalı")
-                        .font(.system(size: 10, weight: .medium))
-                }
-                .foregroundColor(vehicle.kontakOn ? AppTheme.online : AppTheme.textMuted)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(.ultraThinMaterial)
-                .cornerRadius(20)
+                // Kontak durumu badge kaldırıldı
             }
             .padding(12)
         }
@@ -316,9 +305,10 @@ struct VehicleDetailView: View {
                             .foregroundColor(AppTheme.navy)
                         StatusBadge(status: vehicle.status)
                     }
-                    Text(vehicle.model)
-                        .font(.system(size: 13))
-                        .foregroundColor(AppTheme.textMuted)
+                    // name fieldı yorum satırına alındı
+                    // Text(vehicle.model)
+                    //     .font(.system(size: 13))
+                    //     .foregroundColor(AppTheme.textMuted)
 
                     HStack(spacing: 6) {
                         vehicleTag(vehicle.group, icon: "folder.fill", color: .blue)

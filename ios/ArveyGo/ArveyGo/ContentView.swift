@@ -21,6 +21,7 @@ struct ContentView: View {
     @State private var showSideMenu = false
     @State private var showSupportRequest = false
     @State private var alarmsSearchText = ""
+    @GestureState private var dragOffset: CGFloat = 0
 
     var body: some View {
         Group {
@@ -82,6 +83,23 @@ struct ContentView: View {
             SideMenuView(isShowing: $showSideMenu, selectedPage: $selectedPage)
         }
         .animation(.spring(response: 0.3), value: showSideMenu)
+        .gesture(
+            DragGesture()
+                .onEnded { value in
+                    // Swipe from left edge → open menu
+                    if value.startLocation.x < 30 && value.translation.width > 60 {
+                        withAnimation(.spring(response: 0.3)) {
+                            showSideMenu = true
+                        }
+                    }
+                    // Swipe left → close menu
+                    if showSideMenu && value.translation.width < -60 {
+                        withAnimation(.spring(response: 0.3)) {
+                            showSideMenu = false
+                        }
+                    }
+                }
+        )
         .onChange(of: selectedPage) { oldPage, newPage in
             // Clear alarms search text when navigating away from alarms
             // or when navigating to alarms from side menu (not from VehicleDetail)

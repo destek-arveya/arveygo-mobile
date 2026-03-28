@@ -56,7 +56,12 @@ class LiveMapViewModel : ViewModel() {
         viewModelScope.launch {
             WebSocketManager.vehicleList.collect { list ->
                 if (list.isNotEmpty()) {
-                    _vehicles.value = list
+                    // Mevcut araç değerlerini koruyarak güncelle (null sıcaklık/nem için)
+                    val currentMap = _vehicles.value.associateBy { it.id }
+                    _vehicles.value = list.map { newVehicle ->
+                        val existing = currentMap[newVehicle.id]
+                        existing?.mergeUpdate(newVehicle) ?: newVehicle
+                    }
                     _vehicleVersion.value++
                 }
             }
@@ -68,13 +73,23 @@ class LiveMapViewModel : ViewModel() {
             WebSocketManager.events.collect { event ->
                 when (event) {
                     is WSEvent.Snapshot -> {
-                        _vehicles.value = event.vehicles
+                        // Snapshot'ta da mevcut değerleri koru
+                        val currentMap = _vehicles.value.associateBy { it.id }
+                        _vehicles.value = event.vehicles.map { newVehicle ->
+                            val existing = currentMap[newVehicle.id]
+                            existing?.mergeUpdate(newVehicle) ?: newVehicle
+                        }
                         _vehicleVersion.value++
                     }
                     is WSEvent.Update -> {
                         val current = _vehicles.value.toMutableList()
                         val idx = current.indexOfFirst { it.id == event.vehicle.id }
-                        if (idx >= 0) current[idx] = event.vehicle else current.add(event.vehicle)
+                        if (idx >= 0) {
+                            // mergeUpdate ile null değerlerde önceki değeri koru
+                            current[idx] = current[idx].mergeUpdate(event.vehicle)
+                        } else {
+                            current.add(event.vehicle)
+                        }
                         _vehicles.value = current
                         _vehicleVersion.value++
                     }

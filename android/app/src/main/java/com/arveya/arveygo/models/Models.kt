@@ -179,8 +179,11 @@ data class Vehicle(
 
     val formattedTotalKm: String
         get() {
+            // Odometer metre cinsinden gelebilir, km'ye çevir (noktadan sonrası metre olduğu için sadece km kısmı)
+            val kmValue = if (totalKm > 10000) totalKm / 1000 else totalKm
             val fmt = NumberFormat.getNumberInstance(Locale("tr", "TR"))
-            return fmt.format(totalKm)
+            fmt.maximumFractionDigits = 0
+            return fmt.format(kmValue)
         }
 
     val formattedTodayKm: String

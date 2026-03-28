@@ -345,24 +345,7 @@ private fun MapHeader(vehicle: Vehicle, context: Context) {
                     fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = vehicle.status.color
                 )
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .background(Color.White.copy(alpha = 0.9f), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
-            ) {
-                Icon(
-                    Icons.Default.VpnKey, null,
-                    tint = if (vehicle.kontakOn) AppColors.Online else AppColors.TextMuted,
-                    modifier = Modifier.size(10.dp)
-                )
-                Spacer(Modifier.width(5.dp))
-                Text(
-                    if (vehicle.kontakOn) "Kontak Açık" else "Kontak Kapalı",
-                    fontSize = 10.sp, fontWeight = FontWeight.Medium,
-                    color = if (vehicle.kontakOn) AppColors.Online else AppColors.TextMuted
-                )
-            }
+            // Kontak durumu badge kaldırıldı
         }
     }
 }
@@ -400,7 +383,8 @@ private fun VehicleIdentityCard(vehicle: Vehicle) {
                     Spacer(Modifier.width(8.dp))
                     StatusBadge(vehicle.status)
                 }
-                Text(vehicle.model, fontSize = 13.sp, color = AppColors.TextMuted)
+                // name fieldı yorum satırına alındı
+                // Text(vehicle.model, fontSize = 13.sp, color = AppColors.TextMuted)
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     VehicleTag(vehicle.group, Icons.Default.Folder, Color.Blue)

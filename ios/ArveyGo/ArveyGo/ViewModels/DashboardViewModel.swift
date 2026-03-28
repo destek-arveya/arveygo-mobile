@@ -97,7 +97,15 @@ class DashboardViewModel: ObservableObject {
             .sink { [weak self] list in
                 guard let self = self else { return }
                 if !list.isEmpty {
-                    self.vehicles = list
+                    // Mevcut araç değerlerini koruyarak güncelle (null sıcaklık/nem için)
+                    let currentMap = Dictionary(uniqueKeysWithValues: self.vehicles.map { ($0.id, $0) })
+                    self.vehicles = list.map { newVehicle in
+                        if var existing = currentMap[newVehicle.id] {
+                            existing.mergeUpdate(from: newVehicle)
+                            return existing
+                        }
+                        return newVehicle
+                    }
                 }
             }
             .store(in: &cancellables)
@@ -109,10 +117,17 @@ class DashboardViewModel: ObservableObject {
                 guard let self = self else { return }
                 switch event {
                 case .snapshot(let vehicles, _, _):
-                    self.vehicles = vehicles
+                    let currentMap = Dictionary(uniqueKeysWithValues: self.vehicles.map { ($0.id, $0) })
+                    self.vehicles = vehicles.map { newVehicle in
+                        if var existing = currentMap[newVehicle.id] {
+                            existing.mergeUpdate(from: newVehicle)
+                            return existing
+                        }
+                        return newVehicle
+                    }
                 case .update(let vehicle, _):
                     if let idx = self.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
-                        self.vehicles[idx] = vehicle
+                        self.vehicles[idx].mergeUpdate(from: vehicle)
                     } else {
                         self.vehicles.append(vehicle)
                     }

@@ -176,9 +176,11 @@ struct LiveMapView: View {
                 Annotation("", coordinate: coord) {
                     Button(action: {
                         selectedVehicle = vehicle
+                        // Aracı haritanın üst %25'lik kısmına taşı (modal alt yarıyı kaplayacağı için)
+                        let offsetLat = vehicle.lat + 0.012 // ~%25 yukarı kaydırma
                         withAnimation {
                             mapCameraPosition = .region(MKCoordinateRegion(
-                                center: CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng),
+                                center: CLLocationCoordinate2D(latitude: offsetLat, longitude: vehicle.lng),
                                 span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
                             ))
                         }
@@ -327,78 +329,128 @@ struct LiveMapView: View {
         }
     }
 
-    // MARK: - Vehicle Popup Sheet (clean flat-row design)
+    // MARK: - Vehicle Popup Sheet (modern compact design)
     func vehiclePopupSheet(_ vehicle: Vehicle) -> some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                // ── Header: Plate + Status + Model ──
-                HStack(spacing: 12) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(vehicle.status.color.opacity(0.1))
-                            .frame(width: 44, height: 44)
-                        Image(systemName: vehicle.isMotorcycle ? "bicycle" : "car.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(vehicle.status.color)
-                    }
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 8) {
-                            Text(vehicle.plate)
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(AppTheme.navy)
-                            StatusBadge(status: vehicle.status)
-                        }
-                        Text(vehicle.model)
-                            .font(.system(size: 12))
-                            .foregroundColor(AppTheme.textMuted)
-                    }
-                    Spacer()
+        VStack(spacing: 0) {
+            // ── Header: Plate + Status (name ve kontak durumu kaldırıldı) ──
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(
+                            RadialGradient(
+                                colors: [vehicle.status.color.opacity(0.2), vehicle.status.color.opacity(0.05)],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 30
+                            )
+                        )
+                        .frame(width: 48, height: 48)
+                    Image(systemName: vehicle.isMotorcycle ? "bicycle" : "car.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(vehicle.status.color)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 16)
 
-            // ── Info Rows ──
-            VStack(spacing: 0) {
-                popupRow(icon: "gauge.open.with.lines.needle.33percent", label: "Hız", value: vehicle.formattedSpeed)
-                popupDivider
-                popupRow(icon: "road.lanes", label: "Bugünkü Km", value: vehicle.formattedTodayKm)
-                popupDivider
-                popupRow(icon: "mappin.circle.fill", label: "Konum", value: vehicle.locationDisplay)
-                popupDivider
-                popupRow(
-                    icon: vehicle.kontakOn ? "key.fill" : "key",
-                    label: "Kontak",
-                    value: vehicle.kontakOn ? "Açık" : "Kapalı",
-                    valueColor: vehicle.kontakOn ? AppTheme.online : AppTheme.offline
-                )
-                popupDivider
-                popupRow(icon: "speedometer", label: "Toplam Km", value: vehicle.formattedTotalKm + " km")
-                if vehicle.deviceTime != nil {
-                    popupDivider
-                    popupRow(icon: "clock.fill", label: "Son Güncelleme", value: vehicle.formattedDeviceTime)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 10) {
+                        Text(vehicle.plate)
+                            .font(.system(size: 20, weight: .heavy))
+                            .foregroundColor(AppTheme.navy)
+                            .tracking(0.5)
+                        StatusBadge(status: vehicle.status)
+                    }
+                    // name yorum satırına alındı
+                    // Text(vehicle.model)
                 }
-                if let temp = vehicle.temperatureC {
-                    popupDivider
-                    popupRow(
-                        icon: "thermometer.medium",
-                        label: "Sıcaklık",
-                        value: String(format: "%.1f°C", temp),
-                        valueColor: temp < 0 ? .blue : temp < 30 ? AppTheme.online : .red
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 14)
+
+            // ── Compact Info Grid (2-column rows) ──
+            VStack(spacing: 0) {
+                // Row 1: Kontak - Hız
+                HStack(spacing: 0) {
+                    compactInfoTile(
+                        icon: vehicle.kontakOn ? "key.fill" : "key",
+                        label: "Kontak",
+                        value: vehicle.kontakOn ? "Açık" : "Kapalı",
+                        valueColor: vehicle.kontakOn ? AppTheme.online : AppTheme.offline,
+                        iconColor: vehicle.kontakOn ? AppTheme.online : AppTheme.offline
+                    )
+                    Divider().frame(height: 36)
+                    compactInfoTile(
+                        icon: "gauge.open.with.lines.needle.33percent",
+                        label: "Hız",
+                        value: vehicle.formattedSpeed,
+                        iconColor: AppTheme.indigo
                     )
                 }
-                if let hum = vehicle.humidityPct {
-                    popupDivider
-                    popupRow(icon: "humidity.fill", label: "Nem", value: "%\(Int(hum))")
+
+                Divider().padding(.horizontal, 12)
+
+                // Row 2: Bugünkü KM - Toplam KM
+                HStack(spacing: 0) {
+                    compactInfoTile(
+                        icon: "road.lanes",
+                        label: "Bugün",
+                        value: vehicle.formattedTodayKm,
+                        iconColor: AppTheme.indigo
+                    )
+                    Divider().frame(height: 36)
+                    compactInfoTile(
+                        icon: "speedometer",
+                        label: "Toplam",
+                        value: vehicle.formattedTotalKm + " km",
+                        iconColor: AppTheme.navy
+                    )
+                }
+
+                // Row 3: Sıcaklık - Nem (varsa)
+                if vehicle.temperatureC != nil || vehicle.humidityPct != nil {
+                    Divider().padding(.horizontal, 12)
+                    HStack(spacing: 0) {
+                        compactInfoTile(
+                            icon: "thermometer.medium",
+                            label: "Sıcaklık",
+                            value: vehicle.temperatureC.map { String(format: "%.1f°C", $0) } ?? "—",
+                            valueColor: vehicle.temperatureC.map { $0 < 0 ? .blue : ($0 < 30 ? AppTheme.online : .red) },
+                            iconColor: Color(red: 1.0, green: 0.42, blue: 0.21)
+                        )
+                        Divider().frame(height: 36)
+                        compactInfoTile(
+                            icon: "humidity.fill",
+                            label: "Nem",
+                            value: vehicle.humidityPct.map { "%\(Int($0))" } ?? "—",
+                            iconColor: Color(red: 0.024, green: 0.714, blue: 0.831)
+                        )
+                    }
+                }
+
+                // Konum - yorum satırına alındı
+                // popupRow(icon: "mappin.circle.fill", label: "Konum", value: vehicle.locationDisplay)
+
+                // Son Güncelleme - ortalanmış
+                if vehicle.deviceTime != nil {
+                    Divider().padding(.horizontal, 12)
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(AppTheme.textMuted.opacity(0.6))
+                        Text("Son Güncelleme: \(vehicle.formattedDeviceTime)")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(AppTheme.textMuted)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
                 }
             }
             .background(AppTheme.surface)
-            .cornerRadius(14)
+            .cornerRadius(16)
             .padding(.horizontal, 16)
 
             // ── Quick Actions ──
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 popupActionBtn(icon: "location.fill", label: "Yol Tarifi", color: Color(hex: "#3B82F6")) {
                     openMapsDirections(lat: vehicle.lat, lng: vehicle.lng, label: vehicle.plate)
                 }
@@ -416,64 +468,89 @@ struct LiveMapView: View {
                 }
                 popupActionBtn(icon: "lock.fill", label: "Blokaj", color: .red) {}
             }
-            .padding(14)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 14)
             .background(AppTheme.surface)
-            .cornerRadius(14)
+            .cornerRadius(16)
             .padding(.horizontal, 16)
             .padding(.top, 12)
 
-            // ── Canlı İzle Button ──
-            Button(action: {
-                trackingVehicleId = vehicle.id
-                selectedVehicle = nil
-                withAnimation(.easeInOut(duration: 0.6)) {
-                    mapCameraPosition = .region(MKCoordinateRegion(
-                        center: CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng),
-                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                    ))
+            // ── Action Buttons (yan yana) ──
+            HStack(spacing: 10) {
+                Button(action: {
+                    trackingVehicleId = vehicle.id
+                    selectedVehicle = nil
+                    withAnimation(.easeInOut(duration: 0.6)) {
+                        mapCameraPosition = .region(MKCoordinateRegion(
+                            center: CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng),
+                            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                        ))
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "location.circle.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Canlı İzle")
+                            .font(.system(size: 13, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(AppTheme.online)
+                    .cornerRadius(14)
                 }
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "location.circle.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text("Canlı İzle")
-                        .font(.system(size: 14, weight: .bold))
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 44)
-                .background(AppTheme.online)
-                .cornerRadius(14)
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
 
-            // ── Detay Gör Button ──
-            Button(action: {
-                let v = vehicle
-                selectedVehicle = nil
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    detailVehicle = v
+                Button(action: {
+                    let v = vehicle
+                    selectedVehicle = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        detailVehicle = v
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Detay Gör")
+                            .font(.system(size: 13, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(AppTheme.buttonGradient)
+                    .cornerRadius(14)
                 }
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text("Detay Gör")
-                        .font(.system(size: 14, weight: .bold))
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 48)
-                .background(AppTheme.buttonGradient)
-                .cornerRadius(14)
             }
             .padding(.horizontal, 16)
-            .padding(.top, 8)
+            .padding(.top, 12)
             .padding(.bottom, 20)
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    // MARK: - Compact Info Tile
+    func compactInfoTile(icon: String, label: String, value: String, valueColor: Color? = nil, iconColor: Color = AppTheme.indigo) -> some View {
+        HStack(spacing: 8) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(iconColor.opacity(0.1))
+                    .frame(width: 30, height: 30)
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .foregroundColor(iconColor)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(AppTheme.textMuted)
+                Text(value)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(valueColor ?? AppTheme.navy)
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     func popupRow(icon: String, label: String, value: String, valueColor: Color? = nil) -> some View {
@@ -764,7 +841,15 @@ class LiveMapViewModel: ObservableObject {
             .sink { [weak self] vehicleList in
                 guard let self = self else { return }
                 if !vehicleList.isEmpty {
-                    self.vehicles = vehicleList
+                    // Mevcut araç değerlerini koruyarak güncelle (null sıcaklık/nem için)
+                    let currentMap = Dictionary(uniqueKeysWithValues: self.vehicles.map { ($0.id, $0) })
+                    self.vehicles = vehicleList.map { newVehicle in
+                        if var existing = currentMap[newVehicle.id] {
+                            existing.mergeUpdate(from: newVehicle)
+                            return existing
+                        }
+                        return newVehicle
+                    }
                     self.animateAllVehicles(vehicleList)
                 }
             }
@@ -782,12 +867,20 @@ class LiveMapViewModel: ObservableObject {
                 guard let self = self else { return }
                 switch event {
                 case .snapshot(let vehicles, _, _):
-                    self.vehicles = vehicles
+                    // Snapshot'ta da mevcut değerleri koru
+                    let currentMap = Dictionary(uniqueKeysWithValues: self.vehicles.map { ($0.id, $0) })
+                    self.vehicles = vehicles.map { newVehicle in
+                        if var existing = currentMap[newVehicle.id] {
+                            existing.mergeUpdate(from: newVehicle)
+                            return existing
+                        }
+                        return newVehicle
+                    }
                     self.animateAllVehicles(vehicles)
                 case .update(let vehicle, _):
-                    // Update single vehicle in list
+                    // mergeUpdate ile null değerlerde önceki değeri koru
                     if let index = self.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
-                        self.vehicles[index] = vehicle
+                        self.vehicles[index].mergeUpdate(from: vehicle)
                     } else {
                         self.vehicles.append(vehicle)
                     }
