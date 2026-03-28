@@ -418,7 +418,10 @@ object WebSocketManager {
                     dailyFuelLiters = if (vehicle.dailyFuelLiters > 0) vehicle.dailyFuelLiters else old.dailyFuelLiters,
                     dailyFuelPer100km = if (vehicle.dailyFuelPer100km > 0) vehicle.dailyFuelPer100km else old.dailyFuelPer100km,
                     fuelPer100km = if (vehicle.fuelPer100km > 0) vehicle.fuelPer100km else old.fuelPer100km,
-                    deviceId = if (vehicle.deviceId > 0) vehicle.deviceId else old.deviceId
+                    deviceId = if (vehicle.deviceId > 0) vehicle.deviceId else old.deviceId,
+                    firstIgnitionOnAtToday = vehicle.firstIgnitionOnAtToday ?: old.firstIgnitionOnAtToday,
+                    lastIgnitionOnAt = vehicle.lastIgnitionOnAt ?: old.lastIgnitionOnAt,
+                    lastIgnitionOffAt = vehicle.lastIgnitionOffAt ?: old.lastIgnitionOffAt
                 )
                 // Re-apply cached driver name
                 val code = vehicle.driverId

@@ -386,6 +386,9 @@ final class WebSocketManager: ObservableObject {
                     if vehicle.dailyFuelPer100km <= 0 && old.dailyFuelPer100km > 0 { vehicle.dailyFuelPer100km = old.dailyFuelPer100km }
                     if vehicle.fuelPer100km <= 0 && old.fuelPer100km > 0 { vehicle.fuelPer100km = old.fuelPer100km }
                     if vehicle.deviceId == 0 && old.deviceId > 0 { vehicle.deviceId = old.deviceId }
+                    if vehicle.firstIgnitionOnAtToday == nil, let v = old.firstIgnitionOnAtToday { vehicle.firstIgnitionOnAtToday = v }
+                    if vehicle.lastIgnitionOnAt == nil, let v = old.lastIgnitionOnAt { vehicle.lastIgnitionOnAt = v }
+                    if vehicle.lastIgnitionOffAt == nil, let v = old.lastIgnitionOffAt { vehicle.lastIgnitionOffAt = v }
                     // Re-apply cached driver name
                     if let code = vehicle.driverId, !code.isEmpty,
                        let name = driverNameCache[code], !name.isEmpty {

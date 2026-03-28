@@ -525,9 +525,9 @@ struct Vehicle: Identifiable, Equatable {
         driverId = patch.driverId
         if patch.driverId == nil { driverName = "" } else if !patch.driverName.isEmpty { driverName = patch.driverName }
         alarmCode = patch.alarmCode
-        firstIgnitionOnAtToday = patch.firstIgnitionOnAtToday
-        lastIgnitionOnAt = patch.lastIgnitionOnAt
-        lastIgnitionOffAt = patch.lastIgnitionOffAt
+        if let v = patch.firstIgnitionOnAtToday { firstIgnitionOnAtToday = v }
+        if let v = patch.lastIgnitionOnAt { lastIgnitionOnAt = v }
+        if let v = patch.lastIgnitionOffAt { lastIgnitionOffAt = v }
         if patch.deviceId > 0 { deviceId = patch.deviceId }
         if let ai = patch.assignmentId { assignmentId = ai }
         if let v = patch.pdop { pdop = v }
