@@ -87,9 +87,16 @@ fun VehicleDetailScreen(
             else -> Double.NaN
         }
         val deviceBatteryVal = when {
+            detail.has("deviceBatteryLevelPct") -> detail.optDouble("deviceBatteryLevelPct", Double.NaN)
+            detail.has("battery_level_pct") -> detail.optDouble("battery_level_pct", Double.NaN)
             detail.has("deviceBattery") -> detail.optDouble("deviceBattery", Double.NaN)
             detail.has("device_battery") -> detail.optDouble("device_battery", Double.NaN)
-            else -> Double.NaN
+            else -> {
+                // Also check inside power object
+                val powerObj = if (detail.has("power") && !detail.isNull("power")) detail.optJSONObject("power") else null
+                if (powerObj != null && powerObj.has("device_battery_level_pct")) powerObj.optDouble("device_battery_level_pct", Double.NaN)
+                else Double.NaN
+            }
         }
         // Ignition timestamps from API
         val firstIgnitionToday = detail.optString("first_ignition_on_at_today", "").let { if (it.isNotEmpty() && it != "null") it else null }

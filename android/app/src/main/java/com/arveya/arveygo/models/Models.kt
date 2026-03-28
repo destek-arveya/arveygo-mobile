@@ -392,11 +392,17 @@ data class Vehicle(
                 json.has("externalVoltage") -> json.optDouble("externalVoltage")
                 else -> null
             }
-            val deviceBattery = when {
-                json.has("device_battery") -> json.optDouble("device_battery")
-                json.has("deviceBattery") -> json.optDouble("deviceBattery")
+            // deviceBattery (battery_level_pct = percentage): check top-level, then camelCase, then inside telemetry
+            val telObj = if (json.has("telemetry") && !json.isNull("telemetry")) json.optJSONObject("telemetry") else null
+            val deviceBatteryRaw = when {
+                json.has("battery_level_pct") && !json.isNull("battery_level_pct") -> json.optDouble("battery_level_pct")
+                json.has("deviceBatteryLevelPct") && !json.isNull("deviceBatteryLevelPct") -> json.optDouble("deviceBatteryLevelPct")
+                json.has("device_battery") && !json.isNull("device_battery") -> json.optDouble("device_battery")
+                json.has("deviceBattery") && !json.isNull("deviceBattery") -> json.optDouble("deviceBattery")
+                telObj != null && telObj.has("battery_level_pct") && !telObj.isNull("battery_level_pct") -> telObj.optDouble("battery_level_pct")
                 else -> null
             }
+            val deviceBattery = if (deviceBatteryRaw != null && !deviceBatteryRaw.isNaN()) deviceBatteryRaw else null
             val vehicleCategory = json.optString("vehicle_category", "car")
 
             // Temperature: check top-level first (backend sends snake_case: temperature_c)

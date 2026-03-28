@@ -340,10 +340,21 @@ struct Vehicle: Identifiable, Equatable {
             ?? (json["externalVoltage"] as? Double)
             ?? (json["external_voltage"] as? NSNumber)?.doubleValue
             ?? (json["externalVoltage"] as? NSNumber)?.doubleValue
-        let deviceBattery = (json["device_battery"] as? Double)
-            ?? (json["deviceBattery"] as? Double)
-            ?? (json["device_battery"] as? NSNumber)?.doubleValue
-            ?? (json["deviceBattery"] as? NSNumber)?.doubleValue
+        // deviceBattery (battery_level_pct = percentage): check top-level, then camelCase, then inside telemetry
+        let telObj = json["telemetry"] as? [String: Any]
+        let deviceBattery: Double? = {
+            if let v = json["battery_level_pct"] as? Double { return v }
+            if let v = (json["battery_level_pct"] as? NSNumber)?.doubleValue { return v }
+            if let v = json["deviceBatteryLevelPct"] as? Double { return v }
+            if let v = (json["deviceBatteryLevelPct"] as? NSNumber)?.doubleValue { return v }
+            if let v = json["device_battery"] as? Double { return v }
+            if let v = json["deviceBattery"] as? Double { return v }
+            if let v = (json["device_battery"] as? NSNumber)?.doubleValue { return v }
+            if let v = (json["deviceBattery"] as? NSNumber)?.doubleValue { return v }
+            if let tel = telObj, let v = tel["battery_level_pct"] as? Double { return v }
+            if let tel = telObj, let v = (tel["battery_level_pct"] as? NSNumber)?.doubleValue { return v }
+            return nil
+        }()
 
         // Temperature: check top-level first (backend sends snake_case: temperature_c)
         var temperatureC: Double? = nil

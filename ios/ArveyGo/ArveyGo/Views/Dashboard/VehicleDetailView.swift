@@ -63,10 +63,20 @@ class VehicleDetailObserver: ObservableObject {
             ?? (detail["external_voltage"] as? Double)
             ?? (detail["externalVoltage"] as? Int).map { Double($0) }
             ?? (detail["external_voltage"] as? Int).map { Double($0) }
-        let deviceBatteryVal = (detail["deviceBattery"] as? Double)
-            ?? (detail["device_battery"] as? Double)
-            ?? (detail["deviceBattery"] as? Int).map { Double($0) }
-            ?? (detail["device_battery"] as? Int).map { Double($0) }
+        let powerObj = detail["power"] as? [String: Any]
+        let deviceBatteryVal: Double? = {
+            if let v = detail["deviceBatteryLevelPct"] as? Double { return v }
+            if let v = (detail["deviceBatteryLevelPct"] as? Int).map({ Double($0) }) { return v }
+            if let v = detail["battery_level_pct"] as? Double { return v }
+            if let v = (detail["battery_level_pct"] as? Int).map({ Double($0) }) { return v }
+            if let v = detail["deviceBattery"] as? Double { return v }
+            if let v = detail["device_battery"] as? Double { return v }
+            if let v = (detail["deviceBattery"] as? Int).map({ Double($0) }) { return v }
+            if let v = (detail["device_battery"] as? Int).map({ Double($0) }) { return v }
+            if let pw = powerObj, let v = pw["device_battery_level_pct"] as? Double { return v }
+            if let pw = powerObj, let v = (pw["device_battery_level_pct"] as? Int).map({ Double($0) }) { return v }
+            return nil
+        }()
 
         if dailyKmVal > 0 { vehicle.todayKm = Int(dailyKmVal); vehicle.dailyKm = dailyKmVal }
         if !groupNameVal.isEmpty && groupNameVal != "<null>" { vehicle.groupName = groupNameVal }

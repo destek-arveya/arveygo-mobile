@@ -367,11 +367,31 @@ final class WebSocketManager: ObservableObject {
         print("[WS] Snapshot: \(vehiclesArray.count) vehicles, ts=\(ts)")
 
         // snapshot: local araç cache tamamen yenilensin (merge yok)
+        let oldVehicles = vehicles
         var newVehicles: [String: Vehicle] = [:]
         var newOrder: [String] = []
 
         for vehicleJson in vehiclesArray {
-            if let vehicle = Vehicle.fromWSPayload(vehicleJson) {
+            if var vehicle = Vehicle.fromWSPayload(vehicleJson) {
+                // Carry over API-enriched fields from previous cache (WS doesn't provide these)
+                if let old = oldVehicles[vehicle.imei] {
+                    if vehicle.driverName.isEmpty && !old.driverName.isEmpty { vehicle.driverName = old.driverName }
+                    if vehicle.groupName.isEmpty && !old.groupName.isEmpty { vehicle.groupName = old.groupName }
+                    if vehicle.vehicleBrand.isEmpty && !old.vehicleBrand.isEmpty { vehicle.vehicleBrand = old.vehicleBrand }
+                    if vehicle.vehicleModel.isEmpty && !old.vehicleModel.isEmpty { vehicle.vehicleModel = old.vehicleModel }
+                    if vehicle.address.isEmpty && !old.address.isEmpty { vehicle.address = old.address }
+                    if vehicle.city.isEmpty && !old.city.isEmpty { vehicle.city = old.city }
+                    if vehicle.fuelType.isEmpty && !old.fuelType.isEmpty { vehicle.fuelType = old.fuelType }
+                    if vehicle.dailyFuelLiters <= 0 && old.dailyFuelLiters > 0 { vehicle.dailyFuelLiters = old.dailyFuelLiters }
+                    if vehicle.dailyFuelPer100km <= 0 && old.dailyFuelPer100km > 0 { vehicle.dailyFuelPer100km = old.dailyFuelPer100km }
+                    if vehicle.fuelPer100km <= 0 && old.fuelPer100km > 0 { vehicle.fuelPer100km = old.fuelPer100km }
+                    if vehicle.deviceId == 0 && old.deviceId > 0 { vehicle.deviceId = old.deviceId }
+                    // Re-apply cached driver name
+                    if let code = vehicle.driverId, !code.isEmpty,
+                       let name = driverNameCache[code], !name.isEmpty {
+                        vehicle.driverName = name
+                    }
+                }
                 newVehicles[vehicle.imei] = vehicle
                 newOrder.append(vehicle.imei)
             }

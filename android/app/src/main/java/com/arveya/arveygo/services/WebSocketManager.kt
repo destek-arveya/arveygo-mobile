@@ -396,12 +396,38 @@ object WebSocketManager {
         Log.d(TAG, "Snapshot: ${vehiclesArray.length()} vehicles, ts=$ts")
 
         // snapshot: local araç cache tamamen yenilensin (merge yok)
+        val oldVehicles = _vehicles.value
         val newVehicles = mutableMapOf<String, Vehicle>()
         val newOrder = mutableListOf<String>()
 
         for (i in 0 until vehiclesArray.length()) {
             val vehicleJson = vehiclesArray.optJSONObject(i) ?: continue
-            val vehicle = Vehicle.fromWSPayload(vehicleJson) ?: continue
+            var vehicle = Vehicle.fromWSPayload(vehicleJson) ?: continue
+
+            // Carry over API-enriched fields from previous cache (WS doesn't provide these)
+            val old = oldVehicles[vehicle.imei]
+            if (old != null) {
+                vehicle = vehicle.copy(
+                    driverName = if (vehicle.driverName.isNotEmpty()) vehicle.driverName else old.driverName,
+                    groupName = if (vehicle.groupName.isNotEmpty()) vehicle.groupName else old.groupName,
+                    vehicleBrand = if (vehicle.vehicleBrand.isNotEmpty()) vehicle.vehicleBrand else old.vehicleBrand,
+                    vehicleModel = if (vehicle.vehicleModel.isNotEmpty()) vehicle.vehicleModel else old.vehicleModel,
+                    address = if (vehicle.address.isNotEmpty()) vehicle.address else old.address,
+                    city = if (vehicle.city.isNotEmpty()) vehicle.city else old.city,
+                    fuelType = if (vehicle.fuelType.isNotEmpty()) vehicle.fuelType else old.fuelType,
+                    dailyFuelLiters = if (vehicle.dailyFuelLiters > 0) vehicle.dailyFuelLiters else old.dailyFuelLiters,
+                    dailyFuelPer100km = if (vehicle.dailyFuelPer100km > 0) vehicle.dailyFuelPer100km else old.dailyFuelPer100km,
+                    fuelPer100km = if (vehicle.fuelPer100km > 0) vehicle.fuelPer100km else old.fuelPer100km,
+                    deviceId = if (vehicle.deviceId > 0) vehicle.deviceId else old.deviceId
+                )
+                // Re-apply cached driver name
+                val code = vehicle.driverId
+                if (!code.isNullOrEmpty()) {
+                    val name = driverNameCache[code]
+                    if (!name.isNullOrEmpty()) vehicle = vehicle.copy(driverName = name)
+                }
+            }
+
             newVehicles[vehicle.imei] = vehicle
             newOrder.add(vehicle.imei)
         }
