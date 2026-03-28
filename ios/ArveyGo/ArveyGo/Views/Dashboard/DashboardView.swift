@@ -1131,6 +1131,6 @@ struct FullScreenMapView: View {
 // MARK: - Preview
 // ═══════════════════════════════════════════════════════════════════════════
 #Preview {
-    DashboardView(showSideMenu: .constant(false), selectedPage: .constant(.dashboard), alarmsSearchText: .constant(""))
+    DashboardView(showSideMenu: .constant(false), selectedPage: .constant(.dashboard), alarmsSearchText: .constant(""), alarmsAutoOpenCreate: .constant(false), alarmsPrePlate: .constant(""))
         .environmentObject(AuthViewModel())
 }

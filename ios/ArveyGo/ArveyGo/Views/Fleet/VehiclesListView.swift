@@ -592,6 +592,6 @@ class VehiclesListViewModel: ObservableObject {
 }
 
 #Preview {
-    VehiclesListView(showSideMenu: .constant(false), selectedPage: Binding.constant(AppPage.vehicles), alarmsSearchText: .constant(""))
+    VehiclesListView(showSideMenu: .constant(false), selectedPage: Binding.constant(AppPage.vehicles), alarmsSearchText: .constant(""), alarmsAutoOpenCreate: .constant(false), alarmsPrePlate: .constant(""))
         .environmentObject(AuthViewModel())
 }

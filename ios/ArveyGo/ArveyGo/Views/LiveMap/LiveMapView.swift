@@ -974,6 +974,6 @@ struct EnrichedPopupWrapper<Content: View>: View {
 }
 
 #Preview {
-    LiveMapView(showSideMenu: .constant(false), selectedPage: .constant(.liveMap), alarmsSearchText: .constant(""))
+    LiveMapView(showSideMenu: .constant(false), selectedPage: .constant(.liveMap), alarmsSearchText: .constant(""), alarmsAutoOpenCreate: .constant(false), alarmsPrePlate: .constant(""))
         .environmentObject(AuthViewModel())
 }
