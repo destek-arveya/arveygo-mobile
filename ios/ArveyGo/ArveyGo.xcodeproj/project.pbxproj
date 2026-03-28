@@ -42,6 +42,7 @@
 		AA000035 /* DriversView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000035 /* DriversView.swift */; };
 		AA000036 /* FleetManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000036 /* FleetManagementView.swift */; };
 		AA000037 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000037 /* ReportsView.swift */; };
+		AA000038 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000038 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -82,6 +83,7 @@
 		BB000035 /* DriversView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriversView.swift; sourceTree = "<group>"; };
 		BB000036 /* FleetManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetManagementView.swift; sourceTree = "<group>"; };
 		BB000037 /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
+		F523685C2F7879A7006D9B54 /* ArveyGoDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ArveyGoDebug.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -106,6 +108,7 @@
 		DD000002 /* ArveyGo */ = {
 			isa = PBXGroup;
 			children = (
+				F523685C2F7879A7006D9B54 /* ArveyGoDebug.entitlements */,
 				BB000001 /* ArveyGoApp.swift */,
 				BB000002 /* ContentView.swift */,
 				BB000017 /* Info.plist */,
@@ -244,6 +247,7 @@
 				BB000022 /* JWTHelper.swift */,
 				BB000023 /* WebSocketManager.swift */,
 				BB000024 /* APIService.swift */,
+				BB000038 /* AppDelegate.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -378,6 +382,7 @@
 				AA000029 /* RoundedCorner.swift in Sources */,
 				AA000030 /* SettingsView.swift in Sources */,
 				AA000031 /* SupportRequestView.swift in Sources */,
+				AA000038 /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -514,6 +519,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ArveyGo/ArveyGoDebug.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"ArveyGo/Preview Content\"";
@@ -547,6 +553,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ArveyGo/ArveyGo.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"ArveyGo/Preview Content\"";
