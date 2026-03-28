@@ -178,14 +178,9 @@ class AlarmsViewModel: ObservableObject {
             lastPage = pagination["last_page"] as? Int ?? 1
             totalCount = pagination["total"] as? Int ?? alarms.count
         } catch {
-            // API henüz hazır değilse dummy veri göster
             if !append {
-                alarms = Self.dummyAlarms
-                totalCount = alarms.count
-                currentPage = 1
-                lastPage = 1
+                errorMessage = error.localizedDescription
             }
-            errorMessage = nil
         }
 
         isLoading = false
@@ -214,19 +209,6 @@ class AlarmsViewModel: ObservableObject {
         await refresh()
     }
 
-    // MARK: - Dummy Data
-    private static let dummyAlarms: [AlarmEvent] = [
-        AlarmEvent(id: "d1", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "overspeed", code: "Hız limiti: 120 km/s, Anlık: 138 km/s", description: "", lat: 39.9208, lng: 32.8541, speed: 138, createdAt: "2026-03-26 14:22:00", isActive: false),
-        AlarmEvent(id: "d2", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "harsh_brake", code: "Ani fren algılandı", description: "", lat: 41.0082, lng: 28.9784, speed: 67, createdAt: "2026-03-26 13:45:00", isActive: false),
-        AlarmEvent(id: "d3", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "geofence_exit", code: "Ankara Merkez bölgesinden çıkış", description: "", lat: 39.9334, lng: 32.8597, speed: 45, createdAt: "2026-03-26 12:30:00", isActive: true),
-        AlarmEvent(id: "d4", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "idle", code: "15 dk rölanti - Kontak açık, araç durağan", description: "", lat: 41.0136, lng: 28.9550, speed: 0, createdAt: "2026-03-26 11:15:00", isActive: false),
-        AlarmEvent(id: "d5", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "sos", code: "Panik butonu basıldı", description: "", lat: 39.9248, lng: 32.8662, speed: 0, createdAt: "2026-03-26 10:50:00", isActive: true),
-        AlarmEvent(id: "d6", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "harsh_acceleration", code: "Ani hızlanma algılandı", description: "", lat: 41.0210, lng: 28.9390, speed: 82, createdAt: "2026-03-26 10:05:00", isActive: false),
-        AlarmEvent(id: "d7", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "disconnect", code: "Cihaz bağlantısı kesildi", description: "", lat: 39.9180, lng: 32.8450, speed: 0, createdAt: "2026-03-26 09:30:00", isActive: true),
-        AlarmEvent(id: "d8", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "overspeed", code: "Hız limiti: 50 km/s, Anlık: 73 km/s", description: "", lat: 41.0350, lng: 28.9850, speed: 73, createdAt: "2026-03-26 08:45:00", isActive: false),
-        AlarmEvent(id: "d9", imei: "353742378104285", plate: "06 ATS 001", vehicleName: "Beyaz Sprinter", type: "geofence_enter", code: "Ankara Merkez bölgesine giriş", description: "", lat: 39.9255, lng: 32.8540, speed: 35, createdAt: "2026-03-26 08:00:00", isActive: false),
-        AlarmEvent(id: "d10", imei: "353742379713316", plate: "34 ARV 34", vehicleName: "Siyah Vito", type: "power_cut", code: "Harici güç kaynağı kesildi", description: "", lat: 41.0082, lng: 28.9784, speed: 0, createdAt: "2026-03-25 23:10:00", isActive: true),
-    ]
 }
 
 // MARK: - Alarm Set Model (API: /api/mobile/alarm-sets/)
