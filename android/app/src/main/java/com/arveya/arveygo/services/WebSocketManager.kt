@@ -395,46 +395,19 @@ object WebSocketManager {
         val ts = json.optInt("ts", 0)
         Log.d(TAG, "Snapshot: ${vehiclesArray.length()} vehicles, ts=$ts")
 
+        // snapshot: local araç cache tamamen yenilensin (merge yok)
         val newVehicles = mutableMapOf<String, Vehicle>()
         val newOrder = mutableListOf<String>()
 
         for (i in 0 until vehiclesArray.length()) {
             val vehicleJson = vehiclesArray.optJSONObject(i) ?: continue
-            var vehicle = Vehicle.fromWSPayload(vehicleJson) ?: continue
-
-            // Merge with existing data
-            _vehicles.value[vehicle.imei]?.let { existing ->
-                vehicle = existing.mergeUpdate(vehicle)
-            }
+            val vehicle = Vehicle.fromWSPayload(vehicleJson) ?: continue
             newVehicles[vehicle.imei] = vehicle
             newOrder.add(vehicle.imei)
         }
 
         _vehicles.value = newVehicles
         orderList = newOrder
-
-        // ── Dummy motorcycle for development ──
-        val mcImei = "DEMO_MC_001"
-        val dummyMotorcycle = Vehicle(
-            id = mcImei, plate = "34 MC 2026", model = "Honda CB650R",
-            status = VehicleStatus.IDLE, kontakOn = false,
-            totalKm = 12480, todayKm = 37,
-            driver = "", city = "İstanbul", lat = 41.0082, lng = 29.0340,
-            vehicleCategory = "motorcycle",
-            imei = mcImei, companyId = 0, name = "Honda CB650R",
-            speed = 0.0, direction = 165.0, ignition = false, isOnline = true,
-            fix = false, hdop = 1.2, input1 = false, input2 = false, output = false,
-            batteryVoltage = 12.8, externalVoltage = null,
-            temperatureC = null, humidityPct = null, odometer = 12480.0,
-            speedLimit = 120, driverId = null, alarmCode = null,
-            deviceTime = null, ts = (System.currentTimeMillis() / 1000).toInt(),
-            firstIgnitionOnAtToday = null, lastIgnitionOnAt = null, lastIgnitionOffAt = null
-        )
-        val mutableVehicles = _vehicles.value.toMutableMap()
-        mutableVehicles[mcImei] = dummyMotorcycle
-        _vehicles.value = mutableVehicles
-        orderList.add(0, mcImei)
-        // ── End dummy motorcycle ──
 
         rebuildVehicleList()
 

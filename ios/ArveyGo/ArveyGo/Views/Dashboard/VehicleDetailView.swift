@@ -254,7 +254,7 @@ struct VehicleDetailView: View {
                     Circle()
                         .fill(vehicle.status.color)
                         .frame(width: 7, height: 7)
-                    Text(vehicle.status == .online ? "Canlı" : vehicle.status.label)
+                    Text(!vehicle.livenessStatus.isEmpty ? vehicle.livenessLabel : (vehicle.status == .online ? "Canlı" : vehicle.status.label))
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(vehicle.status.color)
                 }
@@ -431,6 +431,10 @@ struct VehicleDetailView: View {
                 if vehicle.deviceTime != nil {
                     listDivider
                     detailRow(icon: "clock.fill", label: "Son Güncelleme", value: vehicle.formattedDeviceTime)
+                }
+                if vehicle.lastPacketAt != nil {
+                    listDivider
+                    detailRow(icon: "arrow.triangle.2.circlepath", label: "Son Paket", value: vehicle.formattedLastPacketAt)
                 }
             }
 

@@ -366,18 +366,12 @@ final class WebSocketManager: ObservableObject {
         let ts = (json["ts"] as? Int) ?? 0
         print("[WS] Snapshot: \(vehiclesArray.count) vehicles, ts=\(ts)")
 
-        // Replace all
+        // snapshot: local araç cache tamamen yenilensin (merge yok)
         var newVehicles: [String: Vehicle] = [:]
         var newOrder: [String] = []
 
         for vehicleJson in vehiclesArray {
-            if var vehicle = Vehicle.fromWSPayload(vehicleJson) {
-                // Merge with existing data if we have it (preserves extra info)
-                if let existing = vehicles[vehicle.imei] {
-                    var merged = existing
-                    merged.mergeUpdate(from: vehicle)
-                    vehicle = merged
-                }
+            if let vehicle = Vehicle.fromWSPayload(vehicleJson) {
                 newVehicles[vehicle.imei] = vehicle
                 newOrder.append(vehicle.imei)
             }
@@ -385,26 +379,6 @@ final class WebSocketManager: ObservableObject {
 
         vehicles = newVehicles
         orderList = newOrder
-
-        // ── Dummy motorcycle for development ──
-        let mcImei = "DEMO_MC_001"
-        let dummyMotorcycle = Vehicle(
-            id: mcImei, plate: "34 MC 2026", model: "Honda CB650R",
-            status: .idle, kontakOn: false, totalKm: 12480, todayKm: 37,
-            driver: "", city: "İstanbul", lat: 41.0082, lng: 29.0340,
-            vehicleCategory: "motorcycle",
-            imei: mcImei, companyId: 0, name: "Honda CB650R",
-            speed: 0.0, direction: 165.0, ignition: false, isOnline: true,
-            fix: false, hdop: 1.2, input1: false, input2: false, output: false,
-            batteryVoltage: 12.8, externalVoltage: nil, odometer: 12480.0,
-            speedLimit: 120, temperatureC: nil, humidityPct: nil,
-            driverId: nil, alarmCode: nil,
-            deviceTime: nil, ts: Int(Date().timeIntervalSince1970),
-            firstIgnitionOnAtToday: nil, lastIgnitionOnAt: nil, lastIgnitionOffAt: nil
-        )
-        vehicles[mcImei] = dummyMotorcycle
-        orderList.insert(mcImei, at: 0)
-        // ── End dummy motorcycle ──
 
         rebuildVehicleList()
 

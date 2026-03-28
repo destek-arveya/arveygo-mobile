@@ -100,6 +100,24 @@ data class Vehicle(
     var deviceTime: String? = null,
     var ts: Int = 0,
     var deviceId: Int = 0,
+    var assignmentId: Int? = null,
+    var pdop: Double? = null,
+    var satellites: Int? = null,
+    var gsmSignal: Int? = null,
+    var altitude: Double? = null,
+    var lastPacketAt: String? = null,
+    var lastPacketTs: Int = 0,
+    var reportIntervalSec: Int? = null,
+    var sleepIntervalSec: Int? = null,
+    var offlineAfterSec: Int? = null,
+    var secondsSinceLastPacket: Int? = null,
+    var livenessStatus: String = "",
+    var connectedNow: Boolean = false,
+    var telemetry: JSONObject? = null,
+    var beacons: org.json.JSONArray? = null,
+    var beaconCount: Int = 0,
+    var sensors: org.json.JSONArray? = null,
+    var sensorCount: Int = 0,
     // Ignition timestamps (from WebSocket)
     var firstIgnitionOnAtToday: String? = null,
     var lastIgnitionOnAt: String? = null,
@@ -218,6 +236,18 @@ data class Vehicle(
     val formattedFirstIgnitionToday: String get() = formatTimestamp(firstIgnitionOnAtToday)
     val formattedLastIgnitionOn: String get() = formatTimestamp(lastIgnitionOnAt)
     val formattedLastIgnitionOff: String get() = formatTimestamp(lastIgnitionOffAt)
+    val formattedLastPacketAt: String get() = formatTimestamp(lastPacketAt)
+
+    /** Liveness status display label */
+    val livenessLabel: String
+        get() = when (livenessStatus) {
+            "connected" -> "Bağlı"
+            "reporting" -> "Raporluyor"
+            "sleeping" -> "Uyku"
+            "late" -> "Gecikmeli"
+            "offline" -> "Çevrimdışı"
+            else -> if (isOnline) "Çevrimiçi" else "Çevrimdışı"
+        }
 
     val formattedDeviceTime: String
         get() {
@@ -335,14 +365,23 @@ data class Vehicle(
             val fuelTypeVal = json.optString("fuelType", json.optString("fuel_type", ""))
             val speedLimit = json.optInt("speed_limit", 0)
             val companyId = json.optInt("company_id", 0)
-            val driverId = if (json.has("driver_id")) json.optString("driver_id") else null
-            val alarmCode = if (json.has("alarm_code")) json.optString("alarm_code") else null
-            val deviceTime = if (json.has("device_time")) json.optString("device_time") else null
+            val driverId: String? = if (json.has("driver_id") && !json.isNull("driver_id")) {
+                val v = json.optString("driver_id", "")
+                if (v.isEmpty() || v == "null") null else v
+            } else null
+            val alarmCode: String? = if (json.has("alarm_code") && !json.isNull("alarm_code")) {
+                val v = json.optString("alarm_code", "")
+                if (v.isEmpty() || v == "null") null else v
+            } else null
+            val deviceTime = if (json.has("device_time") && !json.isNull("device_time")) json.optString("device_time") else null
             val ts = json.optInt("ts", 0)
             val deviceIdValue = if (json.has("id") && !json.isNull("id")) json.optInt("id", 0) else json.optInt("deviceId", 0)
-            val firstIgnitionOnAtToday = if (json.has("first_ignition_on_at_today")) json.optString("first_ignition_on_at_today") else null
-            val lastIgnitionOnAt = if (json.has("last_ignition_on_at")) json.optString("last_ignition_on_at") else null
-            val lastIgnitionOffAt = if (json.has("last_ignition_off_at")) json.optString("last_ignition_off_at") else null
+            val assignmentId: Int? = if (json.has("assignment_id") && !json.isNull("assignment_id")) json.optInt("assignment_id") else null
+            val firstIgnitionOnAtToday: String? = if (json.has("first_ignition_on_at_today") && !json.isNull("first_ignition_on_at_today")) json.optString("first_ignition_on_at_today").let { if (it == "null") null else it } else null
+            val lastIgnitionOnAt: String? = if (json.has("last_ignition_on_at") && !json.isNull("last_ignition_on_at")) json.optString("last_ignition_on_at").let { if (it == "null") null else it } else null
+            val lastIgnitionOffAt: String? = if (json.has("last_ignition_off_at") && !json.isNull("last_ignition_off_at")) json.optString("last_ignition_off_at").let { if (it == "null") null else it } else null
+            val lastPacketAt: String? = if (json.has("last_packet_at") && !json.isNull("last_packet_at")) json.optString("last_packet_at") else null
+            val lastPacketTs = json.optInt("last_packet_ts", 0)
             val batteryVoltage = when {
                 json.has("battery_voltage") -> json.optDouble("battery_voltage")
                 json.has("battery") -> json.optDouble("battery")
@@ -409,8 +448,33 @@ data class Vehicle(
 
             android.util.Log.d("Vehicle", "TEMP PARSE [$plate]: temperatureC=$temperatureC, humidityPct=$humidityPct")
 
-            // Match web backend's 4-condition status logic
+            // New fields
+            val pdop: Double? = if (json.has("pdop") && !json.isNull("pdop")) safeDouble(json.optDouble("pdop")) else null
+            val satellites: Int? = if (json.has("satellites") && !json.isNull("satellites")) json.optInt("satellites") else null
+            val gsmSignal: Int? = if (json.has("gsm_signal") && !json.isNull("gsm_signal")) json.optInt("gsm_signal") else null
+            val altitude: Double? = if (json.has("altitude") && !json.isNull("altitude")) safeDouble(json.optDouble("altitude")) else null
+            val reportIntervalSec: Int? = if (json.has("report_interval_sec") && !json.isNull("report_interval_sec")) json.optInt("report_interval_sec") else null
+            val sleepIntervalSec: Int? = if (json.has("sleep_interval_sec") && !json.isNull("sleep_interval_sec")) json.optInt("sleep_interval_sec") else null
+            val offlineAfterSec: Int? = if (json.has("offline_after_sec") && !json.isNull("offline_after_sec")) json.optInt("offline_after_sec") else null
+            val secondsSinceLastPacket: Int? = if (json.has("seconds_since_last_packet") && !json.isNull("seconds_since_last_packet")) json.optInt("seconds_since_last_packet") else null
+            val livenessStatus = json.optString("liveness_status", "")
+            val connectedNow = json.optBoolean("connected_now", false)
+            val telemetry: JSONObject? = if (json.has("telemetry") && !json.isNull("telemetry")) json.optJSONObject("telemetry") else null
+            val beacons: org.json.JSONArray? = if (json.has("beacons") && !json.isNull("beacons")) json.optJSONArray("beacons") else null
+            val beaconCount = json.optInt("beacon_count", 0)
+            val sensorsArr: org.json.JSONArray? = if (json.has("sensors") && !json.isNull("sensors")) json.optJSONArray("sensors") else null
+            val sensorCount = json.optInt("sensor_count", 0)
+
+            // Use liveness_status for status when available
             val status = when {
+                livenessStatus == "connected" || livenessStatus == "reporting" -> {
+                    if (ignition && speed > 5) VehicleStatus.ONLINE
+                    else if (ignition) VehicleStatus.IDLE
+                    else VehicleStatus.ONLINE // connected but ignition off
+                }
+                livenessStatus == "sleeping" || livenessStatus == "late" -> VehicleStatus.IDLE
+                livenessStatus == "offline" -> VehicleStatus.OFFLINE
+                // Fallback: original logic
                 !isOnline -> VehicleStatus.OFFLINE
                 ignition && speed > 5 -> VehicleStatus.ONLINE
                 ignition -> VehicleStatus.IDLE
@@ -433,10 +497,18 @@ data class Vehicle(
                 odometer = odometer, speedLimit = speedLimit,
                 driverId = driverId, alarmCode = alarmCode,
                 deviceTime = deviceTime, ts = ts,
+                deviceId = deviceIdValue,
+                assignmentId = assignmentId,
+                pdop = pdop, satellites = satellites, gsmSignal = gsmSignal, altitude = altitude,
+                lastPacketAt = lastPacketAt, lastPacketTs = lastPacketTs,
+                reportIntervalSec = reportIntervalSec, sleepIntervalSec = sleepIntervalSec,
+                offlineAfterSec = offlineAfterSec, secondsSinceLastPacket = secondsSinceLastPacket,
+                livenessStatus = livenessStatus, connectedNow = connectedNow,
+                telemetry = telemetry, beacons = beacons, beaconCount = beaconCount,
+                sensors = sensorsArr, sensorCount = sensorCount,
                 firstIgnitionOnAtToday = firstIgnitionOnAtToday,
                 lastIgnitionOnAt = lastIgnitionOnAt,
                 lastIgnitionOffAt = lastIgnitionOffAt,
-                deviceId = deviceIdValue,
                 dailyKm = effectiveDailyKm,
                 fuelType = fuelTypeVal,
                 dailyFuelPer100km = fuelPer100kmVal
@@ -456,23 +528,43 @@ data class Vehicle(
             totalKm = if (patch.odometer > 0) patch.odometer.toInt() else totalKm,
             odometer = if (patch.odometer > 0) patch.odometer else odometer,
             todayKm = if (patch.todayKm > 0) patch.todayKm else todayKm,
-            deviceTime = patch.deviceTime ?: deviceTime,
+            // null alanları gerçekten null olarak işle, eski değeri koruma
+            deviceTime = patch.deviceTime,
             ts = if (patch.ts > 0) patch.ts else ts,
             fix = patch.fix, hdop = patch.hdop,
             input1 = patch.input1, input2 = patch.input2, output = patch.output,
-            batteryVoltage = patch.batteryVoltage ?: batteryVoltage,
-            externalVoltage = patch.externalVoltage ?: externalVoltage,
-            deviceBattery = patch.deviceBattery ?: deviceBattery,
-            temperatureC = patch.temperatureC ?: temperatureC,
-            humidityPct = patch.humidityPct ?: humidityPct,
-            driverId = patch.driverId ?: driverId,
-            driverName = if (patch.driverName.isNotEmpty()) patch.driverName else driverName,
-            alarmCode = patch.alarmCode ?: alarmCode,
-            firstIgnitionOnAtToday = patch.firstIgnitionOnAtToday ?: firstIgnitionOnAtToday,
-            lastIgnitionOnAt = patch.lastIgnitionOnAt ?: lastIgnitionOnAt,
-            lastIgnitionOffAt = patch.lastIgnitionOffAt ?: lastIgnitionOffAt,
+            batteryVoltage = patch.batteryVoltage,
+            externalVoltage = patch.externalVoltage,
+            deviceBattery = patch.deviceBattery,
+            temperatureC = patch.temperatureC,
+            humidityPct = patch.humidityPct,
+            // driver_id null olabilir (kart çıkarılınca), eski değeri tutma
+            driverId = patch.driverId,
+            driverName = if (patch.driverName.isNotEmpty()) patch.driverName else if (patch.driverId == null) "" else driverName,
+            alarmCode = patch.alarmCode,
+            firstIgnitionOnAtToday = patch.firstIgnitionOnAtToday,
+            lastIgnitionOnAt = patch.lastIgnitionOnAt,
+            lastIgnitionOffAt = patch.lastIgnitionOffAt,
             vehicleCategory = if (patch.vehicleCategory != "car") patch.vehicleCategory else vehicleCategory,
             deviceId = if (patch.deviceId > 0) patch.deviceId else deviceId,
+            assignmentId = patch.assignmentId ?: assignmentId,
+            pdop = patch.pdop,
+            satellites = patch.satellites,
+            gsmSignal = patch.gsmSignal,
+            altitude = patch.altitude,
+            lastPacketAt = patch.lastPacketAt ?: lastPacketAt,
+            lastPacketTs = if (patch.lastPacketTs > 0) patch.lastPacketTs else lastPacketTs,
+            reportIntervalSec = patch.reportIntervalSec ?: reportIntervalSec,
+            sleepIntervalSec = patch.sleepIntervalSec ?: sleepIntervalSec,
+            offlineAfterSec = patch.offlineAfterSec ?: offlineAfterSec,
+            secondsSinceLastPacket = patch.secondsSinceLastPacket,
+            livenessStatus = if (patch.livenessStatus.isNotEmpty()) patch.livenessStatus else livenessStatus,
+            connectedNow = patch.connectedNow,
+            telemetry = patch.telemetry ?: telemetry,
+            beacons = patch.beacons ?: beacons,
+            beaconCount = if (patch.beaconCount > 0) patch.beaconCount else beaconCount,
+            sensors = patch.sensors ?: sensors,
+            sensorCount = if (patch.sensorCount > 0) patch.sensorCount else sensorCount,
             // Preserve API-enriched fields (WS doesn't provide these)
             groupName = if (patch.groupName.isNotEmpty()) patch.groupName else groupName,
             vehicleBrand = if (patch.vehicleBrand.isNotEmpty()) patch.vehicleBrand else vehicleBrand,

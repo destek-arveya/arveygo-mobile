@@ -332,7 +332,9 @@ private fun MapHeader(vehicle: Vehicle, context: Context) {
                 Box(Modifier.size(7.dp).clip(CircleShape).background(vehicle.status.color))
                 Spacer(Modifier.width(5.dp))
                 Text(
-                    if (vehicle.status == VehicleStatus.ONLINE) "Canlı" else vehicle.status.label,
+                    if (vehicle.livenessStatus.isNotEmpty()) vehicle.livenessLabel
+                    else if (vehicle.status == VehicleStatus.ONLINE) "Canlı"
+                    else vehicle.status.label,
                     fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = vehicle.status.color
                 )
             }
@@ -560,6 +562,10 @@ private fun OverviewTab(
         if (vehicle.deviceTime != null) {
             ListDivider()
             DetailRow(Icons.Default.Schedule, "Son Güncelleme", vehicle.formattedDeviceTime)
+        }
+        if (vehicle.lastPacketAt != null) {
+            ListDivider()
+            DetailRow(Icons.Default.Sync, "Son Paket", vehicle.formattedLastPacketAt)
         }
     }
 

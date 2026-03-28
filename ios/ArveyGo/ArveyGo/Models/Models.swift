@@ -22,7 +22,13 @@ struct AppUser: Codable, Identifiable {
 }
 
 // MARK: - Vehicle Model
-struct Vehicle: Identifiable, Hashable {
+struct Vehicle: Identifiable, Equatable {
+    // Custom Equatable (telemetry/beacons/sensors are [String:Any] and not Equatable)
+    static func == (lhs: Vehicle, rhs: Vehicle) -> Bool {
+        lhs.id == rhs.id && lhs.ts == rhs.ts && lhs.lat == rhs.lat && lhs.lng == rhs.lng &&
+        lhs.speed == rhs.speed && lhs.ignition == rhs.ignition && lhs.isOnline == rhs.isOnline &&
+        lhs.plate == rhs.plate && lhs.livenessStatus == rhs.livenessStatus && lhs.connectedNow == rhs.connectedNow
+    }
     let id: String
     var plate: String
     var model: String
@@ -64,6 +70,24 @@ struct Vehicle: Identifiable, Hashable {
     var deviceTime: String? = nil
     var ts: Int = 0
     var deviceId: Int = 0
+    var assignmentId: Int? = nil
+    var pdop: Double? = nil
+    var satellites: Int? = nil
+    var gsmSignal: Int? = nil
+    var altitude: Double? = nil
+    var lastPacketAt: String? = nil
+    var lastPacketTs: Int = 0
+    var reportIntervalSec: Int? = nil
+    var sleepIntervalSec: Int? = nil
+    var offlineAfterSec: Int? = nil
+    var secondsSinceLastPacket: Int? = nil
+    var livenessStatus: String = ""
+    var connectedNow: Bool = false
+    var telemetry: [String: Any]? = nil
+    var beacons: [[String: Any]]? = nil
+    var beaconCount: Int = 0
+    var sensors: [[String: Any]]? = nil
+    var sensorCount: Int = 0
 
     // Ignition timestamps (from WebSocket)
     var firstIgnitionOnAtToday: String? = nil
@@ -199,6 +223,19 @@ struct Vehicle: Identifiable, Hashable {
     var formattedFirstIgnitionToday: String { formatTimestamp(firstIgnitionOnAtToday) }
     var formattedLastIgnitionOn: String { formatTimestamp(lastIgnitionOnAt) }
     var formattedLastIgnitionOff: String { formatTimestamp(lastIgnitionOffAt) }
+    var formattedLastPacketAt: String { formatTimestamp(lastPacketAt) }
+
+    /// Liveness status display label
+    var livenessLabel: String {
+        switch livenessStatus {
+        case "connected": return "Bağlı"
+        case "reporting": return "Raporluyor"
+        case "sleeping": return "Uyku"
+        case "late": return "Gecikmeli"
+        case "offline": return "Çevrimdışı"
+        default: return isOnline ? "Çevrimiçi" : "Çevrimdışı"
+        }
+    }
 
     var formattedDeviceTime: String {
         guard let raw = deviceTime, !raw.isEmpty else { return "—" }
@@ -266,14 +303,35 @@ struct Vehicle: Identifiable, Hashable {
         let fuelTypeVal = (json["fuelType"] as? String) ?? (json["fuel_type"] as? String) ?? ""
         let speedLimit = (json["speed_limit"] as? Int) ?? 0
         let companyId = (json["company_id"] as? Int) ?? 0
-        let driverId = json["driver_id"] as? String
-        let alarmCode = json["alarm_code"] as? String
+        // driver_id: null olabilir (kart çıkarılınca), NSNull kontrolü yap
+        let driverId: String? = {
+            guard let raw = json["driver_id"] else { return nil }
+            if raw is NSNull { return nil }
+            if let s = raw as? String, !s.isEmpty, s != "null" { return s }
+            return nil
+        }()
+        let alarmCode: String? = {
+            guard let raw = json["alarm_code"] else { return nil }
+            if raw is NSNull { return nil }
+            if let s = raw as? String, !s.isEmpty, s != "null" { return s }
+            return nil
+        }()
         let deviceTime = json["device_time"] as? String
         let ts = (json["ts"] as? Int) ?? 0
         let deviceIdValue = (json["id"] as? Int) ?? (json["deviceId"] as? Int) ?? 0
-        let firstIgnitionOnAtToday = json["first_ignition_on_at_today"] as? String
-        let lastIgnitionOnAt = json["last_ignition_on_at"] as? String
-        let lastIgnitionOffAt = json["last_ignition_off_at"] as? String
+        let assignmentId = json["assignment_id"] as? Int
+        // Nullable string helper
+        func nullableString(_ key: String) -> String? {
+            guard let raw = json[key] else { return nil }
+            if raw is NSNull { return nil }
+            if let s = raw as? String, !s.isEmpty, s != "null" { return s }
+            return nil
+        }
+        let firstIgnitionOnAtToday = nullableString("first_ignition_on_at_today")
+        let lastIgnitionOnAt = nullableString("last_ignition_on_at")
+        let lastIgnitionOffAt = nullableString("last_ignition_off_at")
+        let lastPacketAt = nullableString("last_packet_at")
+        let lastPacketTs = (json["last_packet_ts"] as? Int) ?? 0
         let batteryVoltage = (json["battery_voltage"] as? Double)
             ?? (json["battery"] as? Double)
             ?? (json["battery_voltage"] as? NSNumber)?.doubleValue
@@ -328,16 +386,40 @@ struct Vehicle: Identifiable, Hashable {
 
         print("🌡️ TEMP PARSE [\(plate)]: temperatureC=\(String(describing: temperatureC)), humidityPct=\(String(describing: humidityPct))")
 
-        // Determine status — matches web backend logic
+        // New fields
+        let pdop = (json["pdop"] as? Double) ?? (json["pdop"] as? NSNumber)?.doubleValue
+        let satellites = json["satellites"] as? Int
+        let gsmSignal = json["gsm_signal"] as? Int
+        let altitude = (json["altitude"] as? Double) ?? (json["altitude"] as? NSNumber)?.doubleValue
+        let reportIntervalSec = json["report_interval_sec"] as? Int
+        let sleepIntervalSec = json["sleep_interval_sec"] as? Int
+        let offlineAfterSec = json["offline_after_sec"] as? Int
+        let secondsSinceLastPacket = json["seconds_since_last_packet"] as? Int
+        let livenessStatus = (json["liveness_status"] as? String) ?? ""
+        let connectedNow = (json["connected_now"] as? Bool) ?? false
+        let telemetry = json["telemetry"] as? [String: Any]
+        let beacons = json["beacons"] as? [[String: Any]]
+        let beaconCount = (json["beacon_count"] as? Int) ?? 0
+        let sensorsArr = json["sensors"] as? [[String: Any]]
+        let sensorCount = (json["sensor_count"] as? Int) ?? 0
+
+        // Use liveness_status for status when available
         let status: VehicleStatus
-        if !isOnline {
-            status = .offline
-        } else if ignition && speed > 5 {
-            status = .online
-        } else if ignition {
+        switch livenessStatus {
+        case "connected", "reporting":
+            if ignition && speed > 5 { status = .online }
+            else if ignition { status = .idle }
+            else { status = .online } // connected but ignition off
+        case "sleeping", "late":
             status = .idle
-        } else {
+        case "offline":
             status = .offline
+        default:
+            // Fallback: original logic
+            if !isOnline { status = .offline }
+            else if ignition && speed > 5 { status = .online }
+            else if ignition { status = .idle }
+            else { status = .offline }
         }
 
         let effectiveDailyKm = dailyKmVal > 0 ? dailyKmVal : todayKmVal
@@ -379,6 +461,24 @@ struct Vehicle: Identifiable, Hashable {
             deviceTime: deviceTime,
             ts: ts,
             deviceId: deviceIdValue,
+            assignmentId: assignmentId,
+            pdop: pdop,
+            satellites: satellites,
+            gsmSignal: gsmSignal,
+            altitude: altitude,
+            lastPacketAt: lastPacketAt,
+            lastPacketTs: lastPacketTs,
+            reportIntervalSec: reportIntervalSec,
+            sleepIntervalSec: sleepIntervalSec,
+            offlineAfterSec: offlineAfterSec,
+            secondsSinceLastPacket: secondsSinceLastPacket,
+            livenessStatus: livenessStatus,
+            connectedNow: connectedNow,
+            telemetry: telemetry,
+            beacons: beacons,
+            beaconCount: beaconCount,
+            sensors: sensorsArr,
+            sensorCount: sensorCount,
             firstIgnitionOnAtToday: firstIgnitionOnAtToday,
             lastIgnitionOnAt: lastIgnitionOnAt,
             lastIgnitionOffAt: lastIgnitionOffAt,
@@ -390,7 +490,7 @@ struct Vehicle: Identifiable, Hashable {
     }
 
     /// Merge fields from another Vehicle (update patch) into this one.
-    /// Preserves non-nil existing values when the patch field is default/empty.
+    /// null alanları gerçekten null olarak işle, eski değeri koruma.
     mutating func mergeUpdate(from patch: Vehicle) {
         if !patch.plate.isEmpty { plate = patch.plate }
         if !patch.model.isEmpty { model = patch.model }
@@ -404,25 +504,45 @@ struct Vehicle: Identifiable, Hashable {
         status = patch.status
         if patch.odometer > 0 { odometer = patch.odometer; totalKm = Int(patch.odometer) }
         if patch.todayKm > 0 { todayKm = patch.todayKm }
-        if let dt = patch.deviceTime { deviceTime = dt }
+        // null alanları gerçekten null olarak işle
+        deviceTime = patch.deviceTime
         if patch.ts > 0 { ts = patch.ts }
         fix = patch.fix
         hdop = patch.hdop
         input1 = patch.input1
         input2 = patch.input2
         output = patch.output
-        if let bv = patch.batteryVoltage { batteryVoltage = bv }
-        if let ev = patch.externalVoltage { externalVoltage = ev }
-        if let db = patch.deviceBattery { deviceBattery = db }
-        if let tc = patch.temperatureC { temperatureC = tc }
-        if let hp = patch.humidityPct { humidityPct = hp }
-        if let di = patch.driverId { driverId = di }
-        if !patch.driverName.isEmpty { driverName = patch.driverName }
-        if let ac = patch.alarmCode { alarmCode = ac }
-        if let fi = patch.firstIgnitionOnAtToday { firstIgnitionOnAtToday = fi }
-        if let li = patch.lastIgnitionOnAt { lastIgnitionOnAt = li }
-        if let lo = patch.lastIgnitionOffAt { lastIgnitionOffAt = lo }
+        batteryVoltage = patch.batteryVoltage
+        externalVoltage = patch.externalVoltage
+        deviceBattery = patch.deviceBattery
+        temperatureC = patch.temperatureC
+        humidityPct = patch.humidityPct
+        // driver_id null olabilir (kart çıkarılınca), eski değeri tutma
+        driverId = patch.driverId
+        if patch.driverId == nil { driverName = "" } else if !patch.driverName.isEmpty { driverName = patch.driverName }
+        alarmCode = patch.alarmCode
+        firstIgnitionOnAtToday = patch.firstIgnitionOnAtToday
+        lastIgnitionOnAt = patch.lastIgnitionOnAt
+        lastIgnitionOffAt = patch.lastIgnitionOffAt
         if patch.deviceId > 0 { deviceId = patch.deviceId }
+        if let ai = patch.assignmentId { assignmentId = ai }
+        pdop = patch.pdop
+        satellites = patch.satellites
+        gsmSignal = patch.gsmSignal
+        altitude = patch.altitude
+        if let lpa = patch.lastPacketAt { lastPacketAt = lpa }
+        if patch.lastPacketTs > 0 { lastPacketTs = patch.lastPacketTs }
+        if let ri = patch.reportIntervalSec { reportIntervalSec = ri }
+        if let si = patch.sleepIntervalSec { sleepIntervalSec = si }
+        if let oa = patch.offlineAfterSec { offlineAfterSec = oa }
+        secondsSinceLastPacket = patch.secondsSinceLastPacket
+        if !patch.livenessStatus.isEmpty { livenessStatus = patch.livenessStatus }
+        connectedNow = patch.connectedNow
+        if let t = patch.telemetry { telemetry = t }
+        if let b = patch.beacons { beacons = b }
+        if patch.beaconCount > 0 { beaconCount = patch.beaconCount }
+        if let s = patch.sensors { sensors = s }
+        if patch.sensorCount > 0 { sensorCount = patch.sensorCount }
         // Preserve API-enriched fields (WS doesn't provide these)
         if !patch.groupName.isEmpty { groupName = patch.groupName }
         if !patch.vehicleBrand.isEmpty { vehicleBrand = patch.vehicleBrand }
