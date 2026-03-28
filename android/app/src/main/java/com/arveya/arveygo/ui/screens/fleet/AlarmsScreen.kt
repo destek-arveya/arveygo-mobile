@@ -1,5 +1,8 @@
 package com.arveya.arveygo.ui.screens.fleet
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -121,6 +124,20 @@ data class AlarmEvent(
             val day = dateParts[2]
             val time = parts[1].take(5)
             "$day ${months[month.coerceIn(0, 12)]} $time"
+        } catch (_: Exception) { createdAt }
+    }
+
+    val formattedFullDate: String get() {
+        if (createdAt.length < 16) return createdAt
+        return try {
+            val parts = createdAt.split(" ")
+            val dateParts = parts[0].split("-")
+            val monthsFull = arrayOf("", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık")
+            val year = dateParts[0]
+            val month = dateParts[1].toIntOrNull() ?: 0
+            val day = dateParts[2]
+            val time = parts[1].take(5)
+            "$day ${monthsFull[month.coerceIn(0, 12)]} $year, $time"
         } catch (_: Exception) { createdAt }
     }
 
@@ -994,7 +1011,7 @@ private fun AlarmDetailSheet(alarm: AlarmEvent, onDismiss: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 Text(alarm.typeLabel, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
                 Spacer(Modifier.height(4.dp))
-                Text(alarm.formattedDate, fontSize = 12.sp, color = AppColors.TextMuted)
+                Text(alarm.formattedFullDate, fontSize = 12.sp, color = AppColors.TextMuted)
             }
 
             Spacer(Modifier.height(8.dp))
@@ -1012,7 +1029,7 @@ private fun AlarmDetailSheet(alarm: AlarmEvent, onDismiss: () -> Unit) {
             HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.LocationOn, title = "Konum", value = String.format("%.4f, %.4f", alarm.lat, alarm.lng))
             HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
-            DetailRow(icon = Icons.Default.CalendarMonth, title = "Tarih", value = alarm.createdAt)
+            DetailRow(icon = Icons.Default.CalendarMonth, title = "Tarih", value = alarm.formattedFullDate)
 
             // Map - Alarm konumu
             if (alarm.lat != 0.0 && alarm.lng != 0.0) {
@@ -1093,6 +1110,22 @@ private fun AlarmDetailSheet(alarm: AlarmEvent, onDismiss: () -> Unit) {
                             },
                             modifier = Modifier.fillMaxSize()
                         )
+                    }
+
+                    // Konuma Git button
+                    val navContext = LocalContext.current
+                    Spacer(Modifier.height(10.dp))
+                    Button(
+                        onClick = {
+                            openMapsDirectionsAlarm(navContext, alarm.lat, alarm.lng, alarm.plate.ifEmpty { alarm.vehicleName })
+                        },
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.Indigo)
+                    ) {
+                        Icon(Icons.Default.Navigation, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Konuma Git", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
 
@@ -1222,3 +1255,17 @@ private val DUMMY_ALARMS = listOf(
     AlarmEvent("d9", "353742378104285", "06 ATS 001", "Beyaz Sprinter", "geofence_enter", "Ankara Merkez bölgesine giriş", "", 39.9255, 32.8540, 35, "2026-03-26 08:00:00"),
     AlarmEvent("d10", "353742379713316", "34 ARV 34", "Siyah Vito", "power_cut", "Harici güç kaynağı kesildi", "", 41.0082, 28.9784, 0, "2026-03-25 23:10:00"),
 )
+
+// MARK: - Open Maps Directions
+private fun openMapsDirectionsAlarm(context: Context, lat: Double, lng: Double, label: String) {
+    try {
+        val gmmIntentUri = Uri.parse("google.navigation:q=$lat,$lng&mode=d")
+        val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri).apply { setPackage("com.google.android.apps.maps") }
+        context.startActivity(mapIntent)
+    } catch (_: Exception) {
+        try {
+            val genericUri = Uri.parse("geo:$lat,$lng?q=$lat,$lng($label)")
+            context.startActivity(Intent(Intent.ACTION_VIEW, genericUri))
+        } catch (_: Exception) { /* no maps app */ }
+    }
+}

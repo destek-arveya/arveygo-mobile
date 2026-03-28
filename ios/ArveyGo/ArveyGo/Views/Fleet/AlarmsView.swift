@@ -81,6 +81,21 @@ struct AlarmEvent: Identifiable, Hashable {
         return "\(day) \(months[min(month, 12)]) \(time)"
     }
 
+    var formattedFullDate: String {
+        // "2026-03-26 14:30:00" → "26 Mart 2026, 14:30"
+        guard createdAt.count >= 16 else { return createdAt }
+        let parts = createdAt.split(separator: " ")
+        guard parts.count >= 2 else { return createdAt }
+        let dateParts = parts[0].split(separator: "-")
+        guard dateParts.count == 3 else { return createdAt }
+        let monthsFull = ["", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+        let year = dateParts[0]
+        let month = Int(dateParts[1]) ?? 0
+        let day = dateParts[2]
+        let time = String(parts[1].prefix(5))
+        return "\(day) \(monthsFull[min(month, 12)]) \(year), \(time)"
+    }
+
     static func from(json: [String: Any], index: Int = 0) -> AlarmEvent {
         let latVal: Double
         if let d = json["lat"] as? Double { latVal = d }
@@ -959,7 +974,7 @@ struct AlarmsView: View {
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(AppTheme.textPrimary)
 
-                        Text(alarm.formattedDate)
+                        Text(alarm.formattedFullDate)
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.textMuted)
                     }
@@ -981,7 +996,7 @@ struct AlarmsView: View {
                         Divider().padding(.leading, 44)
                         detailRow(icon: "mappin.circle.fill", title: "Konum", value: String(format: "%.4f, %.4f", alarm.lat, alarm.lng))
                         Divider().padding(.leading, 44)
-                        detailRow(icon: "calendar", title: "Tarih", value: alarm.createdAt)
+                        detailRow(icon: "calendar", title: "Tarih", value: alarm.formattedFullDate)
                     }
                     .padding(.top, 8)
 
@@ -1023,6 +1038,25 @@ struct AlarmsView: View {
                             .frame(height: 200)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .padding(.horizontal, 16)
+
+                            // Konuma Git button
+                            Button(action: {
+                                openMapsDirectionsAlarm(lat: alarm.lat, lng: alarm.lng, label: alarm.plate.isEmpty ? alarm.vehicleName : alarm.plate)
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "location.fill")
+                                        .font(.system(size: 14, weight: .semibold))
+                                    Text("Konuma Git")
+                                        .font(.system(size: 14, weight: .semibold))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .background(AppTheme.indigo)
+                                .foregroundColor(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 4)
                         }
                         .padding(.bottom, 8)
                     }
@@ -1133,6 +1167,15 @@ struct AlarmsView: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    // MARK: - Open Maps Directions
+    private func openMapsDirectionsAlarm(lat: Double, lng: Double, label: String) {
+        let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        let placemark = MKPlacemark(coordinate: coordinate)
+        let mapItem = MKMapItem(placemark: placemark)
+        mapItem.name = label
+        mapItem.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
     }
 
     // MARK: - Detail Row Helper
