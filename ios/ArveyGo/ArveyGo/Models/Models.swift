@@ -786,3 +786,260 @@ struct CatalogVehicle: Identifiable, Hashable {
     let plate: String
     let name: String
 }
+
+// MARK: - Fleet Cost (API-backed)
+struct FleetCost: Identifiable {
+    let id: String
+    var imei: String = ""
+    var plate: String = ""
+    var category: String = ""
+    var amount: Double = 0
+    var currency: String = "TRY"
+    var costDate: String = ""
+    var description: String = ""
+    var referenceNo: String = ""
+    var createdAt: String? = nil
+    var updatedAt: String? = nil
+
+    var formattedAmount: String {
+        let fmt = NumberFormatter()
+        fmt.numberStyle = .decimal
+        fmt.locale = Locale(identifier: "tr_TR")
+        fmt.maximumFractionDigits = 0
+        let symbol = currency == "TRY" ? "₺" : currency
+        return "\(symbol)\(fmt.string(from: NSNumber(value: amount)) ?? "0")"
+    }
+
+    static func formatAmount(_ value: Double, currency: String = "TRY") -> String {
+        let fmt = NumberFormatter()
+        fmt.numberStyle = .decimal
+        fmt.locale = Locale(identifier: "tr_TR")
+        fmt.maximumFractionDigits = 0
+        let symbol = currency == "TRY" ? "₺" : currency
+        return "\(symbol)\(fmt.string(from: NSNumber(value: value)) ?? "0")"
+    }
+
+    static func fromDict(_ d: [String: Any]) -> FleetCost {
+        FleetCost(
+            id: "\(d["id"] ?? "0")",
+            imei: d["imei"] as? String ?? "",
+            plate: d["plate"] as? String ?? "",
+            category: d["category"] as? String ?? "",
+            amount: (d["amount"] as? Double) ?? Double(d["amount"] as? Int ?? 0),
+            currency: d["currency"] as? String ?? "TRY",
+            costDate: d["cost_date"] as? String ?? "",
+            description: d["description"] as? String ?? "",
+            referenceNo: d["reference_no"] as? String ?? "",
+            createdAt: d["created_at"] as? String,
+            updatedAt: d["updated_at"] as? String
+        )
+    }
+}
+
+// MARK: - Fleet Maintenance
+struct FleetMaintenance: Identifiable {
+    let id: String
+    var imei: String = ""
+    var plate: String = ""
+    var maintenanceType: String = ""
+    var serviceDate: String? = nil
+    var nextServiceDate: String? = nil
+    var kmAtService: Int? = nil
+    var nextServiceKm: Int? = nil
+    var cost: Double? = nil
+    var workshop: String = ""
+    var description: String = ""
+    var status: String = "done"
+    var createdAt: String? = nil
+    var updatedAt: String? = nil
+
+    var statusLabel: String {
+        switch status {
+        case "done": return "Tamamlandı"
+        case "scheduled": return "Planlandı"
+        case "overdue": return "Gecikmiş"
+        default: return status
+        }
+    }
+
+    var title: String {
+        switch maintenanceType {
+        case "oil_change": return "Yağ Değişimi"
+        case "tire_change": return "Lastik Değişimi"
+        case "brake_service": return "Fren Bakımı"
+        case "periodic": return "Periyodik Bakım"
+        case "filter_change": return "Filtre Değişimi"
+        case "battery": return "Akü Kontrolü"
+        default: return maintenanceType.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+
+    var scheduledDate: String {
+        nextServiceDate ?? serviceDate ?? "—"
+    }
+
+    var currentKm: Int {
+        kmAtService ?? 0
+    }
+
+    var formattedCost: String {
+        guard let cost = cost, cost > 0 else { return "—" }
+        let fmt = NumberFormatter()
+        fmt.numberStyle = .decimal
+        fmt.locale = Locale(identifier: "tr_TR")
+        fmt.maximumFractionDigits = 0
+        return "₺\(fmt.string(from: NSNumber(value: cost)) ?? "0")"
+    }
+
+    static func fromDict(_ d: [String: Any]) -> FleetMaintenance {
+        FleetMaintenance(
+            id: "\(d["id"] ?? "0")",
+            imei: d["imei"] as? String ?? "",
+            plate: d["plate"] as? String ?? "",
+            maintenanceType: d["maintenance_type"] as? String ?? "",
+            serviceDate: d["service_date"] as? String,
+            nextServiceDate: d["next_service_date"] as? String,
+            kmAtService: d["km_at_service"] as? Int,
+            nextServiceKm: d["next_service_km"] as? Int,
+            cost: d["cost"] as? Double,
+            workshop: d["workshop"] as? String ?? "",
+            description: d["description"] as? String ?? "",
+            status: d["status"] as? String ?? "done",
+            createdAt: d["created_at"] as? String,
+            updatedAt: d["updated_at"] as? String
+        )
+    }
+}
+
+// MARK: - Fleet Document
+struct FleetDocument: Identifiable {
+    let id: String
+    var imei: String = ""
+    var plate: String = ""
+    var docType: String = ""
+    var title: String = ""
+    var issueDate: String? = nil
+    var expiryDate: String? = nil
+    var reminderDays: Int = 30
+    var filePath: String = ""
+    var notes: String = ""
+    var status: String = "active"
+    var daysLeft: Int? = nil
+    var createdAt: String? = nil
+    var updatedAt: String? = nil
+
+    var statusLabel: String {
+        switch status {
+        case "active": return "Aktif"
+        case "expiring_soon": return "Yaklaşıyor"
+        case "expired": return "Süresi Dolmuş"
+        default: return status
+        }
+    }
+
+    var docTypeLabel: String {
+        switch docType {
+        case "ruhsat": return "Ruhsat"
+        case "sigorta": return "Sigorta"
+        case "muayene": return "Muayene"
+        case "egzoz": return "Egzoz"
+        case "fenni_muayene": return "Fenni Muayene"
+        case "other": return "Diğer"
+        default: return docType.prefix(1).uppercased() + docType.dropFirst()
+        }
+    }
+
+    var daysUntilExpiry: Int {
+        if let dl = daysLeft { return dl }
+        guard let expiry = expiryDate else { return 0 }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        guard let date = fmt.date(from: expiry) else { return 0 }
+        return max(0, Calendar.current.dateComponents([.day], from: Date(), to: date).day ?? 0)
+    }
+
+    static func fromDict(_ d: [String: Any]) -> FleetDocument {
+        FleetDocument(
+            id: "\(d["id"] ?? "0")",
+            imei: d["imei"] as? String ?? "",
+            plate: d["plate"] as? String ?? "",
+            docType: d["doc_type"] as? String ?? "",
+            title: d["title"] as? String ?? "",
+            issueDate: d["issue_date"] as? String,
+            expiryDate: d["expiry_date"] as? String,
+            reminderDays: d["reminder_days"] as? Int ?? 30,
+            filePath: d["file_path"] as? String ?? "",
+            notes: d["notes"] as? String ?? "",
+            status: d["status"] as? String ?? "active",
+            daysLeft: d["days_left"] as? Int,
+            createdAt: d["created_at"] as? String,
+            updatedAt: d["updated_at"] as? String
+        )
+    }
+}
+
+// MARK: - Fleet Catalog
+struct FleetCatalog {
+    var vehicles: [FleetCatalogVehicle] = []
+    var costCategories: [String] = []
+    var maintenanceStatuses: [String] = []
+    var documentTypes: [String] = []
+
+    static func fromDict(_ d: [String: Any]) -> FleetCatalog {
+        let vehiclesArr = d["vehicles"] as? [[String: Any]] ?? []
+        let vehicles = vehiclesArr.map { v in
+            FleetCatalogVehicle(
+                id: v["id"] as? Int ?? 0,
+                imei: v["imei"] as? String ?? "",
+                plate: v["plate"] as? String ?? "",
+                name: v["name"] as? String ?? "",
+                type: v["type"] as? String ?? ""
+            )
+        }
+        return FleetCatalog(
+            vehicles: vehicles,
+            costCategories: d["cost_categories"] as? [String] ?? [],
+            maintenanceStatuses: d["maintenance_statuses"] as? [String] ?? [],
+            documentTypes: d["document_types"] as? [String] ?? []
+        )
+    }
+}
+
+struct FleetCatalogVehicle: Identifiable {
+    let id: Int
+    let imei: String
+    let plate: String
+    let name: String
+    let type: String
+}
+
+// MARK: - Fleet Reminder
+struct FleetReminder: Identifiable {
+    let id: Int
+    let imei: String
+    let plate: String
+    let type: String       // "document" or "maintenance"
+    let label: String
+    let dueDate: String?
+    let daysLeft: Int
+}
+
+// MARK: - Pagination
+struct PaginationMeta {
+    var total: Int = 0
+    var perPage: Int = 20
+    var currentPage: Int = 1
+    var lastPage: Int = 1
+
+    var hasMore: Bool { currentPage < lastPage }
+
+    static func fromDict(_ d: [String: Any]?) -> PaginationMeta {
+        guard let d = d else { return PaginationMeta() }
+        return PaginationMeta(
+            total: d["total"] as? Int ?? 0,
+            perPage: d["per_page"] as? Int ?? 20,
+            currentPage: d["current_page"] as? Int ?? 1,
+            lastPage: d["last_page"] as? Int ?? 1
+        )
+    }
+}

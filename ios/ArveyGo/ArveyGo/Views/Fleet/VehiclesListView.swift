@@ -401,14 +401,6 @@ enum FleetVehicleStatus: String {
     }
 }
 
-// MARK: - Cost Item
-struct VehicleCost: Identifiable {
-    let id: String
-    let category: String
-    let date: String
-    let amount: String
-}
-
 // MARK: - Vehicle Extensions for Fleet
 extension Vehicle {
     var fleetStatus: FleetVehicleStatus {
@@ -440,39 +432,7 @@ extension Vehicle {
         return "—"
     }
 
-    var lastService: String {
-        let dates = ["12.01.2026", "28.11.2025", "05.02.2026", "18.12.2025", "22.01.2026", "10.10.2025", "01.03.2026", "15.11.2025"]
-        if let idx = Int(id), idx > 0, idx <= dates.count { return dates[idx - 1] }
-        return "—"
-    }
-
-    var nextService: String {
-        let dates = ["12.04.2026", "28.02.2026", "05.05.2026", "18.03.2026", "22.04.2026", "10.01.2026 ⚠", "01.06.2026", "15.02.2026"]
-        if let idx = Int(id), idx > 0, idx <= dates.count { return dates[idx - 1] }
-        return "—"
-    }
-
-    var muayeneDate: String {
-        let dates = ["15.06.2026", "03.04.2026", "20.08.2026", "12.05.2026", "28.07.2026", "01.03.2026 ⚠", "10.09.2026", "05.04.2026"]
-        if let idx = Int(id), idx > 0, idx <= dates.count { return dates[idx - 1] }
-        return "—"
-    }
-
-    var insuranceDate: String {
-        let dates = ["01.07.2026", "15.05.2026", "10.09.2026", "22.06.2026", "30.08.2026", "05.04.2026", "20.10.2026", "12.05.2026"]
-        if let idx = Int(id), idx > 0, idx <= dates.count { return dates[idx - 1] }
-        return "—"
-    }
-
-    var recentCosts: [VehicleCost] {
-        [
-            VehicleCost(id: "c1", category: "Yakıt", date: "15.03.2026", amount: "₺2.450"),
-            VehicleCost(id: "c2", category: "Bakım", date: "12.03.2026", amount: "₺1.850"),
-            VehicleCost(id: "c3", category: "Sigorta", date: "01.03.2026", amount: "₺4.200"),
-        ]
-    }
-
-    var totalCost: String { "₺8.500" }
+    var totalCost: String { "—" }
 }
 
 // MARK: - Vehicles List ViewModel

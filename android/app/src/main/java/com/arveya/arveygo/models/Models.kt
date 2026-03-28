@@ -305,41 +305,6 @@ data class Vehicle(
             return "—"
         }
 
-    val lastService: String
-        get() {
-            val dates = listOf("12.01.2026","28.11.2025","05.02.2026","18.12.2025","22.01.2026","10.10.2025","01.03.2026","15.11.2025")
-            val idx = id.toIntOrNull()
-            return if (idx != null && idx in 1..dates.size) dates[idx - 1] else "—"
-        }
-
-    val nextService: String
-        get() {
-            val dates = listOf("12.04.2026","28.02.2026","05.05.2026","18.03.2026","22.04.2026","10.01.2026 ⚠","01.06.2026","15.02.2026")
-            val idx = id.toIntOrNull()
-            return if (idx != null && idx in 1..dates.size) dates[idx - 1] else "—"
-        }
-
-    val muayeneDate: String
-        get() {
-            val dates = listOf("15.06.2026","03.04.2026","20.08.2026","12.05.2026","28.07.2026","01.03.2026 ⚠","10.09.2026","05.04.2026")
-            val idx = id.toIntOrNull()
-            return if (idx != null && idx in 1..dates.size) dates[idx - 1] else "—"
-        }
-
-    val insuranceDate: String
-        get() {
-            val dates = listOf("01.07.2026","15.05.2026","10.09.2026","22.06.2026","30.08.2026","05.04.2026","20.10.2026","12.05.2026")
-            val idx = id.toIntOrNull()
-            return if (idx != null && idx in 1..dates.size) dates[idx - 1] else "—"
-        }
-
-    val recentCosts: List<VehicleCost>
-        get() = listOf(
-            VehicleCost("c1", "Yakıt", "15.03.2026", "₺2.450"),
-            VehicleCost("c2", "Bakım", "12.03.2026", "₺1.850"),
-            VehicleCost("c3", "Sigorta", "01.03.2026", "₺4.200"),
-        )
-
     companion object {
         fun fromWSPayload(json: JSONObject): Vehicle? {
             val imei = json.optString("imei", "")
@@ -586,8 +551,251 @@ enum class FleetVehicleStatus(val label: String, val color: Color) {
     MAINTENANCE("Bakımda", AppColors.Idle)
 }
 
-// MARK: - Vehicle Cost
-data class VehicleCost(val id: String, val category: String, val date: String, val amount: String)
+// MARK: - Vehicle Cost (API-backed)
+data class VehicleCost(
+    val id: String,
+    val imei: String = "",
+    val plate: String = "",
+    val category: String,
+    val amount: Double = 0.0,
+    val currency: String = "TRY",
+    val costDate: String = "",
+    val description: String = "",
+    val referenceNo: String = "",
+    val createdAt: String? = null,
+    val updatedAt: String? = null
+) {
+    /** Formatted amount for display */
+    val formattedAmount: String
+        get() {
+            val fmt = java.text.NumberFormat.getNumberInstance(java.util.Locale("tr", "TR"))
+            fmt.maximumFractionDigits = 0
+            val symbol = if (currency == "TRY") "₺" else currency
+            return "$symbol${fmt.format(amount)}"
+        }
+
+    companion object {
+        fun fromJson(json: org.json.JSONObject): VehicleCost {
+            return VehicleCost(
+                id = json.optString("id", "0"),
+                imei = json.optString("imei", ""),
+                plate = json.optString("plate", ""),
+                category = json.optString("category", ""),
+                amount = json.optDouble("amount", 0.0),
+                currency = json.optString("currency", "TRY"),
+                costDate = json.optString("cost_date", ""),
+                description = json.optString("description", ""),
+                referenceNo = json.optString("reference_no", ""),
+                createdAt = json.optString("created_at", null),
+                updatedAt = json.optString("updated_at", null)
+            )
+        }
+    }
+}
+
+// MARK: - Fleet Maintenance
+data class FleetMaintenance(
+    val id: String,
+    val imei: String = "",
+    val plate: String = "",
+    val maintenanceType: String = "",
+    val serviceDate: String? = null,
+    val nextServiceDate: String? = null,
+    val kmAtService: Int? = null,
+    val nextServiceKm: Int? = null,
+    val cost: Double? = null,
+    val workshop: String = "",
+    val description: String = "",
+    val status: String = "done",
+    val createdAt: String? = null,
+    val updatedAt: String? = null
+) {
+    val statusLabel: String
+        get() = when (status) {
+            "done" -> "Tamamlandı"
+            "scheduled" -> "Planlandı"
+            "overdue" -> "Gecikmiş"
+            else -> status
+        }
+
+    val statusColor: Color
+        get() = when (status) {
+            "done" -> Color(0xFF22C55E)
+            "scheduled" -> Color.Blue
+            "overdue" -> Color.Red
+            else -> Color(0xFFFF9800)
+        }
+
+    val formattedCost: String
+        get() {
+            if (cost == null || cost <= 0) return "—"
+            val fmt = java.text.NumberFormat.getNumberInstance(java.util.Locale("tr", "TR"))
+            fmt.maximumFractionDigits = 0
+            return "₺${fmt.format(cost)}"
+        }
+
+    companion object {
+        fun fromJson(json: org.json.JSONObject): FleetMaintenance {
+            return FleetMaintenance(
+                id = json.optString("id", "0"),
+                imei = json.optString("imei", ""),
+                plate = json.optString("plate", ""),
+                maintenanceType = json.optString("maintenance_type", ""),
+                serviceDate = if (json.has("service_date") && !json.isNull("service_date")) json.optString("service_date") else null,
+                nextServiceDate = if (json.has("next_service_date") && !json.isNull("next_service_date")) json.optString("next_service_date") else null,
+                kmAtService = if (json.has("km_at_service") && !json.isNull("km_at_service")) json.optInt("km_at_service") else null,
+                nextServiceKm = if (json.has("next_service_km") && !json.isNull("next_service_km")) json.optInt("next_service_km") else null,
+                cost = if (json.has("cost") && !json.isNull("cost")) json.optDouble("cost") else null,
+                workshop = json.optString("workshop", ""),
+                description = json.optString("description", ""),
+                status = json.optString("status", "done"),
+                createdAt = json.optString("created_at", null),
+                updatedAt = json.optString("updated_at", null)
+            )
+        }
+    }
+}
+
+// MARK: - Fleet Document
+data class FleetDocument(
+    val id: String,
+    val imei: String = "",
+    val plate: String = "",
+    val docType: String = "",
+    val title: String = "",
+    val issueDate: String? = null,
+    val expiryDate: String? = null,
+    val reminderDays: Int = 30,
+    val filePath: String = "",
+    val notes: String = "",
+    val status: String = "active",
+    val daysLeft: Int? = null,
+    val createdAt: String? = null,
+    val updatedAt: String? = null
+) {
+    val statusLabel: String
+        get() = when (status) {
+            "active" -> "Aktif"
+            "expiring_soon" -> "Yaklaşıyor"
+            "expired" -> "Süresi Dolmuş"
+            else -> status
+        }
+
+    val statusColor: Color
+        get() = when (status) {
+            "active" -> Color(0xFF22C55E)
+            "expiring_soon" -> Color(0xFFFF9800)
+            "expired" -> Color.Red
+            else -> Color(0xFF94A3B8)
+        }
+
+    val docTypeLabel: String
+        get() = when (docType) {
+            "ruhsat" -> "Ruhsat"
+            "sigorta" -> "Sigorta"
+            "muayene" -> "Muayene"
+            "egzoz" -> "Egzoz"
+            "fenni_muayene" -> "Fenni Muayene"
+            "other" -> "Diğer"
+            else -> docType.replaceFirstChar { it.uppercase() }
+        }
+
+    companion object {
+        fun fromJson(json: org.json.JSONObject): FleetDocument {
+            return FleetDocument(
+                id = json.optString("id", "0"),
+                imei = json.optString("imei", ""),
+                plate = json.optString("plate", ""),
+                docType = json.optString("doc_type", ""),
+                title = json.optString("title", ""),
+                issueDate = if (json.has("issue_date") && !json.isNull("issue_date")) json.optString("issue_date") else null,
+                expiryDate = if (json.has("expiry_date") && !json.isNull("expiry_date")) json.optString("expiry_date") else null,
+                reminderDays = json.optInt("reminder_days", 30),
+                filePath = json.optString("file_path", ""),
+                notes = json.optString("notes", ""),
+                status = json.optString("status", "active"),
+                daysLeft = if (json.has("days_left") && !json.isNull("days_left")) json.optInt("days_left") else null,
+                createdAt = json.optString("created_at", null),
+                updatedAt = json.optString("updated_at", null)
+            )
+        }
+    }
+}
+
+// MARK: - Fleet Catalog
+data class FleetCatalog(
+    val vehicles: List<FleetCatalogVehicle> = emptyList(),
+    val costCategories: List<String> = emptyList(),
+    val maintenanceStatuses: List<String> = emptyList(),
+    val documentTypes: List<String> = emptyList()
+) {
+    companion object {
+        fun fromJson(json: org.json.JSONObject): FleetCatalog {
+            val vehiclesArr = json.optJSONArray("vehicles") ?: org.json.JSONArray()
+            val vehicles = (0 until vehiclesArr.length()).map { i ->
+                val v = vehiclesArr.getJSONObject(i)
+                FleetCatalogVehicle(
+                    id = v.optInt("id", 0),
+                    imei = v.optString("imei", ""),
+                    plate = v.optString("plate", ""),
+                    name = v.optString("name", ""),
+                    type = v.optString("type", "")
+                )
+            }
+            fun jsonArrayToStringList(arr: org.json.JSONArray?): List<String> {
+                if (arr == null) return emptyList()
+                return (0 until arr.length()).map { arr.optString(it, "") }
+            }
+            return FleetCatalog(
+                vehicles = vehicles,
+                costCategories = jsonArrayToStringList(json.optJSONArray("cost_categories")),
+                maintenanceStatuses = jsonArrayToStringList(json.optJSONArray("maintenance_statuses")),
+                documentTypes = jsonArrayToStringList(json.optJSONArray("document_types"))
+            )
+        }
+    }
+}
+
+data class FleetCatalogVehicle(
+    val id: Int = 0,
+    val imei: String = "",
+    val plate: String = "",
+    val name: String = "",
+    val type: String = ""
+)
+
+// MARK: - Fleet Reminder
+data class FleetReminder(
+    val id: Int,
+    val imei: String,
+    val plate: String,
+    val type: String,       // "document" or "maintenance"
+    val label: String,      // doc_type/title or maintenance_type
+    val dueDate: String?,   // expiry_date or next_service_date
+    val daysLeft: Int
+)
+
+// MARK: - Pagination
+data class PaginationMeta(
+    val total: Int = 0,
+    val perPage: Int = 20,
+    val currentPage: Int = 1,
+    val lastPage: Int = 1
+) {
+    val hasMore: Boolean get() = currentPage < lastPage
+
+    companion object {
+        fun fromJson(json: org.json.JSONObject?): PaginationMeta {
+            if (json == null) return PaginationMeta()
+            return PaginationMeta(
+                total = json.optInt("total", 0),
+                perPage = json.optInt("per_page", 20),
+                currentPage = json.optInt("current_page", 1),
+                lastPage = json.optInt("last_page", 1)
+            )
+        }
+    }
+}
 
 // MARK: - Driver Score
 data class DriverScore(

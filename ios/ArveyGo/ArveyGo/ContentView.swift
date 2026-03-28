@@ -10,6 +10,7 @@ enum AppPage: String, CaseIterable {
     case routeHistory = "Rota Geçmişi"
     case alarms = "Alarmlar"
     case geofences = "Geofence"
+    case fleetManagement = "Filo Yönetimi"
     case settings = "Ayarlar"
     case support = "Destek Talebi"
 }
@@ -54,6 +55,8 @@ struct ContentView: View {
                     AlarmsView(showSideMenu: $showSideMenu)
                 case .geofences:
                     GeofencesView(showSideMenu: $showSideMenu)
+                case .fleetManagement:
+                    FleetManagementView(showSideMenu: $showSideMenu)
                 case .settings:
                     SettingsView(showSideMenu: $showSideMenu)
                 case .support:

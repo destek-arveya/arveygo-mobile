@@ -740,27 +740,93 @@ private fun DetailRow(
 // MARK: - Maintenance Tab
 @Composable
 private fun MaintenanceTab(vehicle: Vehicle) {
+    var maintenanceList by remember { mutableStateOf<List<FleetMaintenance>>(emptyList()) }
+    var documentsList by remember { mutableStateOf<List<FleetDocument>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(vehicle.imei) {
+        isLoading = true
+        try {
+            val (mList, _) = APIService.fetchFleetMaintenance(imei = vehicle.imei, perPage = 10)
+            maintenanceList = mList
+        } catch (_: Exception) { maintenanceList = emptyList() }
+        try {
+            val (dList, _) = APIService.fetchFleetDocuments(imei = vehicle.imei, perPage = 10)
+            documentsList = dList
+        } catch (_: Exception) { documentsList = emptyList() }
+        isLoading = false
+    }
+
+    if (isLoading) {
+        Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = AppColors.Indigo, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+        }
+        return
+    }
+
     SectionCard(title = "BAKIM TAKVİMİ", icon = Icons.Default.Build) {
-        Column {
-            MaintenanceRow(Icons.Default.Build, "Periyodik Bakım", vehicle.nextService, "Her 10.000 km", MaintenanceStatus.UPCOMING)
-            HorizontalDivider(modifier = Modifier.padding(start = 44.dp), color = AppColors.BorderSoft)
-            MaintenanceRow(Icons.Default.Circle, "Lastik Değişimi", "15.06.2026", "Her 40.000 km", MaintenanceStatus.NORMAL)
-            HorizontalDivider(modifier = Modifier.padding(start = 44.dp), color = AppColors.BorderSoft)
-            MaintenanceRow(Icons.Default.WaterDrop, "Yağ Değişimi", vehicle.lastService, "Her 15.000 km", MaintenanceStatus.COMPLETED)
-            HorizontalDivider(modifier = Modifier.padding(start = 44.dp), color = AppColors.BorderSoft)
-            MaintenanceRow(Icons.Default.FlashOn, "Akü Kontrolü", "20.07.2026", "Yıllık", MaintenanceStatus.NORMAL)
+        if (maintenanceList.isEmpty()) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            ) {
+                Icon(Icons.Default.Build, null, tint = AppColors.TextFaint, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.height(8.dp))
+                Text("Bakım kaydı bulunmuyor", fontSize = 13.sp, color = AppColors.TextMuted)
+            }
+        } else {
+            Column {
+                maintenanceList.forEachIndexed { index, item ->
+                    val statusEnum = when (item.status) {
+                        "done" -> MaintenanceStatus.COMPLETED
+                        "scheduled" -> MaintenanceStatus.NORMAL
+                        "overdue" -> MaintenanceStatus.OVERDUE
+                        else -> MaintenanceStatus.UPCOMING
+                    }
+                    val icon = when {
+                        item.maintenanceType.contains("lastik", true) -> Icons.Default.Circle
+                        item.maintenanceType.contains("yağ", true) || item.maintenanceType.contains("oil", true) -> Icons.Default.WaterDrop
+                        item.maintenanceType.contains("akü", true) || item.maintenanceType.contains("battery", true) -> Icons.Default.FlashOn
+                        else -> Icons.Default.Build
+                    }
+                    val kmInfo = if (item.kmAtService != null) {
+                        val fmt = java.text.NumberFormat.getNumberInstance(java.util.Locale("tr", "TR"))
+                        "${fmt.format(item.kmAtService)} km"
+                    } else ""
+                    MaintenanceRow(icon, item.maintenanceType, item.nextServiceDate ?: item.serviceDate ?: "—", kmInfo, statusEnum)
+                    if (index < maintenanceList.size - 1) {
+                        HorizontalDivider(modifier = Modifier.padding(start = 44.dp), color = AppColors.BorderSoft)
+                    }
+                }
+            }
         }
     }
 
     SectionCard(title = "BELGELER", icon = Icons.Default.Description) {
-        Column {
-            DocumentRow("Muayene", vehicle.muayeneDate, 85, DocStatus.NORMAL)
-            HorizontalDivider(modifier = Modifier.padding(start = 14.dp), color = AppColors.BorderSoft)
-            DocumentRow("Kasko", vehicle.insuranceDate, 120, DocStatus.NORMAL)
-            HorizontalDivider(modifier = Modifier.padding(start = 14.dp), color = AppColors.BorderSoft)
-            DocumentRow("Trafik Sigortası", "10.05.2026", 48, DocStatus.WARNING)
-            HorizontalDivider(modifier = Modifier.padding(start = 14.dp), color = AppColors.BorderSoft)
-            DocumentRow("K Belgesi", "01.04.2026", 9, DocStatus.CRITICAL)
+        if (documentsList.isEmpty()) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            ) {
+                Icon(Icons.Default.Description, null, tint = AppColors.TextFaint, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.height(8.dp))
+                Text("Belge kaydı bulunmuyor", fontSize = 13.sp, color = AppColors.TextMuted)
+            }
+        } else {
+            Column {
+                documentsList.forEachIndexed { index, doc ->
+                    val docStatus = when (doc.status) {
+                        "expired" -> DocStatus.CRITICAL
+                        "expiring_soon" -> DocStatus.WARNING
+                        else -> DocStatus.NORMAL
+                    }
+                    DocumentRow(doc.title.ifEmpty { doc.docTypeLabel }, doc.expiryDate ?: "—", doc.daysLeft ?: 0, docStatus)
+                    if (index < documentsList.size - 1) {
+                        HorizontalDivider(modifier = Modifier.padding(start = 14.dp), color = AppColors.BorderSoft)
+                    }
+                }
+            }
         }
     }
 }
@@ -768,12 +834,68 @@ private fun MaintenanceTab(vehicle: Vehicle) {
 // MARK: - Costs Tab
 @Composable
 private fun CostsTab(vehicle: Vehicle) {
-    SectionCard(title = "MASRAF ÖZETİ (2026)", icon = Icons.Default.BarChart) {
-        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-            CostSummaryItem("Yakıt", "₺14.200", Color(0xFFFF9800), 45, Modifier.weight(1f))
-            CostSummaryItem("Bakım", "₺8.500", Color.Blue, 27, Modifier.weight(1f))
-            CostSummaryItem("Sigorta", "₺5.800", Color(0xFF9C27B0), 18, Modifier.weight(1f))
-            CostSummaryItem("Diğer", "₺3.100", AppColors.TextMuted, 10, Modifier.weight(1f))
+    var costsList by remember { mutableStateOf<List<VehicleCost>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(vehicle.imei) {
+        isLoading = true
+        try {
+            val (cList, _) = APIService.fetchFleetCosts(imei = vehicle.imei, perPage = 20)
+            costsList = cList
+        } catch (_: Exception) { costsList = emptyList() }
+        isLoading = false
+    }
+
+    if (isLoading) {
+        Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = AppColors.Indigo, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+        }
+        return
+    }
+
+    if (costsList.isEmpty()) {
+        SectionCard(title = "MASRAFLAR", icon = Icons.Default.AttachMoney) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            ) {
+                Icon(Icons.Default.AttachMoney, null, tint = AppColors.TextFaint, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.height(8.dp))
+                Text("Masraf kaydı bulunmuyor", fontSize = 13.sp, color = AppColors.TextMuted)
+            }
+        }
+        return
+    }
+
+    // Summary
+    val totalAmount = costsList.sumOf { it.amount }
+    val byCat = costsList.groupBy { it.category }.mapValues { (_, v) -> v.sumOf { it.amount } }
+    val fmt = java.text.NumberFormat.getNumberInstance(java.util.Locale("tr", "TR")).apply { maximumFractionDigits = 0 }
+
+    SectionCard(title = "MASRAF ÖZETİ", icon = Icons.Default.BarChart) {
+        if (byCat.isNotEmpty()) {
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                byCat.entries.take(4).forEach { (cat, amount) ->
+                    val color = when (cat.lowercase()) {
+                        "fuel" -> Color(0xFFFF9800)
+                        "maintenance" -> Color.Blue
+                        "insurance" -> Color(0xFF9C27B0)
+                        else -> AppColors.TextMuted
+                    }
+                    val label = when (cat.lowercase()) {
+                        "fuel" -> "Yakıt"
+                        "maintenance" -> "Bakım"
+                        "insurance" -> "Sigorta"
+                        "tire" -> "Lastik"
+                        "tax" -> "Vergi"
+                        "fine" -> "Ceza"
+                        else -> "Diğer"
+                    }
+                    val percent = if (totalAmount > 0) ((amount / totalAmount) * 100).toInt() else 0
+                    CostSummaryItem(label, "₺${fmt.format(amount)}", color, percent, Modifier.weight(1f))
+                }
+            }
         }
 
         Row(
@@ -782,15 +904,15 @@ private fun CostsTab(vehicle: Vehicle) {
             modifier = Modifier.fillMaxWidth().background(AppColors.Navy.copy(alpha = 0.04f), RoundedCornerShape(10.dp)).padding(14.dp)
         ) {
             Text("TOPLAM", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppColors.TextMuted)
-            Text("₺31.600", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+            Text("₺${fmt.format(totalAmount)}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
         }
     }
 
     SectionCard(title = "SON MASRAFLAR", icon = Icons.Default.List) {
         Column {
-            vehicle.recentCosts.forEachIndexed { index, cost ->
+            costsList.take(10).forEachIndexed { index, cost ->
                 CostRow(cost)
-                if (index < vehicle.recentCosts.size - 1) {
+                if (index < minOf(costsList.size, 10) - 1) {
                     HorizontalDivider(modifier = Modifier.padding(start = 62.dp), color = AppColors.BorderSoft)
                 }
             }
@@ -1043,17 +1165,28 @@ private fun CostSummaryItem(label: String, amount: String, color: Color, percent
 
 @Composable
 private fun CostRow(cost: VehicleCost) {
-    val color = when (cost.category) {
-        "Yakıt" -> Color(0xFFFF9800)
-        "Bakım" -> Color.Blue
-        "Sigorta" -> Color(0xFF9C27B0)
+    val catLower = cost.category.lowercase()
+    val color = when {
+        catLower == "fuel" || catLower.contains("yakıt") -> Color(0xFFFF9800)
+        catLower == "maintenance" || catLower.contains("bakım") -> Color.Blue
+        catLower == "insurance" || catLower.contains("sigorta") -> Color(0xFF9C27B0)
         else -> AppColors.TextMuted
     }
-    val icon = when (cost.category) {
-        "Yakıt" -> Icons.Default.LocalGasStation
-        "Bakım" -> Icons.Default.Build
-        "Sigorta" -> Icons.Default.Shield
+    val icon = when {
+        catLower == "fuel" || catLower.contains("yakıt") -> Icons.Default.LocalGasStation
+        catLower == "maintenance" || catLower.contains("bakım") -> Icons.Default.Build
+        catLower == "insurance" || catLower.contains("sigorta") -> Icons.Default.Shield
         else -> Icons.Default.MoreHoriz
+    }
+    val label = when (catLower) {
+        "fuel" -> "Yakıt"
+        "maintenance" -> "Bakım"
+        "insurance" -> "Sigorta"
+        "tire" -> "Lastik"
+        "tax" -> "Vergi"
+        "fine" -> "Ceza"
+        "other" -> "Diğer"
+        else -> cost.category.replaceFirstChar { it.uppercase() }
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -1067,10 +1200,10 @@ private fun CostRow(cost: VehicleCost) {
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(cost.category, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-            Text(cost.date, fontSize = 11.sp, color = AppColors.TextMuted)
+            Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+            Text(cost.costDate.ifEmpty { "—" }, fontSize = 11.sp, color = AppColors.TextMuted)
         }
-        Text(cost.amount, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+        Text(cost.formattedAmount, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
     }
 }
 

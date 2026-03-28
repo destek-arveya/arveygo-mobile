@@ -104,9 +104,7 @@ fun SideMenu(
                     MenuSection("FİLO YÖNETİMİ") {
                         MenuItem(Icons.Default.DirectionsCar, "Araçlar", AppPage.VEHICLES, selectedPage, onPageSelected)
                         MenuItem(Icons.Default.People, "Sürücüler", AppPage.DRIVERS, selectedPage, onPageSelected)
-                        MenuItem(Icons.Default.Build, "Bakım", null, selectedPage) { onClose() }
-                        MenuItem(Icons.Default.Description, "Belgeler", null, selectedPage) { onClose() }
-                        MenuItem(Icons.Default.AttachMoney, "Masraflar", null, selectedPage) { onClose() }
+                        MenuItem(Icons.Default.Build, "Bakım / Belgeler / Masraflar", AppPage.FLEET_MANAGEMENT, selectedPage, onPageSelected)
                     }
                     MenuSection("İZLEME") {
                         MenuItem(Icons.Default.Notifications, "Alarmlar", AppPage.ALARMS, selectedPage, onPageSelected)

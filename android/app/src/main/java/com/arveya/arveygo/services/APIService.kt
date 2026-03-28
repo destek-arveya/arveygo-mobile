@@ -342,6 +342,148 @@ object APIService {
         httpDelete("/api/mobile/vehicles/$vehicleId/assign-driver")
     }
 
+    // MARK: - Fleet Management
+
+    /** GET /api/mobile/fleet/catalog — vehicles, cost_categories, maintenance_statuses, document_types */
+    suspend fun fetchFleetCatalog(): com.arveya.arveygo.models.FleetCatalog = withContext(Dispatchers.IO) {
+        val json = get("/api/mobile/fleet/catalog")
+        com.arveya.arveygo.models.FleetCatalog.fromJson(json)
+    }
+
+    /** GET /api/mobile/fleet/reminders?days=N */
+    suspend fun fetchFleetReminders(days: Int = 30): List<com.arveya.arveygo.models.FleetReminder> = withContext(Dispatchers.IO) {
+        val json = get("/api/mobile/fleet/reminders?days=$days")
+        val result = mutableListOf<com.arveya.arveygo.models.FleetReminder>()
+
+        val docs = json.optJSONArray("documents")
+        if (docs != null) {
+            for (i in 0 until docs.length()) {
+                val d = docs.getJSONObject(i)
+                result.add(com.arveya.arveygo.models.FleetReminder(
+                    id = d.optInt("id", 0),
+                    imei = d.optString("imei", ""),
+                    plate = d.optString("plate", ""),
+                    type = "document",
+                    label = "${d.optString("doc_type", "")} - ${d.optString("title", "")}",
+                    dueDate = d.optString("expiry_date", null),
+                    daysLeft = d.optInt("days_left", 0)
+                ))
+            }
+        }
+
+        val maint = json.optJSONArray("maintenance")
+        if (maint != null) {
+            for (i in 0 until maint.length()) {
+                val m = maint.getJSONObject(i)
+                result.add(com.arveya.arveygo.models.FleetReminder(
+                    id = m.optInt("id", 0),
+                    imei = m.optString("imei", ""),
+                    plate = m.optString("plate", ""),
+                    type = "maintenance",
+                    label = m.optString("maintenance_type", ""),
+                    dueDate = m.optString("next_service_date", null),
+                    daysLeft = m.optInt("days_left", 0)
+                ))
+            }
+        }
+
+        result.sortBy { it.daysLeft }
+        result
+    }
+
+    /** GET /api/mobile/fleet/costs */
+    suspend fun fetchFleetCosts(
+        imei: String? = null, category: String? = null, page: Int = 1, perPage: Int = 20
+    ): Pair<List<com.arveya.arveygo.models.VehicleCost>, com.arveya.arveygo.models.PaginationMeta> = withContext(Dispatchers.IO) {
+        val params = mutableListOf("page=$page", "per_page=$perPage")
+        if (!imei.isNullOrEmpty()) params.add("imei=$imei")
+        if (!category.isNullOrEmpty()) params.add("category=$category")
+        val json = get("/api/mobile/fleet/costs?${params.joinToString("&")}")
+        val dataArr = json.optJSONArray("data") ?: org.json.JSONArray()
+        val costs = (0 until dataArr.length()).map { com.arveya.arveygo.models.VehicleCost.fromJson(dataArr.getJSONObject(it)) }
+        val pagination = com.arveya.arveygo.models.PaginationMeta.fromJson(json.optJSONObject("pagination"))
+        Pair(costs, pagination)
+    }
+
+    /** POST /api/mobile/fleet/costs */
+    suspend fun createFleetCost(body: Map<String, Any>): com.arveya.arveygo.models.VehicleCost = withContext(Dispatchers.IO) {
+        val json = post("/api/mobile/fleet/costs", org.json.JSONObject(body))
+        com.arveya.arveygo.models.VehicleCost.fromJson(json)
+    }
+
+    /** PUT /api/mobile/fleet/costs/{id} */
+    suspend fun updateFleetCost(id: Int, body: Map<String, Any>): com.arveya.arveygo.models.VehicleCost = withContext(Dispatchers.IO) {
+        val json = put("/api/mobile/fleet/costs/$id", org.json.JSONObject(body))
+        com.arveya.arveygo.models.VehicleCost.fromJson(json)
+    }
+
+    /** DELETE /api/mobile/fleet/costs/{id} */
+    suspend fun deleteFleetCost(id: Int): Unit = withContext(Dispatchers.IO) {
+        httpDelete("/api/mobile/fleet/costs/$id")
+    }
+
+    /** GET /api/mobile/fleet/maintenance */
+    suspend fun fetchFleetMaintenance(
+        imei: String? = null, status: String? = null, page: Int = 1, perPage: Int = 20
+    ): Pair<List<com.arveya.arveygo.models.FleetMaintenance>, com.arveya.arveygo.models.PaginationMeta> = withContext(Dispatchers.IO) {
+        val params = mutableListOf("page=$page", "per_page=$perPage")
+        if (!imei.isNullOrEmpty()) params.add("imei=$imei")
+        if (!status.isNullOrEmpty()) params.add("status=$status")
+        val json = get("/api/mobile/fleet/maintenance?${params.joinToString("&")}")
+        val dataArr = json.optJSONArray("data") ?: org.json.JSONArray()
+        val items = (0 until dataArr.length()).map { com.arveya.arveygo.models.FleetMaintenance.fromJson(dataArr.getJSONObject(it)) }
+        val pagination = com.arveya.arveygo.models.PaginationMeta.fromJson(json.optJSONObject("pagination"))
+        Pair(items, pagination)
+    }
+
+    /** POST /api/mobile/fleet/maintenance */
+    suspend fun createFleetMaintenance(body: Map<String, Any>): com.arveya.arveygo.models.FleetMaintenance = withContext(Dispatchers.IO) {
+        val json = post("/api/mobile/fleet/maintenance", org.json.JSONObject(body))
+        com.arveya.arveygo.models.FleetMaintenance.fromJson(json)
+    }
+
+    /** PUT /api/mobile/fleet/maintenance/{id} */
+    suspend fun updateFleetMaintenance(id: Int, body: Map<String, Any>): com.arveya.arveygo.models.FleetMaintenance = withContext(Dispatchers.IO) {
+        val json = put("/api/mobile/fleet/maintenance/$id", org.json.JSONObject(body))
+        com.arveya.arveygo.models.FleetMaintenance.fromJson(json)
+    }
+
+    /** DELETE /api/mobile/fleet/maintenance/{id} */
+    suspend fun deleteFleetMaintenance(id: Int): Unit = withContext(Dispatchers.IO) {
+        httpDelete("/api/mobile/fleet/maintenance/$id")
+    }
+
+    /** GET /api/mobile/fleet/documents */
+    suspend fun fetchFleetDocuments(
+        imei: String? = null, docType: String? = null, page: Int = 1, perPage: Int = 20
+    ): Pair<List<com.arveya.arveygo.models.FleetDocument>, com.arveya.arveygo.models.PaginationMeta> = withContext(Dispatchers.IO) {
+        val params = mutableListOf("page=$page", "per_page=$perPage")
+        if (!imei.isNullOrEmpty()) params.add("imei=$imei")
+        if (!docType.isNullOrEmpty()) params.add("doc_type=$docType")
+        val json = get("/api/mobile/fleet/documents?${params.joinToString("&")}")
+        val dataArr = json.optJSONArray("data") ?: org.json.JSONArray()
+        val items = (0 until dataArr.length()).map { com.arveya.arveygo.models.FleetDocument.fromJson(dataArr.getJSONObject(it)) }
+        val pagination = com.arveya.arveygo.models.PaginationMeta.fromJson(json.optJSONObject("pagination"))
+        Pair(items, pagination)
+    }
+
+    /** POST /api/mobile/fleet/documents */
+    suspend fun createFleetDocument(body: Map<String, Any>): com.arveya.arveygo.models.FleetDocument = withContext(Dispatchers.IO) {
+        val json = post("/api/mobile/fleet/documents", org.json.JSONObject(body))
+        com.arveya.arveygo.models.FleetDocument.fromJson(json)
+    }
+
+    /** PUT /api/mobile/fleet/documents/{id} */
+    suspend fun updateFleetDocument(id: Int, body: Map<String, Any>): com.arveya.arveygo.models.FleetDocument = withContext(Dispatchers.IO) {
+        val json = put("/api/mobile/fleet/documents/$id", org.json.JSONObject(body))
+        com.arveya.arveygo.models.FleetDocument.fromJson(json)
+    }
+
+    /** DELETE /api/mobile/fleet/documents/{id} */
+    suspend fun deleteFleetDocument(id: Int): Unit = withContext(Dispatchers.IO) {
+        httpDelete("/api/mobile/fleet/documents/$id")
+    }
+
     // MARK: - Helpers
 
     private fun validateResponse(code: Int, body: String) {

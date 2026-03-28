@@ -146,6 +146,13 @@ struct VehicleDetailView: View {
     @State private var mapCameraPosition: MapCameraPosition = .automatic
     @State private var showDriverAssign = false
 
+    // Fleet data states
+    @State private var fleetMaintenances: [FleetMaintenance] = []
+    @State private var fleetDocuments: [FleetDocument] = []
+    @State private var fleetCosts: [FleetCost] = []
+    @State private var isLoadingMaintenance = false
+    @State private var isLoadingCosts = false
+
     /// Navigation callbacks for quick actions
     var onNavigateToRouteHistory: ((Vehicle) -> Void)?
     var onNavigateToAlarms: (() -> Void)?
@@ -612,95 +619,186 @@ struct VehicleDetailView: View {
     // MARK: - Maintenance Tab
     var maintenanceTab: some View {
         VStack(spacing: 16) {
-            sectionCard(title: "BAKIM TAKVİMİ", icon: "wrench.and.screwdriver.fill") {
-                VStack(spacing: 0) {
-                    maintenanceRow(icon: "wrench.fill", title: "Periyodik Bakım", date: vehicle.nextService, status: .upcoming, km: "Her 10.000 km")
-                    Divider().padding(.leading, 44)
-                    maintenanceRow(icon: "circle.circle.fill", title: "Lastik Değişimi", date: "15.06.2026", status: .normal, km: "Her 40.000 km")
-                    Divider().padding(.leading, 44)
-                    maintenanceRow(icon: "drop.fill", title: "Yağ Değişimi", date: vehicle.lastService, status: .completed, km: "Her 15.000 km")
-                    Divider().padding(.leading, 44)
-                    maintenanceRow(icon: "bolt.fill", title: "Akü Kontrolü", date: "20.07.2026", status: .normal, km: "Yıllık")
+            if isLoadingMaintenance {
+                ProgressView("Yükleniyor...")
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            } else {
+                // Maintenance section
+                sectionCard(title: "BAKIM TAKVİMİ", icon: "wrench.and.screwdriver.fill") {
+                    if fleetMaintenances.isEmpty {
+                        HStack {
+                            Image(systemName: "wrench.and.screwdriver")
+                                .foregroundColor(AppTheme.textMuted)
+                            Text("Bu araç için bakım kaydı bulunmuyor")
+                                .font(.system(size: 13))
+                                .foregroundColor(AppTheme.textMuted)
+                        }
+                        .padding(.vertical, 20)
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(Array(fleetMaintenances.enumerated()), id: \.element.id) { index, m in
+                                let mStatus: MaintenanceStatus = m.status == "completed" ? .completed : (m.status == "overdue" ? .overdue : .upcoming)
+                                maintenanceRow(
+                                    icon: m.maintenanceType == "oil_change" ? "drop.fill" : (m.maintenanceType == "tire_change" ? "circle.circle.fill" : "wrench.fill"),
+                                    title: m.title,
+                                    date: m.scheduledDate,
+                                    status: mStatus,
+                                    km: m.currentKm > 0 ? "\(m.currentKm) km" : "—"
+                                )
+                                if index < fleetMaintenances.count - 1 {
+                                    Divider().padding(.leading, 44)
+                                }
+                            }
+                        }
+                    }
                 }
-            }
 
-            sectionCard(title: "BELGELER", icon: "doc.text.fill") {
-                VStack(spacing: 0) {
-                    documentRow(title: "Muayene", date: vehicle.muayeneDate, daysLeft: 85, status: .normal)
-                    Divider().padding(.leading, 14)
-                    documentRow(title: "Kasko", date: vehicle.insuranceDate, daysLeft: 120, status: .normal)
-                    Divider().padding(.leading, 14)
-                    documentRow(title: "Trafik Sigortası", date: "10.05.2026", daysLeft: 48, status: .warning)
-                    Divider().padding(.leading, 14)
-                    documentRow(title: "K Belgesi", date: "01.04.2026", daysLeft: 9, status: .critical)
+                // Documents section
+                sectionCard(title: "BELGELER", icon: "doc.text.fill") {
+                    if fleetDocuments.isEmpty {
+                        HStack {
+                            Image(systemName: "doc.text")
+                                .foregroundColor(AppTheme.textMuted)
+                            Text("Bu araç için belge kaydı bulunmuyor")
+                                .font(.system(size: 13))
+                                .foregroundColor(AppTheme.textMuted)
+                        }
+                        .padding(.vertical, 20)
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(Array(fleetDocuments.enumerated()), id: \.element.id) { index, doc in
+                                let dStatus: DocStatus = doc.status == "expired" ? .critical : (doc.status == "expiring_soon" ? .warning : .normal)
+                                let daysLeft = doc.daysUntilExpiry
+                                documentRow(title: doc.docTypeLabel, date: doc.expiryDate ?? "—", daysLeft: daysLeft, status: dStatus)
+                                if index < fleetDocuments.count - 1 {
+                                    Divider().padding(.leading, 14)
+                                }
+                            }
+                        }
+                    }
                 }
             }
+        }
+        .task {
+            guard !isLoadingMaintenance else { return }
+            isLoadingMaintenance = true
+            do {
+                let (maintenances, _) = try await APIService.shared.fetchFleetMaintenance(imei: vehicle.imei)
+                fleetMaintenances = maintenances
+                let (documents, _) = try await APIService.shared.fetchFleetDocuments(imei: vehicle.imei)
+                fleetDocuments = documents
+            } catch {
+                print("[VehicleDetail] fleet maintenance/docs error: \(error)")
+            }
+            isLoadingMaintenance = false
         }
     }
 
     // MARK: - Costs Tab
     var costsTab: some View {
         VStack(spacing: 16) {
-            sectionCard(title: "MASRAF ÖZETİ (2026)", icon: "chart.bar.fill") {
-                HStack(spacing: 0) {
-                    costSummaryItem(label: "Yakıt", amount: "₺14.200", color: .orange, percent: 45)
-                    costSummaryItem(label: "Bakım", amount: "₺8.500", color: .blue, percent: 27)
-                    costSummaryItem(label: "Sigorta", amount: "₺5.800", color: .purple, percent: 18)
-                    costSummaryItem(label: "Diğer", amount: "₺3.100", color: AppTheme.textMuted, percent: 10)
+            if isLoadingCosts {
+                ProgressView("Yükleniyor...")
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            } else if fleetCosts.isEmpty {
+                sectionCard(title: "MASRAFLAR", icon: "chart.bar.fill") {
+                    HStack {
+                        Image(systemName: "banknote")
+                            .foregroundColor(AppTheme.textMuted)
+                        Text("Bu araç için masraf kaydı bulunmuyor")
+                            .font(.system(size: 13))
+                            .foregroundColor(AppTheme.textMuted)
+                    }
+                    .padding(.vertical, 20)
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.vertical, 8)
+            } else {
+                // Cost summary by category
+                let categoryTotals = Dictionary(grouping: fleetCosts, by: { $0.category })
+                    .mapValues { costs in costs.reduce(0.0) { $0 + $1.amount } }
+                let totalAmount = fleetCosts.reduce(0.0) { $0 + $1.amount }
+                let currency = fleetCosts.first?.currency ?? "TRY"
 
-                HStack {
-                    Text("TOPLAM")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(AppTheme.textMuted)
-                    Spacer()
-                    Text("₺31.600")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(AppTheme.navy)
-                }
-                .padding(14)
-                .background(AppTheme.navy.opacity(0.04))
-                .cornerRadius(10)
-            }
-
-            sectionCard(title: "SON MASRAFLAR", icon: "list.bullet.rectangle") {
-                VStack(spacing: 0) {
-                    ForEach(vehicle.recentCosts) { cost in
-                        HStack(spacing: 12) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(costCategoryColor(cost.category).opacity(0.1))
-                                    .frame(width: 36, height: 36)
-                                Image(systemName: costCategoryIcon(cost.category))
-                                    .font(.system(size: 14))
-                                    .foregroundColor(costCategoryColor(cost.category))
-                            }
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(cost.category)
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundColor(AppTheme.navy)
-                                Text(cost.date)
-                                    .font(.system(size: 11))
-                                    .foregroundColor(AppTheme.textMuted)
-                            }
-
-                            Spacer()
-
-                            Text(cost.amount)
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(AppTheme.navy)
+                sectionCard(title: "MASRAF ÖZETİ", icon: "chart.bar.fill") {
+                    let sortedCats = categoryTotals.sorted { $0.value > $1.value }
+                    HStack(spacing: 0) {
+                        ForEach(sortedCats.prefix(4), id: \.key) { cat, amt in
+                            let pct = totalAmount > 0 ? Int(amt / totalAmount * 100) : 0
+                            costSummaryItem(
+                                label: cat.capitalized,
+                                amount: FleetCost.formatAmount(amt, currency: currency),
+                                color: costCategoryColor(cat),
+                                percent: pct
+                            )
                         }
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 14)
+                    }
+                    .padding(.vertical, 8)
 
-                        if cost.id != vehicle.recentCosts.last?.id {
-                            Divider().padding(.leading, 62)
+                    HStack {
+                        Text("TOPLAM")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(AppTheme.textMuted)
+                        Spacer()
+                        Text(FleetCost.formatAmount(totalAmount, currency: currency))
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(AppTheme.navy)
+                    }
+                    .padding(14)
+                    .background(AppTheme.navy.opacity(0.04))
+                    .cornerRadius(10)
+                }
+
+                sectionCard(title: "SON MASRAFLAR", icon: "list.bullet.rectangle") {
+                    VStack(spacing: 0) {
+                        ForEach(Array(fleetCosts.enumerated()), id: \.element.id) { index, cost in
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(costCategoryColor(cost.category).opacity(0.1))
+                                        .frame(width: 36, height: 36)
+                                    Image(systemName: costCategoryIcon(cost.category))
+                                        .font(.system(size: 14))
+                                        .foregroundColor(costCategoryColor(cost.category))
+                                }
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(cost.category.capitalized)
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundColor(AppTheme.navy)
+                                    Text(cost.costDate)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(AppTheme.textMuted)
+                                }
+
+                                Spacer()
+
+                                Text(cost.formattedAmount)
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(AppTheme.navy)
+                            }
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 14)
+
+                            if index < fleetCosts.count - 1 {
+                                Divider().padding(.leading, 62)
+                            }
                         }
                     }
                 }
             }
+        }
+        .task {
+            guard !isLoadingCosts else { return }
+            isLoadingCosts = true
+            do {
+                let (costs, _) = try await APIService.shared.fetchFleetCosts(imei: vehicle.imei)
+                fleetCosts = costs
+            } catch {
+                print("[VehicleDetail] fleet costs error: \(error)")
+            }
+            isLoadingCosts = false
         }
     }
 

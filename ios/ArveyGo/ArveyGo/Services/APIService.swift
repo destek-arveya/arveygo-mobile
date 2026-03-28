@@ -522,6 +522,137 @@ final class APIService {
         _ = try await httpDelete("/api/mobile/vehicles/\(vehicleId)/assign-driver")
     }
 
+    // MARK: - Fleet Management
+
+    /// GET /api/mobile/fleet/catalog
+    func fetchFleetCatalog() async throws -> FleetCatalog {
+        let json = try await get("/api/mobile/fleet/catalog")
+        return FleetCatalog.fromDict(json)
+    }
+
+    /// GET /api/mobile/fleet/reminders
+    func fetchFleetReminders(days: Int = 30) async throws -> [FleetReminder] {
+        let json = try await get("/api/mobile/fleet/reminders?days=\(days)")
+        var result: [FleetReminder] = []
+
+        if let docs = json["documents"] as? [[String: Any]] {
+            for d in docs {
+                result.append(FleetReminder(
+                    id: d["id"] as? Int ?? 0,
+                    imei: d["imei"] as? String ?? "",
+                    plate: d["plate"] as? String ?? "",
+                    type: "document",
+                    label: "\(d["doc_type"] as? String ?? "") - \(d["title"] as? String ?? "")",
+                    dueDate: d["expiry_date"] as? String,
+                    daysLeft: d["days_left"] as? Int ?? 0
+                ))
+            }
+        }
+
+        if let maint = json["maintenance"] as? [[String: Any]] {
+            for m in maint {
+                result.append(FleetReminder(
+                    id: m["id"] as? Int ?? 0,
+                    imei: m["imei"] as? String ?? "",
+                    plate: m["plate"] as? String ?? "",
+                    type: "maintenance",
+                    label: m["maintenance_type"] as? String ?? "",
+                    dueDate: m["next_service_date"] as? String,
+                    daysLeft: m["days_left"] as? Int ?? 0
+                ))
+            }
+        }
+
+        return result.sorted { $0.daysLeft < $1.daysLeft }
+    }
+
+    /// GET /api/mobile/fleet/costs
+    func fetchFleetCosts(imei: String? = nil, category: String? = nil, page: Int = 1, perPage: Int = 20) async throws -> ([FleetCost], PaginationMeta) {
+        var params = ["page=\(page)", "per_page=\(perPage)"]
+        if let imei = imei, !imei.isEmpty { params.append("imei=\(imei)") }
+        if let category = category, !category.isEmpty { params.append("category=\(category)") }
+        let json = try await get("/api/mobile/fleet/costs?\(params.joined(separator: "&"))")
+        let dataArr = json["data"] as? [[String: Any]] ?? []
+        let costs = dataArr.map { FleetCost.fromDict($0) }
+        let pagination = PaginationMeta.fromDict(json["pagination"] as? [String: Any])
+        return (costs, pagination)
+    }
+
+    /// POST /api/mobile/fleet/costs
+    func createFleetCost(data: [String: Any]) async throws -> FleetCost {
+        let json = try await post("/api/mobile/fleet/costs", body: data)
+        return FleetCost.fromDict(json)
+    }
+
+    /// PUT /api/mobile/fleet/costs/{id}
+    func updateFleetCost(id: Int, data: [String: Any]) async throws -> FleetCost {
+        let json = try await put("/api/mobile/fleet/costs/\(id)", body: data)
+        return FleetCost.fromDict(json)
+    }
+
+    /// DELETE /api/mobile/fleet/costs/{id}
+    func deleteFleetCost(id: Int) async throws {
+        _ = try await httpDelete("/api/mobile/fleet/costs/\(id)")
+    }
+
+    /// GET /api/mobile/fleet/maintenance
+    func fetchFleetMaintenance(imei: String? = nil, status: String? = nil, page: Int = 1, perPage: Int = 20) async throws -> ([FleetMaintenance], PaginationMeta) {
+        var params = ["page=\(page)", "per_page=\(perPage)"]
+        if let imei = imei, !imei.isEmpty { params.append("imei=\(imei)") }
+        if let status = status, !status.isEmpty { params.append("status=\(status)") }
+        let json = try await get("/api/mobile/fleet/maintenance?\(params.joined(separator: "&"))")
+        let dataArr = json["data"] as? [[String: Any]] ?? []
+        let items = dataArr.map { FleetMaintenance.fromDict($0) }
+        let pagination = PaginationMeta.fromDict(json["pagination"] as? [String: Any])
+        return (items, pagination)
+    }
+
+    /// POST /api/mobile/fleet/maintenance
+    func createFleetMaintenance(data: [String: Any]) async throws -> FleetMaintenance {
+        let json = try await post("/api/mobile/fleet/maintenance", body: data)
+        return FleetMaintenance.fromDict(json)
+    }
+
+    /// PUT /api/mobile/fleet/maintenance/{id}
+    func updateFleetMaintenance(id: Int, data: [String: Any]) async throws -> FleetMaintenance {
+        let json = try await put("/api/mobile/fleet/maintenance/\(id)", body: data)
+        return FleetMaintenance.fromDict(json)
+    }
+
+    /// DELETE /api/mobile/fleet/maintenance/{id}
+    func deleteFleetMaintenance(id: Int) async throws {
+        _ = try await httpDelete("/api/mobile/fleet/maintenance/\(id)")
+    }
+
+    /// GET /api/mobile/fleet/documents
+    func fetchFleetDocuments(imei: String? = nil, docType: String? = nil, page: Int = 1, perPage: Int = 20) async throws -> ([FleetDocument], PaginationMeta) {
+        var params = ["page=\(page)", "per_page=\(perPage)"]
+        if let imei = imei, !imei.isEmpty { params.append("imei=\(imei)") }
+        if let docType = docType, !docType.isEmpty { params.append("doc_type=\(docType)") }
+        let json = try await get("/api/mobile/fleet/documents?\(params.joined(separator: "&"))")
+        let dataArr = json["data"] as? [[String: Any]] ?? []
+        let items = dataArr.map { FleetDocument.fromDict($0) }
+        let pagination = PaginationMeta.fromDict(json["pagination"] as? [String: Any])
+        return (items, pagination)
+    }
+
+    /// POST /api/mobile/fleet/documents
+    func createFleetDocument(data: [String: Any]) async throws -> FleetDocument {
+        let json = try await post("/api/mobile/fleet/documents", body: data)
+        return FleetDocument.fromDict(json)
+    }
+
+    /// PUT /api/mobile/fleet/documents/{id}
+    func updateFleetDocument(id: Int, data: [String: Any]) async throws -> FleetDocument {
+        let json = try await put("/api/mobile/fleet/documents/\(id)", body: data)
+        return FleetDocument.fromDict(json)
+    }
+
+    /// DELETE /api/mobile/fleet/documents/{id}
+    func deleteFleetDocument(id: Int) async throws {
+        _ = try await httpDelete("/api/mobile/fleet/documents/\(id)")
+    }
+
     // MARK: - Geofences
 
     /// GET /api/mobile/geofences
