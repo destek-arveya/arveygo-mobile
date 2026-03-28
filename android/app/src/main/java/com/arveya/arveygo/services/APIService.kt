@@ -32,8 +32,13 @@ object APIService {
     /// Global callback invoked on 401 Unauthorized — set by AuthViewModel to trigger logout
     var onSessionExpired: (() -> Unit)? = null
 
+    /// Flag to prevent recursive refresh attempts
+    @Volatile private var isRefreshing = false
+    private var appContext: Context? = null
+
     // MARK: - Init from stored token
     fun initialize(context: Context) {
+        appContext = context.applicationContext
         accessToken = TokenStore.load(context)
         if (accessToken != null) {
             Log.d(TAG, "Restored saved token: ${accessToken!!.take(20)}...")
@@ -178,99 +183,89 @@ object APIService {
 
     // MARK: - Generic Authenticated GET
     suspend fun get(path: String): JSONObject = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
-            .url("$baseURL$path")
-            .get()
-            .addHeader("Accept", "application/json")
-            .addHeader("Authorization", "Bearer $accessToken")
-            .build()
-
-        val response = try {
-            client.newCall(request).execute()
-        } catch (e: Exception) {
-            throw APIException.NetworkError(e)
+        suspend fun execute(): JSONObject {
+            val request = Request.Builder()
+                .url("$baseURL$path")
+                .get()
+                .addHeader("Accept", "application/json")
+                .addHeader("Authorization", "Bearer $accessToken")
+                .build()
+            val response = try { client.newCall(request).execute() } catch (e: Exception) { throw APIException.NetworkError(e) }
+            val body = response.body?.string() ?: ""
+            validateResponse(response.code, body)
+            return try { JSONObject(body) } catch (_: Exception) { throw APIException.DecodingError("JSON ayrıştırılamadı") }
         }
-
-        val body = response.body?.string() ?: ""
-        validateResponse(response.code, body)
-
-        return@withContext try { JSONObject(body) } catch (_: Exception) {
-            throw APIException.DecodingError("JSON ayrıştırılamadı")
+        try {
+            execute()
+        } catch (_: APIException.Unauthorized) {
+            if (attemptTokenRefresh()) execute() else { triggerSessionExpired(); throw APIException.Unauthorized }
         }
     }
 
     // MARK: - Generic Authenticated POST
     suspend fun post(path: String, jsonBody: JSONObject? = null): JSONObject = withContext(Dispatchers.IO) {
-        val requestBody = (jsonBody?.toString() ?: "").toRequestBody("application/json".toMediaType())
-
-        val request = Request.Builder()
-            .url("$baseURL$path")
-            .post(requestBody)
-            .addHeader("Content-Type", "application/json")
-            .addHeader("Accept", "application/json")
-            .addHeader("Authorization", "Bearer $accessToken")
-            .build()
-
-        val response = try {
-            client.newCall(request).execute()
-        } catch (e: Exception) {
-            throw APIException.NetworkError(e)
+        suspend fun execute(): JSONObject {
+            val requestBody = (jsonBody?.toString() ?: "").toRequestBody("application/json".toMediaType())
+            val request = Request.Builder()
+                .url("$baseURL$path")
+                .post(requestBody)
+                .addHeader("Content-Type", "application/json")
+                .addHeader("Accept", "application/json")
+                .addHeader("Authorization", "Bearer $accessToken")
+                .build()
+            val response = try { client.newCall(request).execute() } catch (e: Exception) { throw APIException.NetworkError(e) }
+            val body = response.body?.string() ?: ""
+            validateResponse(response.code, body)
+            return try { JSONObject(body) } catch (_: Exception) { throw APIException.DecodingError("JSON ayrıştırılamadı") }
         }
-
-        val body = response.body?.string() ?: ""
-        validateResponse(response.code, body)
-
-        return@withContext try { JSONObject(body) } catch (_: Exception) {
-            throw APIException.DecodingError("JSON ayrıştırılamadı")
+        try {
+            execute()
+        } catch (_: APIException.Unauthorized) {
+            if (attemptTokenRefresh()) execute() else { triggerSessionExpired(); throw APIException.Unauthorized }
         }
     }
 
     // MARK: - Generic Authenticated PUT
     suspend fun put(path: String, jsonBody: JSONObject): JSONObject = withContext(Dispatchers.IO) {
-        val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaType())
-
-        val request = Request.Builder()
-            .url("$baseURL$path")
-            .put(requestBody)
-            .addHeader("Content-Type", "application/json")
-            .addHeader("Accept", "application/json")
-            .addHeader("Authorization", "Bearer $accessToken")
-            .build()
-
-        val response = try {
-            client.newCall(request).execute()
-        } catch (e: Exception) {
-            throw APIException.NetworkError(e)
+        suspend fun execute(): JSONObject {
+            val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaType())
+            val request = Request.Builder()
+                .url("$baseURL$path")
+                .put(requestBody)
+                .addHeader("Content-Type", "application/json")
+                .addHeader("Accept", "application/json")
+                .addHeader("Authorization", "Bearer $accessToken")
+                .build()
+            val response = try { client.newCall(request).execute() } catch (e: Exception) { throw APIException.NetworkError(e) }
+            val body = response.body?.string() ?: ""
+            validateResponse(response.code, body)
+            return try { JSONObject(body) } catch (_: Exception) { throw APIException.DecodingError("JSON ayrıştırılamadı") }
         }
-
-        val body = response.body?.string() ?: ""
-        validateResponse(response.code, body)
-
-        return@withContext try { JSONObject(body) } catch (_: Exception) {
-            throw APIException.DecodingError("JSON ayrıştırılamadı")
+        try {
+            execute()
+        } catch (_: APIException.Unauthorized) {
+            if (attemptTokenRefresh()) execute() else { triggerSessionExpired(); throw APIException.Unauthorized }
         }
     }
 
     // MARK: - Generic Authenticated DELETE
     suspend fun httpDelete(path: String): JSONObject = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
-            .url("$baseURL$path")
-            .delete()
-            .addHeader("Accept", "application/json")
-            .addHeader("Authorization", "Bearer $accessToken")
-            .build()
-
-        val response = try {
-            client.newCall(request).execute()
-        } catch (e: Exception) {
-            throw APIException.NetworkError(e)
+        suspend fun execute(): JSONObject {
+            val request = Request.Builder()
+                .url("$baseURL$path")
+                .delete()
+                .addHeader("Accept", "application/json")
+                .addHeader("Authorization", "Bearer $accessToken")
+                .build()
+            val response = try { client.newCall(request).execute() } catch (e: Exception) { throw APIException.NetworkError(e) }
+            val body = response.body?.string() ?: ""
+            validateResponse(response.code, body)
+            return try { JSONObject(body) } catch (_: Exception) { throw APIException.DecodingError("JSON ayrıştırılamadı") }
         }
-
-        val body = response.body?.string() ?: ""
-        validateResponse(response.code, body)
-
-        return@withContext try { JSONObject(body) } catch (_: Exception) {
-            throw APIException.DecodingError("JSON ayrıştırılamadı")
+        try {
+            execute()
+        } catch (_: APIException.Unauthorized) {
+            if (attemptTokenRefresh()) execute() else { triggerSessionExpired(); throw APIException.Unauthorized }
         }
     }
 
@@ -490,10 +485,7 @@ object APIService {
         when (code) {
             in 200..299 -> return
             401 -> {
-                accessToken = null
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    onSessionExpired?.invoke()
-                }
+                // Signal that token needs refresh — actual retry is handled by the calling method
                 throw APIException.Unauthorized
             }
             422 -> {
@@ -508,6 +500,48 @@ object APIService {
                 val json = try { JSONObject(body) } catch (_: Exception) { null }
                 throw APIException.HttpError(code, json?.optString("message"))
             }
+        }
+    }
+
+    /**
+     * Attempt to refresh the access token. Returns true if successful.
+     * If refresh also fails with 401, triggers onSessionExpired.
+     */
+    private suspend fun attemptTokenRefresh(): Boolean {
+        if (isRefreshing) return false
+        val ctx = appContext ?: return false
+        isRefreshing = true
+        return try {
+            val request = Request.Builder()
+                .url("$baseURL/api/mobile/auth/refresh")
+                .post("".toRequestBody())
+                .addHeader("Accept", "application/json")
+                .addHeader("Authorization", "Bearer $accessToken")
+                .build()
+            val response = client.newCall(request).execute()
+            val body = response.body?.string() ?: ""
+            if (response.code in 200..299) {
+                val json = try { JSONObject(body) } catch (_: Exception) { null }
+                val newToken = json?.optString("access_token", "") ?: ""
+                if (newToken.isNotEmpty()) {
+                    accessToken = newToken
+                    TokenStore.save(ctx, newToken)
+                    Log.d(TAG, "Token auto-refreshed")
+                    true
+                } else false
+            } else false
+        } catch (_: Exception) {
+            false
+        } finally {
+            isRefreshing = false
+        }
+    }
+
+    /** Trigger session expired callback (logout) on main thread */
+    private fun triggerSessionExpired() {
+        accessToken = null
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            onSessionExpired?.invoke()
         }
     }
 

@@ -58,6 +58,9 @@ final class APIService {
     private let baseURL: String
     private let session: URLSession
 
+    /// Guard against multiple concurrent refresh attempts
+    private var isRefreshing = false
+
     /// Current Bearer token — persisted in Keychain
     private(set) var accessToken: String? {
         didSet {
@@ -183,77 +186,165 @@ final class APIService {
 
     /// GET any authenticated endpoint — returns JSON dict
     func get(_ path: String) async throws -> [String: Any] {
-        let url = try makeURL(path)
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        try applyAuth(&request)
+        do {
+            let url = try makeURL(path)
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            try applyAuth(&request)
 
-        let (data, response) = try await performRequest(request)
-        try validateResponse(response, data: data)
+            let (data, response) = try await performRequest(request)
+            try validateResponse(response, data: data)
 
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw APIError.decodingError("JSON ayrıştırılamadı")
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw APIError.decodingError("JSON ayrıştırılamadı")
+            }
+            return json
+        } catch APIError.unauthorized {
+            // Attempt token refresh then retry once
+            guard await attemptTokenRefresh() else {
+                triggerSessionExpired()
+                throw APIError.unauthorized
+            }
+            let url = try makeURL(path)
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            try applyAuth(&request)
+
+            let (data, response) = try await performRequest(request)
+            try validateResponse(response, data: data)
+
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw APIError.decodingError("JSON ayrıştırılamadı")
+            }
+            return json
         }
-        return json
     }
 
     /// POST any authenticated endpoint — returns JSON dict
     func post(_ path: String, body: [String: Any]? = nil) async throws -> [String: Any] {
-        let url = try makeURL(path)
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        try applyAuth(&request)
+        do {
+            let url = try makeURL(path)
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            try applyAuth(&request)
 
-        if let body = body {
-            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            if let body = body {
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            }
+
+            let (data, response) = try await performRequest(request)
+            try validateResponse(response, data: data)
+
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw APIError.decodingError("JSON ayrıştırılamadı")
+            }
+            return json
+        } catch APIError.unauthorized {
+            guard await attemptTokenRefresh() else {
+                triggerSessionExpired()
+                throw APIError.unauthorized
+            }
+            let url = try makeURL(path)
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            try applyAuth(&request)
+
+            if let body = body {
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            }
+
+            let (data, response) = try await performRequest(request)
+            try validateResponse(response, data: data)
+
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw APIError.decodingError("JSON ayrıştırılamadı")
+            }
+            return json
         }
-
-        let (data, response) = try await performRequest(request)
-        try validateResponse(response, data: data)
-
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw APIError.decodingError("JSON ayrıştırılamadı")
-        }
-        return json
     }
 
     /// PUT any authenticated endpoint
     func put(_ path: String, body: [String: Any]) async throws -> [String: Any] {
-        let url = try makeURL(path)
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        try applyAuth(&request)
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        do {
+            let url = try makeURL(path)
+            var request = URLRequest(url: url)
+            request.httpMethod = "PUT"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            try applyAuth(&request)
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await performRequest(request)
-        try validateResponse(response, data: data)
+            let (data, response) = try await performRequest(request)
+            try validateResponse(response, data: data)
 
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw APIError.decodingError("JSON ayrıştırılamadı")
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw APIError.decodingError("JSON ayrıştırılamadı")
+            }
+            return json
+        } catch APIError.unauthorized {
+            guard await attemptTokenRefresh() else {
+                triggerSessionExpired()
+                throw APIError.unauthorized
+            }
+            let url = try makeURL(path)
+            var request = URLRequest(url: url)
+            request.httpMethod = "PUT"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            try applyAuth(&request)
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (data, response) = try await performRequest(request)
+            try validateResponse(response, data: data)
+
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw APIError.decodingError("JSON ayrıştırılamadı")
+            }
+            return json
         }
-        return json
     }
 
     /// DELETE any authenticated endpoint
     func httpDelete(_ path: String) async throws -> [String: Any] {
-        let url = try makeURL(path)
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        try applyAuth(&request)
+        do {
+            let url = try makeURL(path)
+            var request = URLRequest(url: url)
+            request.httpMethod = "DELETE"
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            try applyAuth(&request)
 
-        let (data, response) = try await performRequest(request)
-        try validateResponse(response, data: data)
+            let (data, response) = try await performRequest(request)
+            try validateResponse(response, data: data)
 
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw APIError.decodingError("JSON ayrıştırılamadı")
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw APIError.decodingError("JSON ayrıştırılamadı")
+            }
+            return json
+        } catch APIError.unauthorized {
+            guard await attemptTokenRefresh() else {
+                triggerSessionExpired()
+                throw APIError.unauthorized
+            }
+            let url = try makeURL(path)
+            var request = URLRequest(url: url)
+            request.httpMethod = "DELETE"
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            try applyAuth(&request)
+
+            let (data, response) = try await performRequest(request)
+            try validateResponse(response, data: data)
+
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw APIError.decodingError("JSON ayrıştırılamadı")
+            }
+            return json
         }
-        return json
     }
 
     // MARK: - Helpers
@@ -287,10 +378,7 @@ final class APIService {
         switch http.statusCode {
         case 200...299: return
         case 401:
-            self.accessToken = nil
-            DispatchQueue.main.async { [weak self] in
-                self?.onSessionExpired?()
-            }
+            // Don't clear token or expire session yet — let caller attempt refresh
             throw APIError.unauthorized
         case 422:
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -301,6 +389,30 @@ final class APIService {
         default:
             let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["message"] as? String
             throw APIError.httpError(http.statusCode, msg)
+        }
+    }
+
+    /// Attempt to refresh the access token. Returns true on success.
+    private func attemptTokenRefresh() async -> Bool {
+        guard !isRefreshing else { return false }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        do {
+            let _ = try await refreshToken()
+            print("[API] Token auto-refreshed on 401")
+            return true
+        } catch {
+            print("[API] Token refresh failed: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    /// Clear token and notify session expired on main thread
+    private func triggerSessionExpired() {
+        self.accessToken = nil
+        DispatchQueue.main.async { [weak self] in
+            self?.onSessionExpired?()
         }
     }
 

@@ -221,7 +221,7 @@ fun LoginScreen() {
                                     cursorColor = AppColors.Navy
                                 ),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 56.dp)
                             )
 
                             Spacer(Modifier.height(16.dp))
@@ -248,7 +248,7 @@ fun LoginScreen() {
                                     cursorColor = AppColors.Navy
                                 ),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 56.dp)
                             )
 
                             Spacer(Modifier.height(12.dp))

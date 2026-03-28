@@ -170,9 +170,11 @@ struct LoginView: View {
                                         .focused($focusedField, equals: .email)
                                 }
                                 .padding(.horizontal, 16)
-                                .frame(height: 50)
+                                .frame(height: 56)
                                 .background(AppTheme.bg)
                                 .cornerRadius(12)
+                                .contentShape(Rectangle())
+                                .onTapGesture { focusedField = .email }
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
                                         .stroke(focusedField == .email ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .email ? 1.5 : 1)
@@ -199,9 +201,11 @@ struct LoginView: View {
                                         .focused($focusedField, equals: .password)
                                 }
                                 .padding(.horizontal, 16)
-                                .frame(height: 50)
+                                .frame(height: 56)
                                 .background(AppTheme.bg)
                                 .cornerRadius(12)
+                                .contentShape(Rectangle())
+                                .onTapGesture { focusedField = .password }
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
                                         .stroke(focusedField == .password ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .password ? 1.5 : 1)
