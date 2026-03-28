@@ -337,14 +337,14 @@ private val ALARM_TYPES = listOf(
 // MARK: - Alarms Screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AlarmsScreen(onMenuClick: () -> Unit, initialSearchText: String = "") {
+fun AlarmsScreen(onMenuClick: () -> Unit, initialSearchText: String = "", autoOpenCreate: Boolean = false, preSelectedPlate: String = "") {
     val authVM = LocalAuthViewModel.current
     val user by authVM.currentUser.collectAsState()
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
-    // Tab state
-    var selectedTab by remember { mutableIntStateOf(0) }
+    // Tab state — auto-switch to Alarm Kuralları tab when creating
+    var selectedTab by remember { mutableIntStateOf(if (autoOpenCreate) 1 else 0) }
 
     // Search — initialize with passed text (e.g. from VehicleDetail "Tümünü Gör")
     var searchText by remember { mutableStateOf(initialSearchText) }
@@ -352,7 +352,8 @@ fun AlarmsScreen(onMenuClick: () -> Unit, initialSearchText: String = "") {
     // Detail sheets
     var selectedAlarm by remember { mutableStateOf<AlarmEvent?>(null) }
     var selectedRule by remember { mutableStateOf<AlarmSet?>(null) }
-    var showCreateSheet by remember { mutableStateOf(false) }
+    var showCreateSheet by remember { mutableStateOf(autoOpenCreate) }
+    var createPrePlate by remember { mutableStateOf(preSelectedPlate) }
 
     // State
     var alarms by remember { mutableStateOf(listOf<AlarmEvent>()) }
@@ -666,9 +667,11 @@ fun AlarmsScreen(onMenuClick: () -> Unit, initialSearchText: String = "") {
     if (showCreateSheet) {
         CreateAlarmSetSheet(
             catalog = catalog,
-            onDismiss = { showCreateSheet = false },
+            preSelectedPlate = createPrePlate,
+            onDismiss = { showCreateSheet = false; createPrePlate = "" },
             onCreated = {
                 showCreateSheet = false
+                createPrePlate = ""
                 scope.launch { fetchAlarmSets() }
             }
         )
@@ -1488,20 +1491,24 @@ private fun RuleDetailSheet(
     }
 }
 
-// MARK: - Create Alarm Set Sheet
+// MARK: - Create Alarm Set Sheet (Modern Step Wizard)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CreateAlarmSetSheet(
     catalog: AlarmCatalog?,
+    preSelectedPlate: String = "",
     onDismiss: () -> Unit,
     onCreated: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
 
+    // Step state (1-based: 1=İsim&Tür, 2=Araçlar, 3=Koşullar, 4=Bildirim)
+    var currentStep by remember { mutableIntStateOf(1) }
+
     // Form state
     var name by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf("speed_violation") }
-    var selectedVehicles by remember { mutableStateOf(setOf<Int>()) } // assignment IDs
+    var selectedVehicles by remember { mutableStateOf(setOf<Int>()) }
     var selectedChannels by remember { mutableStateOf(setOf("push")) }
     var selectedRecipients by remember { mutableStateOf(setOf<Int>()) }
     var selectedGeofence by remember { mutableStateOf<Int?>(null) }
@@ -1509,15 +1516,22 @@ private fun CreateAlarmSetSheet(
     var idleAfterSec by remember { mutableStateOf("300") }
     var isSaving by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+    var vehicleSearch by remember { mutableStateOf("") }
 
-    // Pre-select first recipient if available
-    LaunchedEffect(catalog) {
+    // Pre-select vehicle by plate
+    LaunchedEffect(catalog, preSelectedPlate) {
+        if (preSelectedPlate.isNotEmpty() && catalog != null) {
+            val match = catalog.vehicles.firstOrNull { it.plate.equals(preSelectedPlate, true) || it.label.contains(preSelectedPlate, true) }
+            if (match != null) {
+                selectedVehicles = setOf(match.assignmentId)
+            }
+        }
         catalog?.recipients?.firstOrNull()?.let { selectedRecipients = setOf(it.id) }
     }
 
     suspend fun save() {
         if (name.isBlank()) { errorMsg = "Kural adı gerekli"; return }
-        if (selectedVehicles.isEmpty()) { errorMsg = "En az bir araç seçin"; return }
+        if (selectedVehicles.isEmpty()) { errorMsg = "En az bir araç seçin"; currentStep = 2; return }
         if (selectedChannels.isEmpty()) { errorMsg = "En az bir bildirim kanalı seçin"; return }
         if (selectedRecipients.isEmpty()) { errorMsg = "En az bir alıcı seçin"; return }
 
@@ -1533,28 +1547,17 @@ private fun CreateAlarmSetSheet(
             put("cooldown_sec", 300)
             put("is_active", true)
             put("condition_require_ignition", true)
-
-            // targets
             val targets = org.json.JSONArray()
             selectedVehicles.forEach { assignmentId ->
-                targets.put(JSONObject().apply {
-                    put("scope", "assignment")
-                    put("id", assignmentId)
-                })
+                targets.put(JSONObject().apply { put("scope", "assignment"); put("id", assignmentId) })
             }
             put("targets", targets)
-
-            // channels
             val channels = org.json.JSONArray()
             selectedChannels.forEach { channels.put(it) }
             put("channels", channels)
-
-            // recipients
             val recipients = org.json.JSONArray()
             selectedRecipients.forEach { recipients.put(it) }
             put("recipient_ids", recipients)
-
-            // Conditions based on type
             when (selectedType) {
                 "speed_violation" -> {
                     put("condition_speed_limit_kmh", speedLimit.toIntOrNull() ?: 80)
@@ -1586,217 +1589,656 @@ private fun CreateAlarmSetSheet(
         } catch (e: Exception) {
             errorMsg = "Kayıt başarısız: ${e.message}"
         }
-
         isSaving = false
     }
 
+    val typeOptions = catalog?.types ?: listOf(
+        AlarmTypeOption("speed_violation", "Hız İhlali", "Belirlenen hız limitini aşıldığında bildirim alın"),
+        AlarmTypeOption("idle_alarm", "Rölanti", "Araç belirli süreden fazla rölantide kaldığında uyar"),
+        AlarmTypeOption("movement_detection", "Hareket Algılama", "Park halindeki aracın hareket etmesinde uyar"),
+        AlarmTypeOption("off_hours_usage", "Mesai Dışı Kullanım", "Mesai saatleri dışında kullanımda uyar"),
+        AlarmTypeOption("geofence_alarm", "Bölge Alarmı", "Bölgeye giriş/çıkışta bildirim alın")
+    )
+
+    val stepLabels = listOf("İsim & Tür", "Araçlar", "Koşullar", "Bildirim")
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = AppColors.Bg
+        containerColor = AppColors.Bg,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .fillMaxHeight(0.92f)
         ) {
-            // Title
-            Text("Yeni Alarm Kuralı", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+            // ── Header ──
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(AppColors.Navy)
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Yeni Alarm Oluştur", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Adım adım alarm kurun — çok kolay!", fontSize = 12.sp, color = Color.White.copy(alpha = 0.7f))
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, null, tint = Color.White.copy(alpha = 0.7f))
+                    }
+                }
 
-            // Kural Adı
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Kural Adı") },
-                placeholder = { Text("Örn: Hız Limiti 80 km/s") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = RoundedCornerShape(10.dp)
-            )
+                Spacer(Modifier.height(16.dp))
 
-            // Alarm Türü
-            Text("Alarm Türü", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
-            val typeOptions = catalog?.types ?: listOf(
-                AlarmTypeOption("speed_violation", "Hız İhlali", ""),
-                AlarmTypeOption("idle_alarm", "Rölanti", ""),
-                AlarmTypeOption("movement_detection", "Hareket Algılama", ""),
-                AlarmTypeOption("off_hours_usage", "Mesai Dışı Kullanım", ""),
-                AlarmTypeOption("geofence_alarm", "Bölge Alarmı", "")
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                typeOptions.forEach { type ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (selectedType == type.value) AppColors.Indigo.copy(alpha = 0.08f) else Color.Transparent)
-                            .clickable { selectedType = type.value }
-                            .padding(horizontal = 12.dp, vertical = 10.dp)
-                    ) {
-                        RadioButton(selected = selectedType == type.value, onClick = { selectedType = type.value })
-                        Spacer(Modifier.width(8.dp))
-                        Column {
-                            Text(type.label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
-                            if (type.description.isNotEmpty()) {
-                                Text(type.description, fontSize = 10.sp, color = AppColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // ── Step Indicator ──
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    stepLabels.forEachIndexed { index, label ->
+                        val stepNum = index + 1
+                        val isActive = stepNum == currentStep
+                        val isDone = stepNum < currentStep
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    when {
+                                        isActive -> Color.White.copy(alpha = 0.15f)
+                                        isDone -> Color.White.copy(alpha = 0.08f)
+                                        else -> Color.Transparent
+                                    }
+                                )
+                                .clickable { if (isDone) currentStep = stepNum }
+                                .padding(horizontal = 8.dp, vertical = 8.dp)
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        when {
+                                            isDone -> Color(0xFF22C55E)
+                                            isActive -> Color.White
+                                            else -> Color.White.copy(alpha = 0.2f)
+                                        }
+                                    )
+                            ) {
+                                if (isDone) {
+                                    Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                } else {
+                                    Text(
+                                        "$stepNum",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isActive) AppColors.Navy else Color.White.copy(alpha = 0.5f)
+                                    )
+                                }
                             }
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                label,
+                                fontSize = 10.sp,
+                                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                color = if (isActive || isDone) Color.White else Color.White.copy(alpha = 0.4f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
                 }
             }
 
-            // Type-specific conditions
-            when (selectedType) {
-                "speed_violation" -> {
-                    OutlinedTextField(
-                        value = speedLimit,
-                        onValueChange = { speedLimit = it.filter { c -> c.isDigit() } },
-                        label = { Text("Hız Limiti (km/s)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                }
-                "idle_alarm" -> {
-                    OutlinedTextField(
-                        value = idleAfterSec,
-                        onValueChange = { idleAfterSec = it.filter { c -> c.isDigit() } },
-                        label = { Text("Rölanti Süresi (saniye)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                }
-                "geofence_alarm" -> {
-                    Text("Bölge Seçin", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
-                    catalog?.geofences?.forEach { gf ->
+            // ── Step Content ──
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                when (currentStep) {
+                    // ═══ STEP 1: İsim & Tür ═══
+                    1 -> {
+                        // Kural Adı
+                        Text("Alarm Adı", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            placeholder = { Text("ör. Hız İhlali Alarmı, Depo Kontrolü...", fontSize = 13.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(10.dp)
+                        )
+
+                        Spacer(Modifier.height(4.dp))
+
+                        // Alarm Türü
+                        Text("Alarm Türü Seçin", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            typeOptions.forEach { type ->
+                                val isSelected = selectedType == type.value
+                                val typeIcon = when (type.value) {
+                                    "speed_violation" -> Icons.Default.Speed
+                                    "idle_alarm" -> Icons.Default.HourglassBottom
+                                    "movement_detection" -> Icons.Default.DirectionsCar
+                                    "off_hours_usage" -> Icons.Default.Schedule
+                                    "geofence_alarm" -> Icons.Default.LocationOn
+                                    else -> Icons.Default.Notifications
+                                }
+                                val typeColor = when (type.value) {
+                                    "speed_violation" -> Color(0xFFEF4444)
+                                    "idle_alarm" -> Color(0xFFF59E0B)
+                                    "movement_detection" -> Color(0xFF22C55E)
+                                    "off_hours_usage" -> Color(0xFFA855F7)
+                                    "geofence_alarm" -> AppColors.Indigo
+                                    else -> AppColors.Indigo
+                                }
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (isSelected) typeColor.copy(alpha = 0.06f) else AppColors.Surface)
+                                        .border(
+                                            1.5.dp,
+                                            if (isSelected) typeColor.copy(alpha = 0.3f) else AppColors.BorderSoft,
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                        .clickable { selectedType = type.value }
+                                        .padding(14.dp)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(typeColor.copy(alpha = 0.1f))
+                                    ) {
+                                        Icon(typeIcon, null, tint = typeColor, modifier = Modifier.size(20.dp))
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(type.label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                                        if (type.description.isNotEmpty()) {
+                                            Text(type.description, fontSize = 11.sp, color = AppColors.TextMuted, maxLines = 2)
+                                        }
+                                    }
+                                    if (isSelected) {
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.size(22.dp).clip(CircleShape).background(typeColor)
+                                        ) {
+                                            Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ═══ STEP 2: Araçlar ═══
+                    2 -> {
+                        Text("Hangi araçlar için geçerli olsun?", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+
+                        // Search
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (selectedGeofence == gf.id) AppColors.Indigo.copy(alpha = 0.08f) else Color.Transparent)
-                                .clickable { selectedGeofence = gf.id }
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(AppColors.Surface)
+                                .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(10.dp))
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
                         ) {
-                            RadioButton(selected = selectedGeofence == gf.id, onClick = { selectedGeofence = gf.id })
+                            Icon(Icons.Default.Search, null, tint = AppColors.TextMuted, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text(gf.name, fontSize = 13.sp, color = AppColors.TextPrimary)
+                            BasicTextField(
+                                value = vehicleSearch,
+                                onValueChange = { vehicleSearch = it },
+                                singleLine = true,
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = AppColors.TextPrimary),
+                                decorationBox = { innerTextField ->
+                                    Box(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
+                                        if (vehicleSearch.isEmpty()) Text("Plaka veya araç ara...", fontSize = 13.sp, color = AppColors.TextMuted)
+                                        innerTextField()
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        // Select All / Deselect All
+                        val allVehicleIds = catalog?.vehicles?.map { it.assignmentId }?.toSet() ?: emptySet()
+                        val allSelected = allVehicleIds.isNotEmpty() && selectedVehicles.containsAll(allVehicleIds)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            TextButton(onClick = { selectedVehicles = allVehicleIds }) {
+                                Icon(Icons.Default.SelectAll, null, modifier = Modifier.size(14.dp), tint = AppColors.Indigo)
+                                Spacer(Modifier.width(4.dp))
+                                Text("Tümünü Seç", fontSize = 11.sp, color = AppColors.Indigo, fontWeight = FontWeight.SemiBold)
+                            }
+                            if (selectedVehicles.isNotEmpty()) {
+                                TextButton(onClick = { selectedVehicles = emptySet() }) {
+                                    Text("Temizle (${selectedVehicles.size})", fontSize = 11.sp, color = Color.Red, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+
+                        // Vehicle list
+                        val filteredVehicles = if (vehicleSearch.isBlank()) catalog?.vehicles ?: emptyList()
+                        else catalog?.vehicles?.filter {
+                            it.plate.contains(vehicleSearch, true) || it.label.contains(vehicleSearch, true)
+                        } ?: emptyList()
+
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            filteredVehicles.forEach { v ->
+                                val isSelected = selectedVehicles.contains(v.assignmentId)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) AppColors.Indigo.copy(alpha = 0.06f) else AppColors.Surface)
+                                        .border(1.dp, if (isSelected) AppColors.Indigo.copy(alpha = 0.2f) else AppColors.BorderSoft, RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            selectedVehicles = if (isSelected) selectedVehicles - v.assignmentId else selectedVehicles + v.assignmentId
+                                        }
+                                        .padding(12.dp)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(if (isSelected) AppColors.Indigo else Color.Transparent)
+                                            .border(1.5.dp, if (isSelected) AppColors.Indigo else AppColors.TextMuted, RoundedCornerShape(4.dp))
+                                    ) {
+                                        if (isSelected) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(v.label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                                        if (v.plate.isNotEmpty() && v.plate != v.label) {
+                                            Text(v.plate, fontSize = 11.sp, color = AppColors.TextMuted)
+                                        }
+                                    }
+                                    if (isSelected) {
+                                        Icon(Icons.Default.CheckCircle, null, tint = AppColors.Indigo, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+
+                        if (catalog?.vehicles == null) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = AppColors.Indigo)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Araçlar yükleniyor...", fontSize = 12.sp, color = AppColors.TextMuted)
+                            }
+                        }
+                    }
+
+                    // ═══ STEP 3: Koşullar ═══
+                    3 -> {
+                        val typeLabel = typeOptions.firstOrNull { it.value == selectedType }?.label ?: selectedType
+                        Text("$typeLabel Koşulları", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+
+                        when (selectedType) {
+                            "speed_violation" -> {
+                                Text("Araçlarınızın aşmaması gereken hız limitini belirleyin.", fontSize = 12.sp, color = AppColors.TextMuted)
+                                Spacer(Modifier.height(4.dp))
+                                OutlinedTextField(
+                                    value = speedLimit,
+                                    onValueChange = { speedLimit = it.filter { c -> c.isDigit() } },
+                                    label = { Text("Hız Limiti (km/s)") },
+                                    leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFFEF4444), modifier = Modifier.size(20.dp)) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                // Common presets
+                                Text("Hızlı Seçim", fontSize = 11.sp, color = AppColors.TextMuted)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    listOf("50", "80", "100", "120").forEach { preset ->
+                                        val isSel = speedLimit == preset
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (isSel) AppColors.Indigo else AppColors.Surface)
+                                                .border(1.dp, if (isSel) AppColors.Indigo else AppColors.BorderSoft, RoundedCornerShape(8.dp))
+                                                .clickable { speedLimit = preset }
+                                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                        ) {
+                                            Text("$preset km/s", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (isSel) Color.White else AppColors.TextPrimary)
+                                        }
+                                    }
+                                }
+                            }
+                            "idle_alarm" -> {
+                                Text("Araçlarınızın rölantide kalabileceği maksimum süreyi belirleyin.", fontSize = 12.sp, color = AppColors.TextMuted)
+                                Spacer(Modifier.height(4.dp))
+                                OutlinedTextField(
+                                    value = idleAfterSec,
+                                    onValueChange = { idleAfterSec = it.filter { c -> c.isDigit() } },
+                                    label = { Text("Rölanti Süresi (saniye)") },
+                                    leadingIcon = { Icon(Icons.Default.HourglassBottom, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(20.dp)) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                Text("Hızlı Seçim", fontSize = 11.sp, color = AppColors.TextMuted)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    listOf("180" to "3 dk", "300" to "5 dk", "600" to "10 dk", "900" to "15 dk").forEach { (sec, label) ->
+                                        val isSel = idleAfterSec == sec
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (isSel) AppColors.Indigo else AppColors.Surface)
+                                                .border(1.dp, if (isSel) AppColors.Indigo else AppColors.BorderSoft, RoundedCornerShape(8.dp))
+                                                .clickable { idleAfterSec = sec }
+                                                .padding(horizontal = 14.dp, vertical = 8.dp)
+                                        ) {
+                                            Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (isSel) Color.White else AppColors.TextPrimary)
+                                        }
+                                    }
+                                }
+                            }
+                            "geofence_alarm" -> {
+                                Text("Alarm tetiklenecek bölgeyi seçin.", fontSize = 12.sp, color = AppColors.TextMuted)
+                                Spacer(Modifier.height(4.dp))
+                                catalog?.geofences?.forEach { gf ->
+                                    val isSel = selectedGeofence == gf.id
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (isSel) AppColors.Indigo.copy(alpha = 0.06f) else AppColors.Surface)
+                                            .border(1.dp, if (isSel) AppColors.Indigo.copy(alpha = 0.2f) else AppColors.BorderSoft, RoundedCornerShape(10.dp))
+                                            .clickable { selectedGeofence = gf.id }
+                                            .padding(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.LocationOn, null, tint = if (isSel) AppColors.Indigo else AppColors.TextMuted, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(10.dp))
+                                        Text(gf.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
+                                        if (isSel) Icon(Icons.Default.CheckCircle, null, tint = AppColors.Indigo, modifier = Modifier.size(18.dp))
+                                    }
+                                } ?: Text("Bölge bulunamadı", fontSize = 12.sp, color = AppColors.TextMuted)
+                            }
+                            "movement_detection" -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF22C55E).copy(alpha = 0.06f))
+                                        .padding(16.dp)
+                                ) {
+                                    Icon(Icons.Default.DirectionsCar, null, tint = Color(0xFF22C55E), modifier = Modifier.size(28.dp))
+                                    Spacer(Modifier.height(8.dp))
+                                    Text("Hareket Algılama", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text("Park halindeki araç sallanma, çekilme veya hareket etme durumunda otomatik uyarı alacaksınız. Ek koşul gerekmez.", fontSize = 12.sp, color = AppColors.TextMuted, lineHeight = 18.sp)
+                                }
+                            }
+                            "off_hours_usage" -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFFA855F7).copy(alpha = 0.06f))
+                                        .padding(16.dp)
+                                ) {
+                                    Icon(Icons.Default.Schedule, null, tint = Color(0xFFA855F7), modifier = Modifier.size(28.dp))
+                                    Spacer(Modifier.height(8.dp))
+                                    Text("Mesai Dışı Kullanım", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text("Varsayılan ayarlar: Hafta içi 08:00 - 18:00 arası mesai. Bu saat aralığı dışında araç kullanıldığında bildirim alırsınız.", fontSize = 12.sp, color = AppColors.TextMuted, lineHeight = 18.sp)
+                                    Spacer(Modifier.height(8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        listOf("Pzt", "Sal", "Çar", "Per", "Cum").forEach { day ->
+                                            Box(
+                                                contentAlignment = Alignment.Center,
+                                                modifier = Modifier
+                                                    .size(36.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFFA855F7).copy(alpha = 0.15f))
+                                            ) {
+                                                Text(day, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFA855F7))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ═══ STEP 4: Bildirim ═══
+                    4 -> {
+                        // Channels
+                        Text("Bildirim Kanalları", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text("Alarm tetiklendiğinde hangi kanallardan bildirim almak istiyorsunuz?", fontSize = 12.sp, color = AppColors.TextMuted)
+
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            data class ChannelOption(val key: String, val label: String, val desc: String, val icon: ImageVector, val color: Color)
+                            val channelOptions = listOf(
+                                ChannelOption("push", "Mobil Bildirim", "Telefonunuza anlık bildirim", Icons.Default.PhoneAndroid, AppColors.Indigo),
+                                ChannelOption("email", "E-posta", "Detaylı alarm raporu e-posta ile", Icons.Default.Email, Color(0xFF3B82F6)),
+                                ChannelOption("sms", "SMS", "Kısa mesaj ile uyarı", Icons.Default.Sms, Color(0xFF22C55E))
+                            )
+                            channelOptions.forEach { ch ->
+                                val isSel = selectedChannels.contains(ch.key)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (isSel) ch.color.copy(alpha = 0.06f) else AppColors.Surface)
+                                        .border(1.5.dp, if (isSel) ch.color.copy(alpha = 0.3f) else AppColors.BorderSoft, RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            selectedChannels = if (isSel) selectedChannels - ch.key else selectedChannels + ch.key
+                                        }
+                                        .padding(14.dp)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)).background(ch.color.copy(alpha = 0.1f))
+                                    ) {
+                                        Icon(ch.icon, null, tint = ch.color, modifier = Modifier.size(18.dp))
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(ch.label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                                        Text(ch.desc, fontSize = 11.sp, color = AppColors.TextMuted)
+                                    }
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(if (isSel) ch.color else Color.Transparent)
+                                            .border(1.5.dp, if (isSel) ch.color else AppColors.TextMuted, RoundedCornerShape(4.dp))
+                                    ) {
+                                        if (isSel) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+
+                        // Recipients
+                        Text("Alıcılar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text("Alarm bildirimlerini kimler alsın?", fontSize = 12.sp, color = AppColors.TextMuted)
+
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            catalog?.recipients?.forEach { r ->
+                                val isSel = selectedRecipients.contains(r.id)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSel) AppColors.Indigo.copy(alpha = 0.06f) else AppColors.Surface)
+                                        .border(1.dp, if (isSel) AppColors.Indigo.copy(alpha = 0.2f) else AppColors.BorderSoft, RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            selectedRecipients = if (isSel) selectedRecipients - r.id else selectedRecipients + r.id
+                                        }
+                                        .padding(12.dp)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.size(36.dp).clip(CircleShape).background(AppColors.Indigo.copy(alpha = 0.1f))
+                                    ) {
+                                        Text(
+                                            r.name.take(2).uppercase(),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = AppColors.Indigo
+                                        )
+                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(r.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                                        Text(r.email, fontSize = 11.sp, color = AppColors.TextMuted)
+                                    }
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(if (isSel) AppColors.Indigo else Color.Transparent)
+                                            .border(1.5.dp, if (isSel) AppColors.Indigo else AppColors.TextMuted, RoundedCornerShape(4.dp))
+                                    ) {
+                                        if (isSel) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            } ?: Row(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = AppColors.Indigo)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Alıcılar yükleniyor...", fontSize = 12.sp, color = AppColors.TextMuted)
+                            }
+                        }
+
+                        // Summary card
+                        Spacer(Modifier.height(8.dp))
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(AppColors.Navy.copy(alpha = 0.04f))
+                                .border(1.dp, AppColors.Navy.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text("Özet", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.Sell, null, tint = AppColors.TextMuted, modifier = Modifier.size(14.dp))
+                                Text("Tür: ${typeOptions.firstOrNull { it.value == selectedType }?.label ?: selectedType}", fontSize = 11.sp, color = AppColors.TextSecondary)
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.DirectionsCar, null, tint = AppColors.TextMuted, modifier = Modifier.size(14.dp))
+                                Text("${selectedVehicles.size} araç seçildi", fontSize = 11.sp, color = AppColors.TextSecondary)
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.Notifications, null, tint = AppColors.TextMuted, modifier = Modifier.size(14.dp))
+                                Text("${selectedChannels.size} kanal, ${selectedRecipients.size} alıcı", fontSize = 11.sp, color = AppColors.TextSecondary)
+                            }
                         }
                     }
                 }
             }
 
-            // Araçlar
-            Text("Araçlar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
-            catalog?.vehicles?.forEach { v ->
+            // ── Error Message ──
+            errorMsg?.let {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable {
-                            selectedVehicles = if (selectedVehicles.contains(v.assignmentId))
-                                selectedVehicles - v.assignmentId
-                            else
-                                selectedVehicles + v.assignmentId
-                        }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Checkbox(
-                        checked = selectedVehicles.contains(v.assignmentId),
-                        onCheckedChange = {
-                            selectedVehicles = if (it) selectedVehicles + v.assignmentId else selectedVehicles - v.assignmentId
-                        }
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(v.label, fontSize = 13.sp, color = AppColors.TextPrimary)
+                    Icon(Icons.Default.Error, null, tint = Color.Red, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(it, fontSize = 12.sp, color = Color.Red, modifier = Modifier.weight(1f))
                 }
-            } ?: Text("Araçlar yükleniyor...", fontSize = 12.sp, color = AppColors.TextMuted)
+            }
 
-            // Bildirim Kanalları
-            Text("Bildirim Kanalları", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("email" to "E-posta", "sms" to "SMS", "push" to "Bildirim").forEach { (key, label) ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (selectedChannels.contains(key)) AppColors.Indigo.copy(alpha = 0.1f) else AppColors.Surface)
-                            .border(1.dp, if (selectedChannels.contains(key)) AppColors.Indigo else AppColors.BorderSoft, RoundedCornerShape(8.dp))
-                            .clickable {
-                                selectedChannels = if (selectedChannels.contains(key))
-                                    selectedChannels - key
-                                else
-                                    selectedChannels + key
-                            }
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
+            // ── Bottom Navigation Buttons ──
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(AppColors.Surface)
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Back button
+                if (currentStep > 1) {
+                    OutlinedButton(
+                        onClick = { currentStep--; errorMsg = null },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, AppColors.BorderSoft)
                     ) {
-                        Checkbox(
-                            checked = selectedChannels.contains(key),
-                            onCheckedChange = {
-                                selectedChannels = if (it) selectedChannels + key else selectedChannels - key
-                            },
-                            modifier = Modifier.size(20.dp)
+                        Icon(Icons.Default.ArrowBack, null, modifier = Modifier.size(16.dp), tint = AppColors.TextPrimary)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Geri", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                    }
+                }
+
+                // Next / Save button
+                Button(
+                    onClick = {
+                        errorMsg = null
+                        when (currentStep) {
+                            1 -> {
+                                if (name.isBlank()) { errorMsg = "Alarm adı gerekli"; return@Button }
+                                currentStep = 2
+                            }
+                            2 -> {
+                                if (selectedVehicles.isEmpty()) { errorMsg = "En az bir araç seçin"; return@Button }
+                                currentStep = 3
+                            }
+                            3 -> currentStep = 4
+                            4 -> scope.launch { save() }
+                        }
+                    },
+                    enabled = !isSaving,
+                    modifier = Modifier.weight(if (currentStep > 1) 1.5f else 1f).height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (currentStep == 4) Color(0xFF22C55E) else AppColors.Navy),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
+                    } else {
+                        Text(
+                            if (currentStep == 4) "Alarm Oluştur" else "Devam Et",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp
                         )
                         Spacer(Modifier.width(6.dp))
-                        Text(label, fontSize = 12.sp, color = AppColors.TextPrimary)
+                        Icon(
+                            if (currentStep == 4) Icons.Default.Check else Icons.Default.ArrowForward,
+                            null,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
-                }
-            }
-
-            // Alıcılar
-            Text("Alıcılar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
-            catalog?.recipients?.forEach { r ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable {
-                            selectedRecipients = if (selectedRecipients.contains(r.id))
-                                selectedRecipients - r.id
-                            else
-                                selectedRecipients + r.id
-                        }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Checkbox(
-                        checked = selectedRecipients.contains(r.id),
-                        onCheckedChange = {
-                            selectedRecipients = if (it) selectedRecipients + r.id else selectedRecipients - r.id
-                        }
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Column {
-                        Text(r.name, fontSize = 13.sp, color = AppColors.TextPrimary)
-                        Text(r.email, fontSize = 11.sp, color = AppColors.TextMuted)
-                    }
-                }
-            } ?: Text("Alıcılar yükleniyor...", fontSize = 12.sp, color = AppColors.TextMuted)
-
-            // Error
-            errorMsg?.let {
-                Text(it, fontSize = 12.sp, color = Color.Red, modifier = Modifier.padding(horizontal = 4.dp))
-            }
-
-            // Save button
-            Button(
-                onClick = { scope.launch { save() } },
-                enabled = !isSaving,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AppColors.Navy),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
-                } else {
-                    Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Kaydet", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                 }
             }
         }

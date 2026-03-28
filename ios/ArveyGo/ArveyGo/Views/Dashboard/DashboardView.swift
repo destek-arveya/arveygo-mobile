@@ -11,6 +11,8 @@ struct DashboardView: View {
     @Binding var showSideMenu: Bool
     @Binding var selectedPage: AppPage
     @Binding var alarmsSearchText: String
+    @Binding var alarmsAutoOpenCreate: Bool
+    @Binding var alarmsPrePlate: String
     @State private var selectedVehicle: Vehicle?
     @State private var showFullScreenMap = false
 
@@ -123,6 +125,15 @@ struct DashboardView: View {
                     selectedVehicle = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                         alarmsSearchText = plateText
+                        selectedPage = .alarms
+                    }
+                },
+                onNavigateToAddAlarm: { plate in
+                    selectedVehicle = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        alarmsSearchText = ""
+                        alarmsAutoOpenCreate = true
+                        alarmsPrePlate = plate
                         selectedPage = .alarms
                     }
                 }

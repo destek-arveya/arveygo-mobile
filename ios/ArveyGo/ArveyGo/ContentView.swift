@@ -21,6 +21,8 @@ struct ContentView: View {
     @State private var showSideMenu = false
     @State private var showSupportRequest = false
     @State private var alarmsSearchText = ""
+    @State private var alarmsAutoOpenCreate = false
+    @State private var alarmsPrePlate = ""
     @GestureState private var dragOffset: CGFloat = 0
 
     var body: some View {
@@ -44,17 +46,17 @@ struct ContentView: View {
             Group {
                 switch selectedPage {
                 case .dashboard:
-                    DashboardView(showSideMenu: $showSideMenu, selectedPage: $selectedPage, alarmsSearchText: $alarmsSearchText)
+                    DashboardView(showSideMenu: $showSideMenu, selectedPage: $selectedPage, alarmsSearchText: $alarmsSearchText, alarmsAutoOpenCreate: $alarmsAutoOpenCreate, alarmsPrePlate: $alarmsPrePlate)
                 case .liveMap:
-                    LiveMapView(showSideMenu: $showSideMenu, selectedPage: $selectedPage, alarmsSearchText: $alarmsSearchText)
+                    LiveMapView(showSideMenu: $showSideMenu, selectedPage: $selectedPage, alarmsSearchText: $alarmsSearchText, alarmsAutoOpenCreate: $alarmsAutoOpenCreate, alarmsPrePlate: $alarmsPrePlate)
                 case .vehicles:
-                    VehiclesListView(showSideMenu: $showSideMenu, selectedPage: $selectedPage, alarmsSearchText: $alarmsSearchText)
+                    VehiclesListView(showSideMenu: $showSideMenu, selectedPage: $selectedPage, alarmsSearchText: $alarmsSearchText, alarmsAutoOpenCreate: $alarmsAutoOpenCreate, alarmsPrePlate: $alarmsPrePlate)
                 case .drivers:
                     DriversView(showSideMenu: $showSideMenu)
                 case .routeHistory:
                     RouteHistoryView(showSideMenu: $showSideMenu)
                 case .alarms:
-                    AlarmsView(showSideMenu: $showSideMenu, initialSearchText: alarmsSearchText)
+                    AlarmsView(showSideMenu: $showSideMenu, initialSearchText: alarmsSearchText, autoOpenCreate: alarmsAutoOpenCreate, preSelectedPlate: alarmsPrePlate)
                 case .geofences:
                     GeofencesView(showSideMenu: $showSideMenu)
                 case .fleetManagement:
@@ -103,7 +105,7 @@ struct ContentView: View {
         .onChange(of: selectedPage) { oldPage, newPage in
             // Clear alarms search text when navigating away from alarms
             // or when navigating to alarms from side menu (not from VehicleDetail)
-            if oldPage == .alarms { alarmsSearchText = "" }
+            if oldPage == .alarms { alarmsSearchText = ""; alarmsAutoOpenCreate = false; alarmsPrePlate = "" }
             if newPage == .alarms && oldPage != .alarms {
                 // alarmsSearchText already set by VehicleDetailView callback or stays ""
             }

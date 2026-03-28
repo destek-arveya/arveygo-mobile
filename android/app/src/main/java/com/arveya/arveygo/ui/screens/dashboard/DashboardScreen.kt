@@ -49,6 +49,7 @@ fun DashboardScreen(
     onNavigateToVehicles: () -> Unit = {},
     onNavigateToDrivers: () -> Unit = {},
     onNavigateToAlarms: (String) -> Unit = {},
+    onNavigateToAddAlarm: ((String) -> Unit)? = null,
     onNavigateToRouteHistory: (() -> Unit)? = null
 ) {
     val authVM = LocalAuthViewModel.current
@@ -214,6 +215,10 @@ fun DashboardScreen(
             onNavigateToAlarms = { plateText ->
                 selectedVehicle = null
                 onNavigateToAlarms(plateText)
+            },
+            onNavigateToAddAlarm = { plate ->
+                selectedVehicle = null
+                onNavigateToAddAlarm?.invoke(plate)
             }
         )
     }

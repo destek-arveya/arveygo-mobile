@@ -85,7 +85,8 @@ class VehiclesListViewModel {
 fun VehiclesListScreen(
     onMenuClick: () -> Unit,
     onNavigateToRouteHistory: ((Vehicle) -> Unit)? = null,
-    onNavigateToAlarms: (() -> Unit)? = null
+    onNavigateToAlarms: (() -> Unit)? = null,
+    onNavigateToAddAlarm: ((String) -> Unit)? = null
 ) {
     val authVM = LocalAuthViewModel.current
     val user by authVM.currentUser.collectAsState()
@@ -132,6 +133,10 @@ fun VehiclesListScreen(
             onNavigateToAlarms = { _ ->
                 selectedVehicle = null
                 onNavigateToAlarms?.invoke()
+            },
+            onNavigateToAddAlarm = { plate ->
+                selectedVehicle = null
+                onNavigateToAddAlarm?.invoke(plate)
             }
         )
         return

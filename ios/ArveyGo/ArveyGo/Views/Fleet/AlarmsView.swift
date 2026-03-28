@@ -392,6 +392,8 @@ struct AlarmCatalog {
 struct AlarmsView: View {
     @Binding var showSideMenu: Bool
     var initialSearchText: String = ""
+    var autoOpenCreate: Bool = false
+    var preSelectedPlate: String = ""
     @EnvironmentObject var authVM: AuthViewModel
     @StateObject private var vm = AlarmsViewModel()
     @State private var showFilters = false
@@ -501,7 +503,7 @@ struct AlarmsView: View {
                 ruleDetailSheet(rule)
             }
             .sheet(isPresented: $showCreateSheet) {
-                CreateAlarmSetView(catalog: catalog, onCreated: {
+                CreateAlarmSetView(catalog: catalog, preSelectedPlate: preSelectedPlate, onCreated: {
                     showCreateSheet = false
                     Task { await fetchAlarmSets() }
                 })
@@ -513,6 +515,10 @@ struct AlarmsView: View {
         .task {
             if !initialSearchText.isEmpty {
                 searchText = initialSearchText
+            }
+            if autoOpenCreate {
+                selectedTab = 1
+                showCreateSheet = true
             }
             await vm.fetchAlarms()
             await fetchAlarmSets()
@@ -1423,282 +1429,800 @@ struct AlarmsView: View {
     }
 }
 
-// MARK: - Create Alarm Set View
+// MARK: - Create Alarm Set View (Modern Step Wizard)
 struct CreateAlarmSetView: View {
     let catalog: AlarmCatalog?
+    var preSelectedPlate: String = ""
     let onCreated: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+
+    // Step state (1=İsim&Tür, 2=Araçlar, 3=Koşullar, 4=Bildirim)
+    @State private var currentStep = 1
+    let stepLabels = ["İsim & Tür", "Araçlar", "Koşullar", "Bildirim"]
+
+    // Form state
     @State private var name = ""
     @State private var selectedType = "speed_violation"
-    @State private var selectedVehicles = Set<Int>()  // assignment IDs
-    @State private var selectedChannels = Set<String>(["push"])
+    @State private var selectedVehicles = Set<Int>()
+    @State private var selectedChannels: Set<String> = ["push"]
     @State private var selectedRecipients = Set<Int>()
     @State private var selectedGeofence: Int? = nil
     @State private var speedLimit = "80"
     @State private var idleAfterSec = "300"
     @State private var isSaving = false
     @State private var errorMsg: String? = nil
+    @State private var vehicleSearch = ""
 
     var typeOptions: [AlarmTypeOption] {
         catalog?.types ?? [
-            AlarmTypeOption(value: "speed_violation", label: "Hız İhlali", description: ""),
-            AlarmTypeOption(value: "idle_alarm", label: "Rölanti", description: ""),
-            AlarmTypeOption(value: "movement_detection", label: "Hareket Algılama", description: ""),
-            AlarmTypeOption(value: "off_hours_usage", label: "Mesai Dışı Kullanım", description: ""),
-            AlarmTypeOption(value: "geofence_alarm", label: "Bölge Alarmı", description: "")
+            AlarmTypeOption(value: "speed_violation", label: "Hız İhlali", description: "Belirlenen hız limitini aşıldığında bildirim alın"),
+            AlarmTypeOption(value: "idle_alarm", label: "Rölanti", description: "Araç belirli süreden fazla rölantide kaldığında uyar"),
+            AlarmTypeOption(value: "movement_detection", label: "Hareket Algılama", description: "Park halindeki aracın hareket etmesinde uyar"),
+            AlarmTypeOption(value: "off_hours_usage", label: "Mesai Dışı Kullanım", description: "Mesai saatleri dışında kullanımda uyar"),
+            AlarmTypeOption(value: "geofence_alarm", label: "Bölge Alarmı", description: "Bölgeye giriş/çıkışta bildirim alın")
         ]
     }
 
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Kural Adı
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Kural Adı")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(AppTheme.textPrimary)
-                        TextField("Örn: Hız Limiti 80 km/s", text: $name)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(size: 14))
-                    }
+    private func iconForType(_ type: String) -> String {
+        switch type {
+        case "speed_violation": return "speedometer"
+        case "idle_alarm": return "hourglass.bottomhalf.filled"
+        case "movement_detection": return "car.fill"
+        case "off_hours_usage": return "clock.fill"
+        case "geofence_alarm": return "location.fill"
+        default: return "bell.fill"
+        }
+    }
 
-                    // Alarm Türü
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Alarm Türü")
+    private func colorForType(_ type: String) -> Color {
+        switch type {
+        case "speed_violation": return Color(red: 0.937, green: 0.267, blue: 0.267) // EF4444
+        case "idle_alarm": return Color(red: 0.961, green: 0.620, blue: 0.043) // F59E0B
+        case "movement_detection": return Color(red: 0.133, green: 0.773, blue: 0.369) // 22C55E
+        case "off_hours_usage": return Color(red: 0.659, green: 0.333, blue: 0.969) // A855F7
+        case "geofence_alarm": return AppTheme.indigo
+        default: return AppTheme.indigo
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // ── Navy Header ──
+            VStack(spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Yeni Alarm Oluştur")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                        Text("Adım adım alarm kurun — çok kolay!")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                    Spacer()
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.7))
+                            .frame(width: 32, height: 32)
+                            .background(.white.opacity(0.15))
+                            .clipShape(Circle())
+                    }
+                }
+
+                // ── Step Indicator ──
+                HStack(spacing: 4) {
+                    ForEach(Array(stepLabels.enumerated()), id: \.offset) { index, label in
+                        let stepNum = index + 1
+                        let isActive = stepNum == currentStep
+                        let isDone = stepNum < currentStep
+
+                        Button(action: { if isDone { currentStep = stepNum } }) {
+                            HStack(spacing: 6) {
+                                ZStack {
+                                    Circle()
+                                        .fill(isDone ? Color(red: 0.133, green: 0.773, blue: 0.369) : (isActive ? .white : .white.opacity(0.2)))
+                                        .frame(width: 22, height: 22)
+                                    if isDone {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.white)
+                                    } else {
+                                        Text("\(stepNum)")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(isActive ? AppTheme.navy : .white.opacity(0.5))
+                                    }
+                                }
+                                Text(label)
+                                    .font(.system(size: 10, weight: isActive ? .semibold : .regular))
+                                    .foregroundColor(isActive || isDone ? .white : .white.opacity(0.4))
+                                    .lineLimit(1)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(isActive ? .white.opacity(0.15) : (isDone ? .white.opacity(0.08) : .clear))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!isDone)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(AppTheme.navy)
+
+            // ── Step Content ──
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    switch currentStep {
+
+                    // ═══ STEP 1: İsim & Tür ═══
+                    case 1:
+                        Text("Alarm Adı")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(AppTheme.textPrimary)
+
+                        TextField("ör. Hız İhlali Alarmı, Depo Kontrolü...", text: $name)
+                            .font(.system(size: 14))
+                            .padding(12)
+                            .background(AppTheme.surface)
+                            .cornerRadius(10)
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
+
+                        Text("Alarm Türü Seçin")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppTheme.textPrimary)
+                            .padding(.top, 4)
 
                         ForEach(typeOptions) { type in
+                            let isSelected = selectedType == type.value
+                            let typeColor = colorForType(type.value)
+
                             Button(action: { selectedType = type.value }) {
-                                HStack(spacing: 10) {
-                                    Image(systemName: selectedType == type.value ? "largecircle.fill.circle" : "circle")
-                                        .foregroundColor(selectedType == type.value ? AppTheme.indigo : AppTheme.textMuted)
-                                    VStack(alignment: .leading, spacing: 1) {
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(typeColor.opacity(0.1))
+                                            .frame(width: 40, height: 40)
+                                        Image(systemName: iconForType(type.value))
+                                            .font(.system(size: 16))
+                                            .foregroundColor(typeColor)
+                                    }
+
+                                    VStack(alignment: .leading, spacing: 2) {
                                         Text(type.label)
-                                            .font(.system(size: 13, weight: .medium))
+                                            .font(.system(size: 13, weight: .semibold))
                                             .foregroundColor(AppTheme.textPrimary)
                                         if !type.description.isEmpty {
                                             Text(type.description)
-                                                .font(.system(size: 10))
+                                                .font(.system(size: 11))
                                                 .foregroundColor(AppTheme.textMuted)
-                                                .lineLimit(1)
+                                                .lineLimit(2)
                                         }
                                     }
+
                                     Spacer()
+
+                                    if isSelected {
+                                        ZStack {
+                                            Circle()
+                                                .fill(typeColor)
+                                                .frame(width: 22, height: 22)
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 11, weight: .bold))
+                                                .foregroundColor(.white)
+                                        }
+                                    }
                                 }
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 8)
-                                .background(selectedType == type.value ? AppTheme.indigo.opacity(0.06) : Color.clear)
-                                .cornerRadius(8)
+                                .padding(14)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(isSelected ? typeColor.opacity(0.06) : AppTheme.surface)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(isSelected ? typeColor.opacity(0.3) : AppTheme.borderSoft, lineWidth: 1.5)
+                                )
                             }
                             .buttonStyle(.plain)
                         }
-                    }
 
-                    // Type-specific conditions
-                    if selectedType == "speed_violation" {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Hız Limiti (km/s)")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(AppTheme.textPrimary)
-                            TextField("80", text: $speedLimit)
-                                .textFieldStyle(.roundedBorder)
-                                .keyboardType(.numberPad)
-                                .font(.system(size: 14))
-                        }
-                    }
-
-                    if selectedType == "idle_alarm" {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Rölanti Süresi (saniye)")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(AppTheme.textPrimary)
-                            TextField("300", text: $idleAfterSec)
-                                .textFieldStyle(.roundedBorder)
-                                .keyboardType(.numberPad)
-                                .font(.system(size: 14))
-                        }
-                    }
-
-                    if selectedType == "geofence_alarm", let geofences = catalog?.geofences {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Bölge Seçin")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(AppTheme.textPrimary)
-                            ForEach(geofences) { gf in
-                                Button(action: { selectedGeofence = gf.id }) {
-                                    HStack {
-                                        Image(systemName: selectedGeofence == gf.id ? "largecircle.fill.circle" : "circle")
-                                            .foregroundColor(selectedGeofence == gf.id ? AppTheme.indigo : AppTheme.textMuted)
-                                        Text(gf.name)
-                                            .font(.system(size: 13))
-                                            .foregroundColor(AppTheme.textPrimary)
-                                        Spacer()
-                                    }
-                                    .padding(.vertical, 4)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    // Araçlar
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Araçlar")
+                    // ═══ STEP 2: Araçlar ═══
+                    case 2:
+                        Text("Hangi araçlar için geçerli olsun?")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(AppTheme.textPrimary)
 
-                        if let vehicles = catalog?.vehicles {
-                            ForEach(vehicles) { v in
-                                Button(action: {
-                                    if selectedVehicles.contains(v.assignmentId) {
-                                        selectedVehicles.remove(v.assignmentId)
-                                    } else {
-                                        selectedVehicles.insert(v.assignmentId)
-                                    }
-                                }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: selectedVehicles.contains(v.assignmentId) ? "checkmark.square.fill" : "square")
-                                            .foregroundColor(selectedVehicles.contains(v.assignmentId) ? AppTheme.indigo : AppTheme.textMuted)
-                                        Text(v.label)
-                                            .font(.system(size: 13))
-                                            .foregroundColor(AppTheme.textPrimary)
-                                        Spacer()
-                                    }
-                                    .padding(.vertical, 4)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        } else {
-                            Text("Araçlar yükleniyor...")
-                                .font(.system(size: 12))
-                                .foregroundColor(AppTheme.textMuted)
-                        }
-                    }
-
-                    // Bildirim Kanalları
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Bildirim Kanalları")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(AppTheme.textPrimary)
-
+                        // Search
                         HStack(spacing: 8) {
-                            ForEach([("email", "E-posta"), ("sms", "SMS"), ("push", "Bildirim")], id: \.0) { (key, label) in
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 14))
+                                .foregroundColor(AppTheme.textMuted)
+                            TextField("Plaka veya araç ara...", text: $vehicleSearch)
+                                .font(.system(size: 13))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(AppTheme.surface)
+                        .cornerRadius(10)
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
+
+                        // Select All / Clear
+                        HStack(spacing: 12) {
+                            Button(action: {
+                                if let vehicles = catalog?.vehicles {
+                                    selectedVehicles = Set(vehicles.map { $0.assignmentId })
+                                }
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "checklist")
+                                        .font(.system(size: 12))
+                                    Text("Tümünü Seç")
+                                        .font(.system(size: 11, weight: .semibold))
+                                }
+                                .foregroundColor(AppTheme.indigo)
+                            }
+                            if !selectedVehicles.isEmpty {
+                                Button(action: { selectedVehicles.removeAll() }) {
+                                    Text("Temizle (\(selectedVehicles.count))")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(.red)
+                                }
+                            }
+                            Spacer()
+                        }
+
+                        // Vehicle list
+                        if let vehicles = catalog?.vehicles {
+                            let filtered = vehicleSearch.isEmpty ? vehicles : vehicles.filter {
+                                $0.plate.localizedCaseInsensitiveContains(vehicleSearch) || $0.label.localizedCaseInsensitiveContains(vehicleSearch)
+                            }
+                            ForEach(filtered) { v in
+                                let isSelected = selectedVehicles.contains(v.assignmentId)
                                 Button(action: {
-                                    if selectedChannels.contains(key) {
-                                        selectedChannels.remove(key)
-                                    } else {
-                                        selectedChannels.insert(key)
-                                    }
+                                    if isSelected { selectedVehicles.remove(v.assignmentId) }
+                                    else { selectedVehicles.insert(v.assignmentId) }
                                 }) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: selectedChannels.contains(key) ? "checkmark.square.fill" : "square")
-                                            .font(.system(size: 14))
-                                        Text(label)
-                                            .font(.system(size: 12))
+                                    HStack(spacing: 10) {
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .fill(isSelected ? AppTheme.indigo : .clear)
+                                                .frame(width: 20, height: 20)
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 4)
+                                                        .stroke(isSelected ? AppTheme.indigo : AppTheme.textMuted, lineWidth: 1.5)
+                                                )
+                                            if isSelected {
+                                                Image(systemName: "checkmark")
+                                                    .font(.system(size: 11, weight: .bold))
+                                                    .foregroundColor(.white)
+                                            }
+                                        }
+
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(v.label)
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundColor(AppTheme.textPrimary)
+                                            if !v.plate.isEmpty && v.plate != v.label {
+                                                Text(v.plate)
+                                                    .font(.system(size: 11))
+                                                    .foregroundColor(AppTheme.textMuted)
+                                            }
+                                        }
+
+                                        Spacer()
+
+                                        if isSelected {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .font(.system(size: 16))
+                                                .foregroundColor(AppTheme.indigo)
+                                        }
                                     }
-                                    .foregroundColor(selectedChannels.contains(key) ? AppTheme.indigo : AppTheme.textPrimary)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 8)
-                                    .background(selectedChannels.contains(key) ? AppTheme.indigo.opacity(0.1) : AppTheme.surface)
-                                    .cornerRadius(8)
+                                    .padding(12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(isSelected ? AppTheme.indigo.opacity(0.06) : AppTheme.surface)
+                                    )
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(selectedChannels.contains(key) ? AppTheme.indigo : AppTheme.borderSoft, lineWidth: 1)
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(isSelected ? AppTheme.indigo.opacity(0.2) : AppTheme.borderSoft, lineWidth: 1)
                                     )
                                 }
                                 .buttonStyle(.plain)
                             }
+                        } else {
+                            HStack {
+                                ProgressView().scaleEffect(0.8)
+                                Text("Araçlar yükleniyor...")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppTheme.textMuted)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(20)
                         }
-                    }
 
-                    // Alıcılar
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Alıcılar")
+                    // ═══ STEP 3: Koşullar ═══
+                    case 3:
+                        let typeLabel = typeOptions.first(where: { $0.value == selectedType })?.label ?? selectedType
+                        Text("\(typeLabel) Koşulları")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(AppTheme.textPrimary)
 
+                        switch selectedType {
+                        case "speed_violation":
+                            Text("Araçlarınızın aşmaması gereken hız limitini belirleyin.")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.textMuted)
+
+                            HStack(spacing: 10) {
+                                Image(systemName: "speedometer")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(Color(red: 0.937, green: 0.267, blue: 0.267))
+                                TextField("Hız Limiti (km/s)", text: $speedLimit)
+                                    .font(.system(size: 14))
+                                    .keyboardType(.numberPad)
+                            }
+                            .padding(12)
+                            .background(AppTheme.surface)
+                            .cornerRadius(10)
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
+
+                            Text("Hızlı Seçim")
+                                .font(.system(size: 11))
+                                .foregroundColor(AppTheme.textMuted)
+
+                            HStack(spacing: 8) {
+                                ForEach(["50", "80", "100", "120"], id: \.self) { preset in
+                                    let isSel = speedLimit == preset
+                                    Button(action: { speedLimit = preset }) {
+                                        Text("\(preset) km/s")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundColor(isSel ? .white : AppTheme.textPrimary)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 8)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(isSel ? AppTheme.indigo : AppTheme.surface)
+                                            )
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(isSel ? AppTheme.indigo : AppTheme.borderSoft, lineWidth: 1)
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+
+                        case "idle_alarm":
+                            Text("Araçlarınızın rölantide kalabileceği maksimum süreyi belirleyin.")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.textMuted)
+
+                            HStack(spacing: 10) {
+                                Image(systemName: "hourglass.bottomhalf.filled")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(Color(red: 0.961, green: 0.620, blue: 0.043))
+                                TextField("Rölanti Süresi (saniye)", text: $idleAfterSec)
+                                    .font(.system(size: 14))
+                                    .keyboardType(.numberPad)
+                            }
+                            .padding(12)
+                            .background(AppTheme.surface)
+                            .cornerRadius(10)
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
+
+                            Text("Hızlı Seçim")
+                                .font(.system(size: 11))
+                                .foregroundColor(AppTheme.textMuted)
+
+                            HStack(spacing: 8) {
+                                ForEach([("180", "3 dk"), ("300", "5 dk"), ("600", "10 dk"), ("900", "15 dk")], id: \.0) { sec, label in
+                                    let isSel = idleAfterSec == sec
+                                    Button(action: { idleAfterSec = sec }) {
+                                        Text(label)
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundColor(isSel ? .white : AppTheme.textPrimary)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 8)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(isSel ? AppTheme.indigo : AppTheme.surface)
+                                            )
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(isSel ? AppTheme.indigo : AppTheme.borderSoft, lineWidth: 1)
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+
+                        case "geofence_alarm":
+                            Text("Alarm tetiklenecek bölgeyi seçin.")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.textMuted)
+
+                            if let geofences = catalog?.geofences {
+                                ForEach(geofences) { gf in
+                                    let isSel = selectedGeofence == gf.id
+                                    Button(action: { selectedGeofence = gf.id }) {
+                                        HStack(spacing: 10) {
+                                            Image(systemName: "location.fill")
+                                                .font(.system(size: 14))
+                                                .foregroundColor(isSel ? AppTheme.indigo : AppTheme.textMuted)
+                                            Text(gf.name)
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundColor(AppTheme.textPrimary)
+                                            Spacer()
+                                            if isSel {
+                                                Image(systemName: "checkmark.circle.fill")
+                                                    .font(.system(size: 16))
+                                                    .foregroundColor(AppTheme.indigo)
+                                            }
+                                        }
+                                        .padding(12)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .fill(isSel ? AppTheme.indigo.opacity(0.06) : AppTheme.surface)
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .stroke(isSel ? AppTheme.indigo.opacity(0.2) : AppTheme.borderSoft, lineWidth: 1)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            } else {
+                                Text("Bölge bulunamadı")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppTheme.textMuted)
+                            }
+
+                        case "movement_detection":
+                            VStack(alignment: .leading, spacing: 8) {
+                                Image(systemName: "car.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(Color(red: 0.133, green: 0.773, blue: 0.369))
+                                Text("Hareket Algılama")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(AppTheme.textPrimary)
+                                Text("Park halindeki araç sallanma, çekilme veya hareket etme durumunda otomatik uyarı alacaksınız. Ek koşul gerekmez.")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppTheme.textMuted)
+                                    .lineSpacing(4)
+                            }
+                            .padding(16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color(red: 0.133, green: 0.773, blue: 0.369).opacity(0.06))
+                            )
+
+                        case "off_hours_usage":
+                            VStack(alignment: .leading, spacing: 8) {
+                                Image(systemName: "clock.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(Color(red: 0.659, green: 0.333, blue: 0.969))
+                                Text("Mesai Dışı Kullanım")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(AppTheme.textPrimary)
+                                Text("Varsayılan ayarlar: Hafta içi 08:00 - 18:00 arası mesai. Bu saat aralığı dışında araç kullanıldığında bildirim alırsınız.")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppTheme.textMuted)
+                                    .lineSpacing(4)
+                                HStack(spacing: 6) {
+                                    ForEach(["Pzt", "Sal", "Çar", "Per", "Cum"], id: \.self) { day in
+                                        Text(day)
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(Color(red: 0.659, green: 0.333, blue: 0.969))
+                                            .frame(width: 36, height: 36)
+                                            .background(
+                                                Circle()
+                                                    .fill(Color(red: 0.659, green: 0.333, blue: 0.969).opacity(0.15))
+                                            )
+                                    }
+                                }
+                            }
+                            .padding(16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color(red: 0.659, green: 0.333, blue: 0.969).opacity(0.06))
+                            )
+
+                        default:
+                            EmptyView()
+                        }
+
+                    // ═══ STEP 4: Bildirim ═══
+                    case 4:
+                        // Channels
+                        Text("Bildirim Kanalları")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppTheme.textPrimary)
+                        Text("Alarm tetiklendiğinde hangi kanallardan bildirim almak istiyorsunuz?")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.textMuted)
+
+                        let channels: [(key: String, label: String, desc: String, icon: String, color: Color)] = [
+                            ("push", "Mobil Bildirim", "Telefonunuza anlık bildirim", "iphone", AppTheme.indigo),
+                            ("email", "E-posta", "Detaylı alarm raporu e-posta ile", "envelope.fill", Color(red: 0.231, green: 0.510, blue: 0.965)),
+                            ("sms", "SMS", "Kısa mesaj ile uyarı", "message.fill", Color(red: 0.133, green: 0.773, blue: 0.369))
+                        ]
+
+                        ForEach(channels, id: \.key) { ch in
+                            let isSel = selectedChannels.contains(ch.key)
+                            Button(action: {
+                                if isSel { selectedChannels.remove(ch.key) }
+                                else { selectedChannels.insert(ch.key) }
+                            }) {
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(ch.color.opacity(0.1))
+                                            .frame(width: 38, height: 38)
+                                        Image(systemName: ch.icon)
+                                            .font(.system(size: 16))
+                                            .foregroundColor(ch.color)
+                                    }
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(ch.label)
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundColor(AppTheme.textPrimary)
+                                        Text(ch.desc)
+                                            .font(.system(size: 11))
+                                            .foregroundColor(AppTheme.textMuted)
+                                    }
+
+                                    Spacer()
+
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(isSel ? ch.color : .clear)
+                                            .frame(width: 22, height: 22)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 4)
+                                                    .stroke(isSel ? ch.color : AppTheme.textMuted, lineWidth: 1.5)
+                                            )
+                                        if isSel {
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 11, weight: .bold))
+                                                .foregroundColor(.white)
+                                        }
+                                    }
+                                }
+                                .padding(14)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(isSel ? ch.color.opacity(0.06) : AppTheme.surface)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(isSel ? ch.color.opacity(0.3) : AppTheme.borderSoft, lineWidth: 1.5)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        // Recipients
+                        Text("Alıcılar")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppTheme.textPrimary)
+                            .padding(.top, 8)
+                        Text("Alarm bildirimlerini kimler alsın?")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.textMuted)
+
                         if let recipients = catalog?.recipients {
                             ForEach(recipients) { r in
+                                let isSel = selectedRecipients.contains(r.id)
                                 Button(action: {
-                                    if selectedRecipients.contains(r.id) {
-                                        selectedRecipients.remove(r.id)
-                                    } else {
-                                        selectedRecipients.insert(r.id)
-                                    }
+                                    if isSel { selectedRecipients.remove(r.id) }
+                                    else { selectedRecipients.insert(r.id) }
                                 }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: selectedRecipients.contains(r.id) ? "checkmark.square.fill" : "square")
-                                            .foregroundColor(selectedRecipients.contains(r.id) ? AppTheme.indigo : AppTheme.textMuted)
-                                        VStack(alignment: .leading, spacing: 1) {
+                                    HStack(spacing: 10) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(AppTheme.indigo.opacity(0.1))
+                                                .frame(width: 36, height: 36)
+                                            Text(String(r.name.prefix(2)).uppercased())
+                                                .font(.system(size: 12, weight: .bold))
+                                                .foregroundColor(AppTheme.indigo)
+                                        }
+
+                                        VStack(alignment: .leading, spacing: 2) {
                                             Text(r.name)
-                                                .font(.system(size: 13))
+                                                .font(.system(size: 13, weight: .medium))
                                                 .foregroundColor(AppTheme.textPrimary)
                                             Text(r.email)
                                                 .font(.system(size: 11))
                                                 .foregroundColor(AppTheme.textMuted)
                                         }
+
                                         Spacer()
+
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .fill(isSel ? AppTheme.indigo : .clear)
+                                                .frame(width: 20, height: 20)
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 4)
+                                                        .stroke(isSel ? AppTheme.indigo : AppTheme.textMuted, lineWidth: 1.5)
+                                                )
+                                            if isSel {
+                                                Image(systemName: "checkmark")
+                                                    .font(.system(size: 10, weight: .bold))
+                                                    .foregroundColor(.white)
+                                            }
+                                        }
                                     }
-                                    .padding(.vertical, 4)
+                                    .padding(12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(isSel ? AppTheme.indigo.opacity(0.06) : AppTheme.surface)
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(isSel ? AppTheme.indigo.opacity(0.2) : AppTheme.borderSoft, lineWidth: 1)
+                                    )
                                 }
                                 .buttonStyle(.plain)
                             }
                         } else {
-                            Text("Alıcılar yükleniyor...")
-                                .font(.system(size: 12))
-                                .foregroundColor(AppTheme.textMuted)
+                            HStack {
+                                ProgressView().scaleEffect(0.8)
+                                Text("Alıcılar yükleniyor...")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppTheme.textMuted)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(16)
                         }
-                    }
 
-                    // Error
-                    if let error = errorMsg {
-                        Text(error)
-                            .font(.system(size: 12))
-                            .foregroundColor(.red)
-                    }
+                        // Summary card
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Özet")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(AppTheme.navy)
 
-                    // Save button
-                    Button(action: { Task { await save() } }) {
-                        HStack {
-                            if isSaving {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                    .tint(.white)
-                            } else {
-                                Image(systemName: "checkmark")
-                                Text("Kaydet")
+                            HStack(spacing: 4) {
+                                Image(systemName: "tag.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppTheme.textMuted)
+                                Text("Tür: \(typeOptions.first(where: { $0.value == selectedType })?.label ?? selectedType)")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(AppTheme.textSecondary)
+                            }
+                            HStack(spacing: 4) {
+                                Image(systemName: "car.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppTheme.textMuted)
+                                Text("\(selectedVehicles.count) araç seçildi")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(AppTheme.textSecondary)
+                            }
+                            HStack(spacing: 4) {
+                                Image(systemName: "bell.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppTheme.textMuted)
+                                Text("\(selectedChannels.count) kanal, \(selectedRecipients.count) alıcı")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(AppTheme.textSecondary)
                             }
                         }
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(AppTheme.navy)
-                        .cornerRadius(12)
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(AppTheme.navy.opacity(0.04))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(AppTheme.navy.opacity(0.1), lineWidth: 1)
+                        )
+                        .padding(.top, 8)
+
+                    default:
+                        EmptyView()
                     }
-                    .disabled(isSaving)
                 }
-                .padding(16)
+                .padding(20)
             }
-            .background(AppTheme.bg)
-            .navigationTitle("Yeni Alarm Kuralı")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("İptal") { dismiss() }
+
+            // ── Error Message ──
+            if let error = errorMsg {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(.red)
+                    Text(error)
+                        .font(.system(size: 12))
+                        .foregroundColor(.red)
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 6)
+            }
+
+            // ── Bottom Navigation Buttons ──
+            HStack(spacing: 10) {
+                if currentStep > 1 {
+                    Button(action: { currentStep -= 1; errorMsg = nil }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("Geri")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundColor(AppTheme.textPrimary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(AppTheme.borderSoft, lineWidth: 1)
+                        )
+                    }
+                }
+
+                Button(action: {
+                    errorMsg = nil
+                    switch currentStep {
+                    case 1:
+                        if name.trimmingCharacters(in: .whitespaces).isEmpty { errorMsg = "Alarm adı gerekli"; return }
+                        currentStep = 2
+                    case 2:
+                        if selectedVehicles.isEmpty { errorMsg = "En az bir araç seçin"; return }
+                        currentStep = 3
+                    case 3:
+                        currentStep = 4
+                    case 4:
+                        Task { await save() }
+                    default: break
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        if isSaving {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .tint(.white)
+                        } else {
+                            Text(currentStep == 4 ? "Alarm Oluştur" : "Devam Et")
+                                .font(.system(size: 14, weight: .semibold))
+                            Image(systemName: currentStep == 4 ? "checkmark" : "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(currentStep == 4 ? Color(red: 0.133, green: 0.773, blue: 0.369) : AppTheme.navy)
+                    )
+                }
+                .disabled(isSaving)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .background(AppTheme.surface)
+        }
+        .background(AppTheme.bg)
+        .onAppear {
+            // Pre-select vehicle by plate
+            if !preSelectedPlate.isEmpty, let vehicles = catalog?.vehicles {
+                if let match = vehicles.first(where: { $0.plate.localizedCaseInsensitiveCompare(preSelectedPlate) == .orderedSame || $0.label.localizedCaseInsensitiveContains(preSelectedPlate) }) {
+                    selectedVehicles.insert(match.assignmentId)
                 }
             }
-            .onAppear {
-                // Pre-select first recipient
-                if let first = catalog?.recipients.first {
-                    selectedRecipients.insert(first.id)
-                }
+            // Pre-select first recipient
+            if let first = catalog?.recipients?.first {
+                selectedRecipients.insert(first.id)
             }
         }
-        .presentationDetents([.large])
     }
 
     private func save() async {
@@ -1724,7 +2248,6 @@ struct CreateAlarmSetView: View {
             "recipient_ids": Array(selectedRecipients)
         ]
 
-        // Type-specific conditions
         switch selectedType {
         case "speed_violation":
             body["condition_speed_limit_kmh"] = Int(speedLimit) ?? 80

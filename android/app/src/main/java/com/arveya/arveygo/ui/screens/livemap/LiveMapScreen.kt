@@ -226,7 +226,8 @@ private fun createVehiclePinBitmap(
 fun LiveMapScreen(
     onMenuClick: () -> Unit,
     onNavigateToRouteHistory: ((Vehicle) -> Unit)? = null,
-    onNavigateToAlarms: (() -> Unit)? = null
+    onNavigateToAlarms: (() -> Unit)? = null,
+    onNavigateToAddAlarm: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val authVM = LocalAuthViewModel.current
@@ -256,6 +257,10 @@ fun LiveMapScreen(
             onNavigateToAlarms = { _ ->
                 detailVehicle = null
                 onNavigateToAlarms?.invoke()
+            },
+            onNavigateToAddAlarm = { plate ->
+                detailVehicle = null
+                onNavigateToAddAlarm?.invoke(plate)
             }
         )
         return
@@ -686,6 +691,10 @@ fun LiveMapScreen(
                         onNavigateToAlarms = {
                             selectedVehicle = null
                             onNavigateToAlarms?.invoke()
+                        },
+                        onNavigateToAddAlarm = { plate ->
+                            selectedVehicle = null
+                            onNavigateToAddAlarm?.invoke(plate)
                         }
                     )
                 }
@@ -762,7 +771,8 @@ private fun VehiclePopupCard(
     onLiveTrack: () -> Unit,
     onDetail: () -> Unit,
     onNavigateToRouteHistory: ((Vehicle) -> Unit)? = null,
-    onNavigateToAlarms: (() -> Unit)? = null
+    onNavigateToAlarms: (() -> Unit)? = null,
+    onNavigateToAddAlarm: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
@@ -956,9 +966,9 @@ private fun VehiclePopupCard(
                 onClose()
                 onNavigateToRouteHistory?.invoke(vehicle)
             }
-            PopupActionBtn(Icons.Default.NotificationsActive, "Alarmlar", Color(0xFFFF9800), Modifier.weight(1f)) {
+            PopupActionBtn(Icons.Default.AddAlert, "Alarm Ekle", Color(0xFFFF9800), Modifier.weight(1f)) {
                 onClose()
-                onNavigateToAlarms?.invoke()
+                onNavigateToAddAlarm?.invoke(vehicle.plate)
             }
             PopupActionBtn(Icons.Default.Lock, "Blokaj", Color.Red, Modifier.weight(1f)) {}
         }

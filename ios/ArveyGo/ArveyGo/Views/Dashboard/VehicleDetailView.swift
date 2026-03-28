@@ -156,13 +156,15 @@ struct VehicleDetailView: View {
     /// Navigation callbacks for quick actions
     var onNavigateToRouteHistory: ((Vehicle) -> Void)?
     var onNavigateToAlarms: ((String) -> Void)?
+    var onNavigateToAddAlarm: ((String) -> Void)?
 
     private var vehicle: Vehicle { observer.vehicle }
 
-    init(vehicle: Vehicle, onNavigateToRouteHistory: ((Vehicle) -> Void)? = nil, onNavigateToAlarms: ((String) -> Void)? = nil) {
+    init(vehicle: Vehicle, onNavigateToRouteHistory: ((Vehicle) -> Void)? = nil, onNavigateToAlarms: ((String) -> Void)? = nil, onNavigateToAddAlarm: ((String) -> Void)? = nil) {
         _observer = StateObject(wrappedValue: VehicleDetailObserver(vehicle: vehicle))
         self.onNavigateToRouteHistory = onNavigateToRouteHistory
         self.onNavigateToAlarms = onNavigateToAlarms
+        self.onNavigateToAddAlarm = onNavigateToAddAlarm
     }
 
     enum DetailTab: String, CaseIterable {
@@ -416,10 +418,10 @@ struct VehicleDetailView: View {
                         onNavigateToRouteHistory?(vehicle)
                     }
                 }
-                quickActionButton(icon: "bell.fill", label: "Alarmlar", color: .orange) {
+                quickActionButton(icon: "bell.badge.fill", label: "Alarm Ekle", color: .orange) {
                     dismiss()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                        onNavigateToAlarms?(vehicle.plate)
+                        onNavigateToAddAlarm?(vehicle.plate)
                     }
                 }
                 quickActionButton(icon: "square.and.arrow.up", label: "Paylaş", color: AppTheme.textMuted) {
@@ -460,7 +462,7 @@ struct VehicleDetailView: View {
                 listDivider
                 detailRow(icon: "key", label: "Son Kontak Kapama", value: vehicle.formattedLastIgnitionOff)
                 listDivider
-                detailRow(icon: "battery.100", label: "Araç Aküsü", value: formatVoltage(vehicle.batteryVoltage ?? vehicle.externalVoltage))
+                
                 if vehicle.deviceBattery != nil {
                     listDivider
                     detailRow(icon: "iphone", label: "Cihaz Bataryası", value: formatDeviceBattery(vehicle.deviceBattery))

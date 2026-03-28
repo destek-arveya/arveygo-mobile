@@ -50,7 +50,8 @@ fun VehicleDetailScreen(
     vehicle: Vehicle,
     onBack: () -> Unit,
     onNavigateToRouteHistory: ((Vehicle) -> Unit)? = null,
-    onNavigateToAlarms: ((String) -> Unit)? = null
+    onNavigateToAlarms: ((String) -> Unit)? = null,
+    onNavigateToAddAlarm: ((String) -> Unit)? = null
 ) {
     var selectedTab by remember { mutableStateOf(DetailTab.OVERVIEW) }
     val context = LocalContext.current
@@ -252,7 +253,7 @@ fun VehicleDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 when (selectedTab) {
-                    DetailTab.OVERVIEW -> OverviewTab(currentVehicle, context, onBack, onNavigateToRouteHistory, onNavigateToAlarms, driverName, onDriverAssigned = {
+                    DetailTab.OVERVIEW -> OverviewTab(currentVehicle, context, onBack, onNavigateToRouteHistory, onNavigateToAlarms, onNavigateToAddAlarm, driverName, onDriverAssigned = {
                         refreshDriverInfo()
                     })
                     DetailTab.MAINTENANCE -> MaintenanceTab(currentVehicle)
@@ -486,6 +487,7 @@ private fun OverviewTab(
     onBack: () -> Unit,
     onNavigateToRouteHistory: ((Vehicle) -> Unit)?,
     onNavigateToAlarms: ((String) -> Unit)?,
+    onNavigateToAddAlarm: ((String) -> Unit)?,
     driverName: String = "",
     onDriverAssigned: (() -> Unit)? = null
 ) {
@@ -518,9 +520,9 @@ private fun OverviewTab(
                 onBack()
                 onNavigateToRouteHistory?.invoke(vehicle)
             },
-            QuickAction(Icons.Default.NotificationsActive, "Alarmlar", Color(0xFFFF9800)) {
+            QuickAction(Icons.Default.AddAlert, "Alarm Ekle", Color(0xFFFF9800)) {
                 onBack()
-                onNavigateToAlarms?.invoke(vehicle.plate)
+                onNavigateToAddAlarm?.invoke(vehicle.plate)
             },
             QuickAction(Icons.Default.Share, "Paylaş", AppColors.TextMuted) {
                 shareVehicleLocation(context, vehicle)
@@ -574,7 +576,7 @@ private fun OverviewTab(
         ListDivider()
         DetailRow(Icons.Default.VpnKey, "Son Kontak Kapama", vehicle.formattedLastIgnitionOff)
         ListDivider()
-        DetailRow(Icons.Default.BatteryChargingFull, "Araç Aküsü", formatVoltage(vehicleBatteryDisplay))
+        
         if (vehicle.deviceBattery != null) {
             ListDivider()
             DetailRow(Icons.Default.PhoneAndroid, "Cihaz Bataryası", formatDeviceBattery(vehicle.deviceBattery))

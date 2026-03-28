@@ -63,6 +63,8 @@ fun MainContent(authVM: AuthViewModel) {
     var showSideMenu by remember { mutableStateOf(false) }
     var showSupportRequest by remember { mutableStateOf(false) }
     var alarmsSearchText by remember { mutableStateOf("") }
+    var alarmsAutoOpenCreate by remember { mutableStateOf(false) }
+    var alarmsPrePlate by remember { mutableStateOf("") }
 
     // Observe consecutive failures to trigger support request page
     val consecutiveFailures by WebSocketManager.consecutiveFailures.collectAsState()
@@ -86,18 +88,21 @@ fun MainContent(authVM: AuthViewModel) {
                 onNavigateToMap = { selectedPage = AppPage.LIVE_MAP },
                 onNavigateToVehicles = { selectedPage = AppPage.VEHICLES },
                 onNavigateToDrivers = { selectedPage = AppPage.DRIVERS },
-                onNavigateToAlarms = { searchText -> alarmsSearchText = searchText; selectedPage = AppPage.ALARMS },
+                onNavigateToAlarms = { searchText -> alarmsSearchText = searchText; alarmsAutoOpenCreate = false; alarmsPrePlate = ""; selectedPage = AppPage.ALARMS },
+                onNavigateToAddAlarm = { plate -> alarmsSearchText = ""; alarmsAutoOpenCreate = true; alarmsPrePlate = plate; selectedPage = AppPage.ALARMS },
                 onNavigateToRouteHistory = { selectedPage = AppPage.ROUTE_HISTORY }
             )
             AppPage.LIVE_MAP -> LiveMapScreen(
                 onMenuClick = { showSideMenu = true },
                 onNavigateToRouteHistory = { _ -> selectedPage = AppPage.ROUTE_HISTORY },
-                onNavigateToAlarms = { alarmsSearchText = ""; selectedPage = AppPage.ALARMS }
+                onNavigateToAlarms = { alarmsSearchText = ""; alarmsAutoOpenCreate = false; alarmsPrePlate = ""; selectedPage = AppPage.ALARMS },
+                onNavigateToAddAlarm = { plate -> alarmsSearchText = ""; alarmsAutoOpenCreate = true; alarmsPrePlate = plate; selectedPage = AppPage.ALARMS }
             )
             AppPage.VEHICLES -> VehiclesListScreen(
                 onMenuClick = { showSideMenu = true },
                 onNavigateToRouteHistory = { _ -> selectedPage = AppPage.ROUTE_HISTORY },
-                onNavigateToAlarms = { alarmsSearchText = ""; selectedPage = AppPage.ALARMS }
+                onNavigateToAlarms = { alarmsSearchText = ""; alarmsAutoOpenCreate = false; alarmsPrePlate = ""; selectedPage = AppPage.ALARMS },
+                onNavigateToAddAlarm = { plate -> alarmsSearchText = ""; alarmsAutoOpenCreate = true; alarmsPrePlate = plate; selectedPage = AppPage.ALARMS }
             )
             AppPage.DRIVERS -> DriversScreen(
                 onMenuClick = { showSideMenu = true }
@@ -107,7 +112,9 @@ fun MainContent(authVM: AuthViewModel) {
             )
             AppPage.ALARMS -> AlarmsScreen(
                 onMenuClick = { showSideMenu = true },
-                initialSearchText = alarmsSearchText
+                initialSearchText = alarmsSearchText,
+                autoOpenCreate = alarmsAutoOpenCreate,
+                preSelectedPlate = alarmsPrePlate
             )
             AppPage.GEOFENCES -> GeofencesScreen(
                 onMenuClick = { showSideMenu = true }
