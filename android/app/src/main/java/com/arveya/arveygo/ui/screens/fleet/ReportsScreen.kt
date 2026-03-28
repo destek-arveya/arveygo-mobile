@@ -4,6 +4,8 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -187,7 +189,7 @@ private fun ReportDetailPage(reportType: String, onBack: () -> Unit) {
     // Filters
     var startDate by remember { mutableStateOf(LocalDate.now().minusDays(6)) }
     var endDate by remember { mutableStateOf(LocalDate.now()) }
-    var selectedVehicle by remember { mutableStateOf("") }
+    var selectedVehicles by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showDatePicker by remember { mutableStateOf(false) }
 
     // Available filter options (filled from API response)
@@ -204,7 +206,7 @@ private fun ReportDetailPage(reportType: String, onBack: () -> Unit) {
             params.add("start_date=${startDate.format(dateFmt)}")
             params.add("end_date=${endDate.format(dateFmt)}")
         }
-        if (selectedVehicle.isNotEmpty()) params.add("vehicle=$selectedVehicle")
+        selectedVehicles.forEach { v -> params.add("vehicles[]=$v") }
         params.add("page=$currentPage")
         params.add("per_page=25")
         return "$base?${params.joinToString("&")}"
@@ -278,9 +280,9 @@ private fun ReportDetailPage(reportType: String, onBack: () -> Unit) {
                         startDate = startDate,
                         endDate = endDate,
                         vehicleOptions = vehicleOptions,
-                        selectedVehicle = selectedVehicle,
+                        selectedVehicles = selectedVehicles,
                         onDateChange = { s, e -> startDate = s; endDate = e; currentPage = 1; load() },
-                        onVehicleChange = { selectedVehicle = it; currentPage = 1; load() }
+                        onVehiclesChange = { selectedVehicles = it; currentPage = 1; load() }
                     )
                 }
 
@@ -1092,9 +1094,9 @@ private fun FiltersBar(
     startDate: LocalDate,
     endDate: LocalDate,
     vehicleOptions: List<FilterOption>,
-    selectedVehicle: String,
+    selectedVehicles: Set<String>,
     onDateChange: (LocalDate, LocalDate) -> Unit,
-    onVehicleChange: (String) -> Unit
+    onVehiclesChange: (Set<String>) -> Unit
 ) {
     var showDateSheet by remember { mutableStateOf(false) }
     var showVehicleSheet by remember { mutableStateOf(false) }
@@ -1125,19 +1127,18 @@ private fun FiltersBar(
             )
         }
 
-        // Vehicle chip
+        // Vehicle chip (multi-select)
         if (vehicleOptions.isNotEmpty()) {
+            val vehicleLabel = when {
+                selectedVehicles.isEmpty() -> "Tüm Araçlar"
+                selectedVehicles.size == 1 -> vehicleOptions.find { it.value == selectedVehicles.first() }?.label ?: "1 Araç"
+                else -> "${selectedVehicles.size} Araç"
+            }
             FilterChip(
-                selected = selectedVehicle.isNotEmpty(),
+                selected = selectedVehicles.isNotEmpty(),
                 onClick = { showVehicleSheet = true },
                 label = {
-                    Text(
-                        if (selectedVehicle.isEmpty()) "Tüm Araçlar"
-                        else vehicleOptions.find { it.value == selectedVehicle }?.label ?: "Araç",
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Text(vehicleLabel, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 },
                 leadingIcon = { Icon(Icons.Default.DirectionsCar, null, Modifier.size(16.dp)) },
                 shape = RoundedCornerShape(10.dp),
@@ -1160,18 +1161,18 @@ private fun FiltersBar(
         )
     }
 
-    // Vehicle selection bottom sheet
+    // Vehicle multi-selection bottom sheet
     if (showVehicleSheet) {
-        VehicleSelectSheet(
+        VehicleMultiSelectSheet(
             options = vehicleOptions,
-            selected = selectedVehicle,
-            onSelect = { onVehicleChange(it); showVehicleSheet = false },
+            selectedVehicles = selectedVehicles,
+            onConfirm = { onVehiclesChange(it); showVehicleSheet = false },
             onDismiss = { showVehicleSheet = false }
         )
     }
 }
 
-// ── Date Range Sheet ──
+// ── Date Range Sheet (Custom Range + Presets, max 3 months) ──
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DateRangeSheet(
@@ -1180,77 +1181,215 @@ private fun DateRangeSheet(
     onConfirm: (LocalDate, LocalDate) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var tempStart by remember { mutableStateOf(startDate) }
+    var tempEnd by remember { mutableStateOf(endDate) }
+    var pickingStart by remember { mutableStateOf(true) }
+    var validationError by remember { mutableStateOf<String?>(null) }
+    val today = LocalDate.now()
+    val maxRangeMonths = 3L
+
     val presets = listOf(
-        "Bugün" to (LocalDate.now() to LocalDate.now()),
-        "Son 7 Gün" to (LocalDate.now().minusDays(6) to LocalDate.now()),
-        "Son 30 Gün" to (LocalDate.now().minusDays(29) to LocalDate.now()),
-        "Bu Ay" to (LocalDate.now().withDayOfMonth(1) to LocalDate.now()),
+        "Bugün" to (today to today),
+        "Dün" to (today.minusDays(1) to today.minusDays(1)),
+        "Son 7 Gün" to (today.minusDays(6) to today),
+        "Son 30 Gün" to (today.minusDays(29) to today),
+        "Bu Ay" to (today.withDayOfMonth(1) to today),
+        "Geçen Ay" to (today.minusMonths(1).withDayOfMonth(1) to today.minusMonths(1).withDayOfMonth(today.minusMonths(1).lengthOfMonth())),
+        "Son 3 Ay" to (today.minusMonths(3) to today),
     )
+
+    fun validate(s: LocalDate, e: LocalDate): Boolean {
+        if (e.isBefore(s)) {
+            validationError = "Bitiş tarihi başlangıçtan önce olamaz"
+            return false
+        }
+        if (s.plusMonths(maxRangeMonths).isBefore(e)) {
+            validationError = "Maksimum 3 aylık aralık seçilebilir"
+            return false
+        }
+        if (s.isAfter(today)) {
+            validationError = "Gelecek tarih seçilemez"
+            return false
+        }
+        validationError = null
+        return true
+    }
+
+    // Run validation whenever dates change
+    LaunchedEffect(tempStart, tempEnd) { validate(tempStart, tempEnd) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = AppColors.Surface,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     ) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
             Text("Tarih Aralığı", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+            Spacer(Modifier.height(4.dp))
+            Text("Maksimum 3 ay seçilebilir", fontSize = 12.sp, color = AppColors.TextMuted)
             Spacer(Modifier.height(16.dp))
 
-            presets.forEach { (label, range) ->
-                val isSelected = startDate == range.first && endDate == range.second
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (isSelected) AppColors.Indigo.copy(alpha = 0.08f) else Color.Transparent)
-                        .clickable { onConfirm(range.first, range.second) }
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        if (isSelected) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
-                        null,
-                        tint = if (isSelected) AppColors.Indigo else AppColors.TextMuted,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        label,
-                        fontSize = 14.sp,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (isSelected) AppColors.Indigo else AppColors.TextSecondary
-                    )
+            // ── Quick Presets ──
+            Text("Hızlı Seçim", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextSecondary)
+            Spacer(Modifier.height(8.dp))
+
+            // Flow-like preset chips
+            val rows = presets.chunked(3)
+            rows.forEach { chunk ->
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 6.dp)) {
+                    chunk.forEach { (label, range) ->
+                        val isActive = tempStart == range.first && tempEnd == range.second
+                        Surface(
+                            onClick = {
+                                tempStart = range.first; tempEnd = range.second
+                                if (validate(range.first, range.second)) {
+                                    onConfirm(range.first, range.second)
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isActive) AppColors.Indigo.copy(alpha = 0.12f) else AppColors.Bg,
+                            border = BorderStroke(1.dp, if (isActive) AppColors.Indigo.copy(alpha = 0.3f) else AppColors.BorderSoft)
+                        ) {
+                            Text(
+                                label,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                fontSize = 12.sp,
+                                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                color = if (isActive) AppColors.Indigo else AppColors.TextSecondary
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
-        }
-    }
-}
-
-// ── Vehicle Select Sheet ──
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun VehicleSelectSheet(
-    options: List<FilterOption>,
-    selected: String,
-    onSelect: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = AppColors.Surface,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-            Text("Araç Seçin", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = AppColors.BorderSoft)
             Spacer(Modifier.height(16.dp))
 
-            // "All vehicles" option
-            VehicleOptionRow("Tüm Araçlar", "", selected, onSelect)
+            // ── Custom Date Pickers ──
+            Text("Özel Tarih Seçimi", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextSecondary)
+            Spacer(Modifier.height(12.dp))
 
-            options.forEach { opt ->
-                VehicleOptionRow(opt.label, opt.value, selected, onSelect)
+            // Start / End toggle
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(AppColors.Bg),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                listOf(true to "Başlangıç" , false to "Bitiş").forEach { (isStart, label) ->
+                    val active = pickingStart == isStart
+                    val dateVal = if (isStart) tempStart else tempEnd
+                    Surface(
+                        onClick = { pickingStart = isStart },
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (active) AppColors.Indigo else Color.Transparent,
+                        modifier = Modifier.weight(1f).padding(4.dp)
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(vertical = 10.dp)
+                        ) {
+                            Text(
+                                label,
+                                fontSize = 11.sp,
+                                color = if (active) Color.White.copy(alpha = 0.8f) else AppColors.TextMuted
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                dateVal.format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (active) Color.White else AppColors.Navy
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // DatePicker
+            val datePickerState = rememberDatePickerState(
+                initialSelectedDateMillis = if (pickingStart)
+                    tempStart.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+                else
+                    tempEnd.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli(),
+                selectableDates = object : SelectableDates {
+                    override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                        val d = java.time.Instant.ofEpochMilli(utcTimeMillis).atZone(java.time.ZoneOffset.UTC).toLocalDate()
+                        return !d.isAfter(today)
+                    }
+                }
+            )
+
+            // Sync DatePicker when tab changes
+            LaunchedEffect(pickingStart) {
+                val millis = if (pickingStart)
+                    tempStart.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+                else
+                    tempEnd.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+                datePickerState.selectedDateMillis = millis
+            }
+
+            // Update tempStart/tempEnd when user picks a date
+            LaunchedEffect(datePickerState.selectedDateMillis) {
+                datePickerState.selectedDateMillis?.let { millis ->
+                    val picked = java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneOffset.UTC).toLocalDate()
+                    if (pickingStart) {
+                        tempStart = picked
+                        if (picked.isAfter(tempEnd)) tempEnd = picked
+                    } else {
+                        tempEnd = picked
+                        if (picked.isBefore(tempStart)) tempStart = picked
+                    }
+                }
+            }
+
+            DatePicker(
+                state = datePickerState,
+                showModeToggle = false,
+                title = null,
+                headline = null,
+                modifier = Modifier.fillMaxWidth(),
+                colors = DatePickerDefaults.colors(
+                    selectedDayContainerColor = AppColors.Indigo,
+                    todayContentColor = AppColors.Indigo,
+                    todayDateBorderColor = AppColors.Indigo
+                )
+            )
+
+            // Validation error
+            if (validationError != null) {
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.ErrorOutline, null, tint = Color(0xFFDC2626), modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(validationError!!, fontSize = 12.sp, color = Color(0xFFDC2626))
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Confirm button
+            Button(
+                onClick = { if (validate(tempStart, tempEnd)) onConfirm(tempStart, tempEnd) },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                enabled = validationError == null,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AppColors.Indigo,
+                    disabledContainerColor = AppColors.Indigo.copy(alpha = 0.4f)
+                )
+            ) {
+                Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Uygula", fontWeight = FontWeight.SemiBold)
             }
 
             Spacer(Modifier.height(24.dp))
@@ -1258,31 +1397,185 @@ private fun VehicleSelectSheet(
     }
 }
 
+// ── Vehicle Multi-Select Sheet (Searchable + Checkboxes) ──
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun VehicleOptionRow(label: String, value: String, selected: String, onSelect: (String) -> Unit) {
-    val isSelected = selected == value
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (isSelected) AppColors.Indigo.copy(alpha = 0.08f) else Color.Transparent)
-            .clickable { onSelect(value) }
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically
+private fun VehicleMultiSelectSheet(
+    options: List<FilterOption>,
+    selectedVehicles: Set<String>,
+    onConfirm: (Set<String>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var tempSelected by remember { mutableStateOf(selectedVehicles) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filtered = remember(searchQuery, options) {
+        if (searchQuery.isBlank()) options
+        else options.filter { it.label.contains(searchQuery, ignoreCase = true) }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = AppColors.Surface,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     ) {
-        Icon(
-            if (isSelected) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
-            null,
-            tint = if (isSelected) AppColors.Indigo else AppColors.TextMuted,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(Modifier.width(12.dp))
-        Text(
-            label,
-            fontSize = 14.sp,
-            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (isSelected) AppColors.Indigo else AppColors.TextSecondary
-        )
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+            // Header
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Araç Seçin", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                Spacer(Modifier.weight(1f))
+                if (tempSelected.isNotEmpty()) {
+                    Surface(
+                        onClick = { tempSelected = emptySet() },
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFDC2626).copy(alpha = 0.08f)
+                    ) {
+                        Text(
+                            "Temizle",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            fontSize = 12.sp,
+                            color = Color(0xFFDC2626),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                if (tempSelected.isEmpty()) "Tüm araçlar gösterilecek" else "${tempSelected.size} araç seçili",
+                fontSize = 12.sp,
+                color = AppColors.TextMuted
+            )
+            Spacer(Modifier.height(12.dp))
+
+            // Search bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Araç ara…", fontSize = 14.sp) },
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp)) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AppColors.Indigo,
+                    unfocusedBorderColor = AppColors.BorderSoft,
+                    focusedContainerColor = AppColors.Bg,
+                    unfocusedContainerColor = AppColors.Bg
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(12.dp))
+
+            // Select all / deselect all
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable {
+                        tempSelected = if (tempSelected.size == options.size)
+                            emptySet()
+                        else
+                            options.map { it.value }.toSet()
+                    }
+                    .padding(vertical = 10.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = tempSelected.size == options.size && options.isNotEmpty(),
+                    onCheckedChange = {
+                        tempSelected = if (it) options.map { o -> o.value }.toSet() else emptySet()
+                    },
+                    colors = CheckboxDefaults.colors(checkedColor = AppColors.Indigo)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Tümünü Seç", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
+            }
+
+            HorizontalDivider(color = AppColors.BorderSoft)
+
+            // Vehicle list
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp)
+            ) {
+                items(filtered) { opt ->
+                    val isChecked = tempSelected.contains(opt.value)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isChecked) AppColors.Indigo.copy(alpha = 0.06f) else Color.Transparent)
+                            .clickable {
+                                tempSelected = if (isChecked)
+                                    tempSelected - opt.value
+                                else
+                                    tempSelected + opt.value
+                            }
+                            .padding(vertical = 10.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = isChecked,
+                            onCheckedChange = {
+                                tempSelected = if (it)
+                                    tempSelected + opt.value
+                                else
+                                    tempSelected - opt.value
+                            },
+                            colors = CheckboxDefaults.colors(checkedColor = AppColors.Indigo)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Icon(Icons.Default.DirectionsCar, null, tint = if (isChecked) AppColors.Indigo else AppColors.TextMuted, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            opt.label,
+                            fontSize = 14.sp,
+                            color = if (isChecked) AppColors.Navy else AppColors.TextSecondary,
+                            fontWeight = if (isChecked) FontWeight.Medium else FontWeight.Normal
+                        )
+                    }
+                }
+
+                if (filtered.isEmpty()) {
+                    item {
+                        Text(
+                            "Araç bulunamadı",
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            fontSize = 14.sp,
+                            color = AppColors.TextMuted,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Confirm button
+            Button(
+                onClick = { onConfirm(tempSelected) },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = AppColors.Indigo)
+            ) {
+                Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (tempSelected.isEmpty()) "Tüm Araçları Göster" else "${tempSelected.size} Araç Seçildi — Uygula",
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(Modifier.height(24.dp))
+        }
     }
 }
 

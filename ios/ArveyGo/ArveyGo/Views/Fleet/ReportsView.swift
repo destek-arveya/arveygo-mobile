@@ -149,7 +149,7 @@ private struct ReportDetailPage: View {
     // Filters
     @State private var startDate = Calendar.current.date(byAdding: .day, value: -6, to: Date()) ?? Date()
     @State private var endDate = Date()
-    @State private var selectedVehicle = ""
+    @State private var selectedVehicles: Set<String> = []
     @State private var vehicleOptions: [FilterOption] = []
     @State private var showDatePicker = false
     @State private var showVehiclePicker = false
@@ -190,7 +190,7 @@ private struct ReportDetailPage: View {
                             startDate: $startDate,
                             endDate: $endDate,
                             vehicleOptions: vehicleOptions,
-                            selectedVehicle: $selectedVehicle,
+                            selectedVehicles: $selectedVehicles,
                             showDatePicker: $showDatePicker,
                             showVehiclePicker: $showVehiclePicker,
                             onApply: { currentPage = 1; loadReport() }
@@ -252,15 +252,15 @@ private struct ReportDetailPage: View {
                 endDate: $endDate,
                 onConfirm: { currentPage = 1; loadReport() }
             )
-            .presentationDetents([.medium])
+            .presentationDetents([.large])
         }
         .sheet(isPresented: $showVehiclePicker) {
-            VehicleSelectSheetView(
+            VehicleMultiSelectSheetView(
                 options: vehicleOptions,
-                selected: $selectedVehicle,
-                onSelect: { currentPage = 1; loadReport() }
+                selectedVehicles: $selectedVehicles,
+                onConfirm: { currentPage = 1; loadReport() }
             )
-            .presentationDetents([.medium])
+            .presentationDetents([.large])
         }
     }
 
@@ -277,7 +277,7 @@ private struct ReportDetailPage: View {
             params.append("start_date=\(fmt.string(from: startDate))")
             params.append("end_date=\(fmt.string(from: endDate))")
         }
-        if !selectedVehicle.isEmpty { params.append("vehicle=\(selectedVehicle)") }
+        for v in selectedVehicles { params.append("vehicles[]=\(v)") }
         params.append("page=\(currentPage)")
         params.append("per_page=25")
         return "\(base)?\(params.joined(separator: "&"))"
@@ -933,7 +933,7 @@ private struct FiltersBarView: View {
     @Binding var startDate: Date
     @Binding var endDate: Date
     let vehicleOptions: [FilterOption]
-    @Binding var selectedVehicle: String
+    @Binding var selectedVehicles: Set<String>
     @Binding var showDatePicker: Bool
     @Binding var showVehiclePicker: Bool
     let onApply: () -> Void
@@ -960,19 +960,28 @@ private struct FiltersBarView: View {
             }
 
             if !vehicleOptions.isEmpty {
+                let vehicleLabel: String = {
+                    if selectedVehicles.isEmpty { return "Tüm Araçlar" }
+                    if selectedVehicles.count == 1,
+                       let first = selectedVehicles.first,
+                       let opt = vehicleOptions.first(where: { $0.value == first }) {
+                        return opt.label
+                    }
+                    return "\(selectedVehicles.count) Araç"
+                }()
+
                 Button(action: { showVehiclePicker = true }) {
                     HStack(spacing: 4) {
                         Image(systemName: "car.fill")
                             .font(.system(size: 12))
-                        Text(selectedVehicle.isEmpty ? "Tüm Araçlar" :
-                                (vehicleOptions.first(where: { $0.value == selectedVehicle })?.label ?? "Araç"))
+                        Text(vehicleLabel)
                             .font(.system(size: 12))
                             .lineLimit(1)
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(selectedVehicle.isEmpty ? Color.gray.opacity(0.08) : AppTheme.indigo.opacity(0.08))
-                    .foregroundColor(selectedVehicle.isEmpty ? AppTheme.textSecondary : AppTheme.indigo)
+                    .background(selectedVehicles.isEmpty ? Color.gray.opacity(0.08) : AppTheme.indigo.opacity(0.08))
+                    .foregroundColor(selectedVehicles.isEmpty ? AppTheme.textSecondary : AppTheme.indigo)
                     .cornerRadius(10)
                 }
             }
@@ -982,113 +991,375 @@ private struct FiltersBarView: View {
     }
 }
 
-// ── Date Range Sheet ──
+// ── Date Range Sheet (Custom Range + Presets, max 3 months) ──
 private struct DateRangeSheetView: View {
     @Binding var startDate: Date
     @Binding var endDate: Date
     let onConfirm: () -> Void
     @Environment(\.dismiss) var dismiss
 
+    @State private var tempStart: Date = Date()
+    @State private var tempEnd: Date = Date()
+    @State private var pickingStart = true
+    @State private var validationError: String? = nil
+
+    private let maxMonths = 3
+    private let cal = Calendar.current
+
     var presets: [(String, Date, Date)] {
-        let cal = Calendar.current
         let now = Date()
         return [
             ("Bugün", now, now),
+            ("Dün", cal.date(byAdding: .day, value: -1, to: now)!, cal.date(byAdding: .day, value: -1, to: now)!),
             ("Son 7 Gün", cal.date(byAdding: .day, value: -6, to: now)!, now),
             ("Son 30 Gün", cal.date(byAdding: .day, value: -29, to: now)!, now),
-            ("Bu Ay", cal.date(from: cal.dateComponents([.year, .month], from: now))!, now)
+            ("Bu Ay", cal.date(from: cal.dateComponents([.year, .month], from: now))!, now),
+            ("Geçen Ay", {
+                let prev = cal.date(byAdding: .month, value: -1, to: now)!
+                let start = cal.date(from: cal.dateComponents([.year, .month], from: prev))!
+                let end = cal.date(byAdding: .day, value: -1, to: cal.date(from: cal.dateComponents([.year, .month], from: now))!)!
+                return (start, end)
+            }().0, {
+                let prev = cal.date(byAdding: .month, value: -1, to: now)!
+                let start = cal.date(from: cal.dateComponents([.year, .month], from: prev))!
+                let end = cal.date(byAdding: .day, value: -1, to: cal.date(from: cal.dateComponents([.year, .month], from: now))!)!
+                return (start, end)
+            }().1),
+            ("Son 3 Ay", cal.date(byAdding: .month, value: -3, to: now)!, now)
         ]
     }
 
+    func validate(_ s: Date, _ e: Date) -> Bool {
+        if e < s {
+            validationError = "Bitiş tarihi başlangıçtan önce olamaz"
+            return false
+        }
+        if let maxDate = cal.date(byAdding: .month, value: maxMonths, to: s), e > maxDate {
+            validationError = "Maksimum 3 aylık aralık seçilebilir"
+            return false
+        }
+        if s > Date() {
+            validationError = "Gelecek tarih seçilemez"
+            return false
+        }
+        validationError = nil
+        return true
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Tarih Aralığı")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(AppTheme.navy)
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Subtitle
+                    Text("Maksimum 3 ay seçilebilir")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.textMuted)
+                        .padding(.horizontal, 20)
 
-            ForEach(presets, id: \.0) { label, s, e in
-                let isSelected = Calendar.current.isDate(startDate, inSameDayAs: s) && Calendar.current.isDate(endDate, inSameDayAs: e)
+                    // ── Quick Presets ──
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Hızlı Seçim")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppTheme.textSecondary)
+                            .padding(.horizontal, 20)
 
-                Button(action: {
-                    startDate = s; endDate = e
-                    dismiss()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { onConfirm() }
-                }) {
-                    HStack(spacing: 12) {
-                        Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                            .font(.system(size: 18))
-                            .foregroundColor(isSelected ? AppTheme.indigo : AppTheme.textMuted)
-                        Text(label)
-                            .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
-                            .foregroundColor(isSelected ? AppTheme.indigo : AppTheme.textSecondary)
-                        Spacer()
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                            ForEach(presets, id: \.0) { label, s, e in
+                                let isActive = cal.isDate(tempStart, inSameDayAs: s) && cal.isDate(tempEnd, inSameDayAs: e)
+                                Button(action: {
+                                    tempStart = s; tempEnd = e
+                                    if validate(s, e) {
+                                        startDate = s; endDate = e
+                                        dismiss()
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { onConfirm() }
+                                    }
+                                }) {
+                                    Text(label)
+                                        .font(.system(size: 12, weight: isActive ? .semibold : .regular))
+                                        .foregroundColor(isActive ? AppTheme.indigo : AppTheme.textSecondary)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .frame(maxWidth: .infinity)
+                                        .background(isActive ? AppTheme.indigo.opacity(0.12) : AppTheme.bg)
+                                        .cornerRadius(8)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(isActive ? AppTheme.indigo.opacity(0.3) : Color.gray.opacity(0.2), lineWidth: 1)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 20)
                     }
-                    .padding(14)
-                    .background(isSelected ? AppTheme.indigo.opacity(0.08) : Color.clear)
-                    .cornerRadius(10)
-                }
-                .padding(.horizontal, 20)
-            }
 
-            Spacer()
+                    Divider().padding(.horizontal, 20)
+
+                    // ── Custom Date Section ──
+                    Text("Özel Tarih Seçimi")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(AppTheme.textSecondary)
+                        .padding(.horizontal, 20)
+
+                    // Start / End toggle
+                    HStack(spacing: 0) {
+                        ForEach([(true, "Başlangıç"), (false, "Bitiş")], id: \.0) { isStart, label in
+                            let active = pickingStart == isStart
+                            let dateVal = isStart ? tempStart : tempEnd
+                            let fmt = DateFormatter()
+                            let _ = fmt.dateFormat = "dd MMM yyyy"
+
+                            Button(action: { withAnimation { pickingStart = isStart } }) {
+                                VStack(spacing: 2) {
+                                    Text(label)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(active ? .white.opacity(0.8) : AppTheme.textMuted)
+                                    Text(fmt.string(from: dateVal))
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(active ? .white : AppTheme.navy)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(active ? AppTheme.indigo : Color.clear)
+                                .cornerRadius(10)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(4)
+                    .background(AppTheme.bg)
+                    .cornerRadius(10)
+                    .padding(.horizontal, 20)
+
+                    // DatePicker
+                    DatePicker(
+                        pickingStart ? "Başlangıç" : "Bitiş",
+                        selection: pickingStart ? $tempStart : $tempEnd,
+                        in: ...Date(),
+                        displayedComponents: .date
+                    )
+                    .datePickerStyle(.graphical)
+                    .tint(AppTheme.indigo)
+                    .padding(.horizontal, 12)
+                    .onChange(of: tempStart) { _ in
+                        if tempStart > tempEnd { tempEnd = tempStart }
+                        let _ = validate(tempStart, tempEnd)
+                    }
+                    .onChange(of: tempEnd) { _ in
+                        if tempEnd < tempStart { tempStart = tempEnd }
+                        let _ = validate(tempStart, tempEnd)
+                    }
+
+                    // Validation error
+                    if let err = validationError {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.circle")
+                                .font(.system(size: 12))
+                            Text(err)
+                                .font(.system(size: 12))
+                        }
+                        .foregroundColor(Color(hex: "#DC2626"))
+                        .padding(.horizontal, 20)
+                    }
+
+                    // Confirm button
+                    Button(action: {
+                        if validate(tempStart, tempEnd) {
+                            startDate = tempStart; endDate = tempEnd
+                            dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { onConfirm() }
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Uygula")
+                                .font(.system(size: 15, weight: .semibold))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(validationError == nil ? AppTheme.indigo : AppTheme.indigo.opacity(0.4))
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .disabled(validationError != nil)
+                    .padding(.horizontal, 20)
+
+                    Spacer().frame(height: 20)
+                }
+            }
+            .navigationTitle("Tarih Aralığı")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("İptal") { dismiss() }
+                }
+            }
+        }
+        .onAppear {
+            tempStart = startDate
+            tempEnd = endDate
         }
     }
 }
 
-// ── Vehicle Select Sheet ──
-private struct VehicleSelectSheetView: View {
+// ── Vehicle Multi-Select Sheet (Searchable + Checkboxes) ──
+private struct VehicleMultiSelectSheetView: View {
     let options: [FilterOption]
-    @Binding var selected: String
-    let onSelect: () -> Void
+    @Binding var selectedVehicles: Set<String>
+    let onConfirm: () -> Void
     @Environment(\.dismiss) var dismiss
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Araç Seçin")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(AppTheme.navy)
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
+    @State private var tempSelected: Set<String> = []
+    @State private var searchQuery = ""
 
-            Button(action: {
-                selected = ""
-                dismiss()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { onSelect() }
-            }) {
-                vehicleOptionRow("Tüm Araçlar", isSelected: selected.isEmpty)
-            }
-            .padding(.horizontal, 20)
-
-            ForEach(options, id: \.value) { opt in
-                Button(action: {
-                    selected = opt.value
-                    dismiss()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { onSelect() }
-                }) {
-                    vehicleOptionRow(opt.label, isSelected: selected == opt.value)
-                }
-                .padding(.horizontal, 20)
-            }
-
-            Spacer()
-        }
+    var filtered: [FilterOption] {
+        if searchQuery.isEmpty { return options }
+        return options.filter { $0.label.localizedCaseInsensitiveContains(searchQuery) }
     }
 
-    func vehicleOptionRow(_ label: String, isSelected: Bool) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                .font(.system(size: 18))
-                .foregroundColor(isSelected ? AppTheme.indigo : AppTheme.textMuted)
-            Text(label)
-                .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
-                .foregroundColor(isSelected ? AppTheme.indigo : AppTheme.textSecondary)
-            Spacer()
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // Header info
+                HStack {
+                    Text(tempSelected.isEmpty ? "Tüm araçlar gösterilecek" : "\(tempSelected.count) araç seçili")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.textMuted)
+                    Spacer()
+                    if !tempSelected.isEmpty {
+                        Button(action: { tempSelected = [] }) {
+                            Text("Temizle")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(Color(hex: "#DC2626"))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(Color(hex: "#DC2626").opacity(0.08))
+                                .cornerRadius(8)
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+
+                // Search bar
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14))
+                        .foregroundColor(AppTheme.textMuted)
+                    TextField("Araç ara…", text: $searchQuery)
+                        .font(.system(size: 14))
+                    if !searchQuery.isEmpty {
+                        Button(action: { searchQuery = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(AppTheme.textMuted)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(AppTheme.bg)
+                .cornerRadius(12)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.borderSoft, lineWidth: 1))
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
+
+                // Select all
+                Button(action: {
+                    if tempSelected.count == options.count {
+                        tempSelected = []
+                    } else {
+                        tempSelected = Set(options.map { $0.value })
+                    }
+                }) {
+                    HStack(spacing: 10) {
+                        Image(systemName: tempSelected.count == options.count ? "checkmark.square.fill" : "square")
+                            .font(.system(size: 18))
+                            .foregroundColor(tempSelected.count == options.count ? AppTheme.indigo : AppTheme.textMuted)
+                        Text("Tümünü Seç")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(AppTheme.navy)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                }
+                .buttonStyle(.plain)
+
+                Divider().padding(.horizontal, 20)
+
+                // Vehicle list
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(filtered) { opt in
+                            let isChecked = tempSelected.contains(opt.value)
+                            Button(action: {
+                                if isChecked {
+                                    tempSelected.remove(opt.value)
+                                } else {
+                                    tempSelected.insert(opt.value)
+                                }
+                            }) {
+                                HStack(spacing: 10) {
+                                    Image(systemName: isChecked ? "checkmark.square.fill" : "square")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(isChecked ? AppTheme.indigo : AppTheme.textMuted)
+                                    Image(systemName: "car.fill")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(isChecked ? AppTheme.indigo : AppTheme.textMuted)
+                                    Text(opt.label)
+                                        .font(.system(size: 14, weight: isChecked ? .medium : .regular))
+                                        .foregroundColor(isChecked ? AppTheme.navy : AppTheme.textSecondary)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                                .background(isChecked ? AppTheme.indigo.opacity(0.06) : Color.clear)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        if filtered.isEmpty {
+                            Text("Araç bulunamadı")
+                                .font(.system(size: 14))
+                                .foregroundColor(AppTheme.textMuted)
+                                .padding(24)
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                }
+
+                // Confirm button
+                Button(action: {
+                    selectedVehicles = tempSelected
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { onConfirm() }
+                }) {
+                    HStack {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text(tempSelected.isEmpty ? "Tüm Araçları Göster" : "\(tempSelected.count) Araç Seçildi — Uygula")
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(AppTheme.indigo)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+            }
+            .navigationTitle("Araç Seçin")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("İptal") { dismiss() }
+                }
+            }
         }
-        .padding(14)
-        .background(isSelected ? AppTheme.indigo.opacity(0.08) : Color.clear)
-        .cornerRadius(10)
+        .onAppear { tempSelected = selectedVehicles }
     }
 }
 
