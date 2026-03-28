@@ -229,67 +229,182 @@ class AlarmsViewModel: ObservableObject {
     ]
 }
 
-// MARK: - Alarm Rule Model (Kullanıcının oluşturduğu kurallar)
-struct AlarmRule: Identifiable, Hashable {
+// MARK: - Alarm Set Model (API: /api/mobile/alarm-sets/)
+struct AlarmSet: Identifiable, Hashable {
     let id: Int
     let name: String
-    let type: String
-    let condition: String
-    let vehicles: String // hangi araçlara uygulanıyor
+    let description: String?
+    let alarmType: String
+    let status: String
+    let evaluationMode: String
+    let sourceMode: String
+    let cooldownSec: Int
     let isActive: Bool
+    let conditionSummary: String
+    let channelCodes: String
+    let targetCount: Int
+    let channelCount: Int
+    let recipientCount: Int
     let createdAt: String
 
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
-    static func == (lhs: AlarmRule, rhs: AlarmRule) -> Bool { lhs.id == rhs.id }
+    static func == (lhs: AlarmSet, rhs: AlarmSet) -> Bool { lhs.id == rhs.id }
 
     var icon: String {
-        switch type.lowercased() {
-        case "overspeed": return "gauge.with.dots.needle.33percent"
-        case "geofence": return "mappin.and.ellipse"
-        case "idle": return "clock.fill"
-        case "harsh_brake": return "exclamationmark.octagon.fill"
-        case "disconnect": return "antenna.radiowaves.left.and.right.slash"
-        case "power_cut": return "bolt.slash.fill"
-        case "sos": return "sos"
+        switch alarmType {
+        case "speed_violation": return "gauge.with.dots.needle.33percent"
+        case "geofence_alarm": return "mappin.and.ellipse"
+        case "idle_alarm": return "clock.fill"
+        case "movement_detection": return "figure.walk.motion"
+        case "off_hours_usage": return "clock.badge.exclamationmark"
         default: return "bell.badge.fill"
         }
     }
 
     var color: Color {
-        switch type.lowercased() {
-        case "overspeed", "sos": return .red
-        case "geofence": return .green
-        case "idle": return Color(red: 245/255, green: 158/255, blue: 11/255)
-        case "harsh_brake", "disconnect": return .orange
+        switch alarmType {
+        case "speed_violation": return .red
+        case "geofence_alarm": return .green
+        case "idle_alarm": return Color(red: 245/255, green: 158/255, blue: 11/255)
+        case "movement_detection": return .orange
+        case "off_hours_usage": return AppTheme.indigo
         default: return AppTheme.indigo
         }
     }
 
     var typeLabel: String {
-        switch type.lowercased() {
-        case "overspeed": return "Hız Aşımı"
-        case "geofence": return "Geofence"
-        case "idle": return "Rölanti"
-        case "harsh_brake": return "Sert Fren"
-        case "disconnect": return "Bağlantı Kopma"
-        case "power_cut": return "Güç Kesilmesi"
-        case "sos": return "SOS / Panik"
-        default: return type.replacingOccurrences(of: "_", with: " ").capitalized
+        switch alarmType {
+        case "speed_violation": return "Hız İhlali"
+        case "idle_alarm": return "Rölanti"
+        case "movement_detection": return "Hareket Algılama"
+        case "off_hours_usage": return "Mesai Dışı Kullanım"
+        case "geofence_alarm": return "Bölge Alarmı"
+        default: return alarmType.replacingOccurrences(of: "_", with: " ").capitalized
         }
+    }
+
+    var statusLabel: String {
+        switch status {
+        case "active": return "Aktif"
+        case "paused": return "Duraklatıldı"
+        case "draft": return "Taslak"
+        case "archived": return "Arşiv"
+        default: return status.capitalized
+        }
+    }
+
+    var statusColor: Color {
+        switch status {
+        case "active": return .green
+        case "paused": return Color(red: 245/255, green: 158/255, blue: 11/255)
+        case "draft": return .gray
+        case "archived": return Color(red: 107/255, green: 114/255, blue: 128/255)
+        default: return .gray
+        }
+    }
+
+    var channelList: [String] {
+        channelCodes.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    var formattedDate: String {
+        guard createdAt.count >= 10 else { return createdAt }
+        let dateParts = createdAt.prefix(10).split(separator: "-")
+        guard dateParts.count == 3 else { return createdAt }
+        let months = ["", "Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
+        let month = Int(dateParts[1]) ?? 0
+        let day = dateParts[2]
+        return "\(day) \(months[min(month, 12)])"
+    }
+
+    static func from(json: [String: Any]) -> AlarmSet {
+        let desc = json["description"] as? String
+        return AlarmSet(
+            id: json["id"] as? Int ?? 0,
+            name: json["name"] as? String ?? "",
+            description: (desc == nil || desc == "null" || desc?.isEmpty == true) ? nil : desc,
+            alarmType: json["alarm_type"] as? String ?? "",
+            status: json["status"] as? String ?? "draft",
+            evaluationMode: json["evaluation_mode"] as? String ?? "live",
+            sourceMode: json["source_mode"] as? String ?? "derived",
+            cooldownSec: json["cooldown_sec"] as? Int ?? 300,
+            isActive: json["is_active"] as? Bool ?? false,
+            conditionSummary: json["condition_summary"] as? String ?? "",
+            channelCodes: json["channel_codes"] as? String ?? "",
+            targetCount: json["target_count"] as? Int ?? 0,
+            channelCount: json["channel_count"] as? Int ?? 0,
+            recipientCount: json["recipient_count"] as? Int ?? 0,
+            createdAt: json["created_at"] as? String ?? ""
+        )
     }
 }
 
-// MARK: - Dummy Alarm Rules
-private let dummyAlarmRules: [AlarmRule] = [
-    AlarmRule(id: 1, name: "Şehir İçi Hız Limiti", type: "overspeed", condition: "Hız > 50 km/s", vehicles: "Tüm Araçlar", isActive: true, createdAt: "2026-01-15"),
-    AlarmRule(id: 2, name: "Otoban Hız Limiti", type: "overspeed", condition: "Hız > 120 km/s", vehicles: "Tüm Araçlar", isActive: true, createdAt: "2026-01-15"),
-    AlarmRule(id: 3, name: "Ankara Merkez Bölgesi", type: "geofence", condition: "Bölgeden çıkışta bildir", vehicles: "06 ATS 001, 06 TUV 222", isActive: true, createdAt: "2026-02-10"),
-    AlarmRule(id: 4, name: "İstanbul Depo Bölgesi", type: "geofence", condition: "Bölgeye girişte bildir", vehicles: "34 ARV 34, 34 ABC 123", isActive: false, createdAt: "2026-02-20"),
-    AlarmRule(id: 5, name: "Rölanti Uyarısı", type: "idle", condition: "10 dk üzeri rölanti", vehicles: "Tüm Araçlar", isActive: true, createdAt: "2026-03-01"),
-    AlarmRule(id: 6, name: "Sert Fren Algılama", type: "harsh_brake", condition: "Ani fren algılandığında", vehicles: "Tüm Araçlar", isActive: true, createdAt: "2026-03-05"),
-    AlarmRule(id: 7, name: "Bağlantı Kopma Uyarısı", type: "disconnect", condition: "Cihaz bağlantısı kesildiğinde", vehicles: "06 ATS 001", isActive: false, createdAt: "2026-03-10"),
-    AlarmRule(id: 8, name: "SOS Butonu", type: "sos", condition: "Panik butonu basıldığında", vehicles: "Tüm Araçlar", isActive: true, createdAt: "2026-03-12"),
-]
+// MARK: - Catalog models
+struct AlarmCatalogVehicle: Identifiable {
+    let id: Int
+    let assignmentId: Int
+    let label: String
+    let plate: String
+}
+
+struct AlarmCatalogRecipient: Identifiable {
+    let id: Int
+    let name: String
+    let email: String
+}
+
+struct AlarmCatalogGeofence: Identifiable {
+    let id: Int
+    let name: String
+}
+
+struct AlarmTypeOption: Identifiable {
+    var id: String { value }
+    let value: String
+    let label: String
+    let description: String
+}
+
+struct AlarmCatalog {
+    let vehicles: [AlarmCatalogVehicle]
+    let recipients: [AlarmCatalogRecipient]
+    let geofences: [AlarmCatalogGeofence]
+    let types: [AlarmTypeOption]
+
+    static func from(json: [String: Any]) -> AlarmCatalog {
+        let catalog = json["catalog"] as? [String: Any] ?? json
+        var vehicles: [AlarmCatalogVehicle] = []
+        if let assignments = catalog["assignments"] as? [[String: Any]] {
+            vehicles = assignments.map { v in
+                AlarmCatalogVehicle(
+                    id: v["device_id"] as? Int ?? v["id"] as? Int ?? 0,
+                    assignmentId: v["id"] as? Int ?? 0,
+                    label: v["label"] as? String ?? "",
+                    plate: v["plate"] as? String ?? ""
+                )
+            }
+        }
+        var recipients: [AlarmCatalogRecipient] = []
+        if let recipArr = catalog["recipients"] as? [[String: Any]] {
+            recipients = recipArr.map { r in
+                AlarmCatalogRecipient(id: r["id"] as? Int ?? 0, name: r["name"] as? String ?? "", email: r["email"] as? String ?? "")
+            }
+        }
+        var geofences: [AlarmCatalogGeofence] = []
+        if let geoArr = catalog["geofences"] as? [[String: Any]] {
+            geofences = geoArr.map { g in
+                AlarmCatalogGeofence(id: g["id"] as? Int ?? 0, name: g["name"] as? String ?? "")
+            }
+        }
+        var types: [AlarmTypeOption] = []
+        if let typeArr = catalog["types"] as? [[String: Any]] {
+            types = typeArr.map { t in
+                AlarmTypeOption(value: t["value"] as? String ?? "", label: t["label"] as? String ?? "", description: t["description"] as? String ?? "")
+            }
+        }
+        return AlarmCatalog(vehicles: vehicles, recipients: recipients, geofences: geofences, types: types)
+    }
+}
 
 // MARK: - Alarms View
 struct AlarmsView: View {
@@ -300,7 +415,14 @@ struct AlarmsView: View {
     @State private var selectedTab = 0 // 0: Gelen Alarmlar, 1: Alarm Kuralları
     @State private var searchText = ""
     @State private var selectedAlarm: AlarmEvent? = nil
-    @State private var selectedRule: AlarmRule? = nil
+    @State private var selectedRule: AlarmSet? = nil
+
+    @State private var showCreateSheet = false
+    @State private var alarmSets: [AlarmSet] = []
+    @State private var isLoadingSets = false
+    @State private var setsError: String? = nil
+    @State private var catalog: AlarmCatalog? = nil
+    @State private var actionLoadingId: Int? = nil
 
     let alarmTypes = [
         ("overspeed", "Hız Aşımı"),
@@ -392,8 +514,14 @@ struct AlarmsView: View {
             .sheet(item: $selectedAlarm) { alarm in
                 alarmDetailSheet(alarm)
             }
-            .sheet(item: $selectedRule) { rule in
+            .sheet(item: $selectedRule) { (rule: AlarmSet) in
                 ruleDetailSheet(rule)
+            }
+            .sheet(isPresented: $showCreateSheet) {
+                CreateAlarmSetView(catalog: catalog, onCreated: {
+                    showCreateSheet = false
+                    Task { await fetchAlarmSets() }
+                })
             }
             .onChange(of: selectedTab) { _ in
                 searchText = ""
@@ -401,7 +529,45 @@ struct AlarmsView: View {
         }
         .task {
             await vm.fetchAlarms()
+            await fetchAlarmSets()
+            await fetchCatalog()
         }
+    }
+
+    // MARK: - Alarm Sets API
+    private func fetchAlarmSets() async {
+        isLoadingSets = true
+        setsError = nil
+        do {
+            let json = try await APIService.shared.get("/api/mobile/alarm-sets/")
+            let dataArr = json["data"] as? [[String: Any]] ?? []
+            alarmSets = dataArr.map { AlarmSet.from(json: $0) }
+        } catch {
+            setsError = "Alarm kuralları yüklenemedi"
+        }
+        isLoadingSets = false
+    }
+
+    private func fetchCatalog() async {
+        do {
+            let json = try await APIService.shared.get("/api/mobile/alarm-sets/catalog")
+            catalog = AlarmCatalog.from(json: json)
+        } catch { }
+    }
+
+    private func toggleAlarmSet(_ set: AlarmSet) async {
+        actionLoadingId = set.id
+        let action = set.status == "active" ? "pause" : "activate"
+        _ = try? await APIService.shared.post("/api/mobile/alarm-sets/\(set.id)/\(action)")
+        await fetchAlarmSets()
+        actionLoadingId = nil
+    }
+
+    private func archiveAlarmSet(_ set: AlarmSet) async {
+        actionLoadingId = set.id
+        _ = try? await APIService.shared.post("/api/mobile/alarm-sets/\(set.id)/archive")
+        await fetchAlarmSets()
+        actionLoadingId = nil
     }
 
     // MARK: - Tab Selector
@@ -454,14 +620,13 @@ struct AlarmsView: View {
     }
 
     // Filtered rules based on search
-    var filteredRules: [AlarmRule] {
-        guard !searchText.isEmpty else { return dummyAlarmRules }
+    var filteredRules: [AlarmSet] {
+        guard !searchText.isEmpty else { return alarmSets }
         let q = searchText.lowercased()
-        return dummyAlarmRules.filter {
+        return alarmSets.filter {
             $0.name.lowercased().contains(q) ||
             $0.typeLabel.lowercased().contains(q) ||
-            $0.condition.lowercased().contains(q) ||
-            $0.vehicles.lowercased().contains(q)
+            $0.conditionSummary.lowercased().contains(q)
         }
     }
 
@@ -498,36 +663,59 @@ struct AlarmsView: View {
 
     // MARK: - Alarm Rules Tab
     var alarmRulesTab: some View {
-        ScrollView {
-            LazyVStack(spacing: 8) {
-                // Search
-                searchBar
+        Group {
+            if isLoadingSets && alarmSets.isEmpty {
+                loadingView
+            } else if let error = setsError, alarmSets.isEmpty {
+                errorView(error)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        // Search
+                        searchBar
 
-                // Yeni Kural Ekle butonu — kart tarzı
-                newRuleButton
+                        // Yeni Kural Ekle butonu
+                        newRuleButton
 
-                // Başlık
-                HStack {
-                    Text("\(filteredRules.count) kural tanımlı")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppTheme.textMuted)
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
+                        // Başlık
+                        HStack {
+                            Text("\(filteredRules.count) kural tanımlı")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(AppTheme.textMuted)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 4)
 
-                ForEach(filteredRules) { rule in
-                    alarmRuleCard(rule)
-                        .onTapGesture { selectedRule = rule }
+                        if filteredRules.isEmpty {
+                            VStack(spacing: 8) {
+                                Image(systemName: "gearshape")
+                                    .font(.system(size: 36))
+                                    .foregroundColor(AppTheme.textFaint)
+                                Text("Henüz alarm kuralı yok")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(AppTheme.textMuted)
+                                Text("Yukarıdaki butona tıklayarak yeni kural ekleyin")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppTheme.textFaint)
+                            }
+                            .padding(.vertical, 40)
+                        }
+
+                        ForEach(filteredRules) { rule in
+                            alarmSetCard(rule)
+                                .onTapGesture { selectedRule = rule }
+                        }
+                    }
+                    .padding(.bottom, 20)
                 }
             }
-            .padding(.bottom, 20)
         }
     }
 
     // MARK: - New Rule Button (Kart tarzı)
     var newRuleButton: some View {
-        Button(action: {}) {
+        Button(action: { showCreateSheet = true }) {
             HStack(spacing: 10) {
                 ZStack {
                     Circle()
@@ -566,8 +754,8 @@ struct AlarmsView: View {
         .padding(.horizontal, 16)
     }
 
-    // MARK: - Alarm Rule Card
-    func alarmRuleCard(_ rule: AlarmRule) -> some View {
+    // MARK: - Alarm Set Card
+    func alarmSetCard(_ rule: AlarmSet) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 // İkon
@@ -591,18 +779,18 @@ struct AlarmsView: View {
 
                 Spacer()
 
-                // Aktif/Pasif toggle göstergesi
+                // Status badge
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(rule.isActive ? Color.green : Color.gray)
+                        .fill(rule.statusColor)
                         .frame(width: 7, height: 7)
-                    Text(rule.isActive ? "Aktif" : "Pasif")
+                    Text(rule.statusLabel)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(rule.isActive ? .green : .gray)
+                        .foregroundColor(rule.statusColor)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background((rule.isActive ? Color.green : Color.gray).opacity(0.1))
+                .background(rule.statusColor.opacity(0.1))
                 .cornerRadius(12)
             }
 
@@ -612,18 +800,27 @@ struct AlarmsView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 10))
                         .foregroundColor(AppTheme.textFaint)
-                    Text("Koşul: \(rule.condition)")
+                    Text("Koşul: \(rule.conditionSummary)")
                         .font(.system(size: 11))
                         .foregroundColor(AppTheme.textSecondary)
+                        .lineLimit(1)
                 }
                 HStack(spacing: 6) {
                     Image(systemName: "car.fill")
                         .font(.system(size: 10))
                         .foregroundColor(AppTheme.textFaint)
-                    Text("Araçlar: \(rule.vehicles)")
+                    Text("\(rule.targetCount) araç")
                         .font(.system(size: 11))
                         .foregroundColor(AppTheme.textSecondary)
-                        .lineLimit(1)
+
+                    Spacer().frame(width: 8)
+
+                    // Channel icons
+                    ForEach(rule.channelList, id: \.self) { ch in
+                        Image(systemName: ch == "email" ? "envelope.fill" : ch == "sms" ? "message.fill" : "bell.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(AppTheme.textFaint)
+                    }
                 }
             }
             .padding(.leading, 48)
@@ -1076,7 +1273,7 @@ struct AlarmsView: View {
     }
 
     // MARK: - Rule Detail Sheet
-    func ruleDetailSheet(_ rule: AlarmRule) -> some View {
+    func ruleDetailSheet(_ rule: AlarmSet) -> some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 0) {
@@ -1095,18 +1292,24 @@ struct AlarmsView: View {
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(AppTheme.textPrimary)
 
-                        // Aktif/Pasif badge
+                        if let desc = rule.description {
+                            Text(desc)
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.textMuted)
+                        }
+
+                        // Status badge
                         HStack(spacing: 5) {
                             Circle()
-                                .fill(rule.isActive ? Color.green : Color.gray)
+                                .fill(rule.statusColor)
                                 .frame(width: 8, height: 8)
-                            Text(rule.isActive ? "Aktif" : "Pasif")
+                            Text(rule.statusLabel)
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(rule.isActive ? .green : .gray)
+                                .foregroundColor(rule.statusColor)
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 5)
-                        .background((rule.isActive ? Color.green : Color.gray).opacity(0.1))
+                        .background(rule.statusColor.opacity(0.1))
                         .cornerRadius(16)
                     }
                     .frame(maxWidth: .infinity)
@@ -1117,43 +1320,75 @@ struct AlarmsView: View {
                     VStack(spacing: 0) {
                         detailRow(icon: "tag.fill", title: "Alarm Türü", value: rule.typeLabel)
                         Divider().padding(.leading, 44)
-                        detailRow(icon: "exclamationmark.triangle.fill", title: "Koşul", value: rule.condition)
+                        detailRow(icon: "exclamationmark.triangle.fill", title: "Koşul", value: rule.conditionSummary.isEmpty ? "—" : rule.conditionSummary)
                         Divider().padding(.leading, 44)
-                        detailRow(icon: "car.fill", title: "Araçlar", value: rule.vehicles)
+                        detailRow(icon: "car.fill", title: "Hedef Araçlar", value: "\(rule.targetCount) araç")
                         Divider().padding(.leading, 44)
-                        detailRow(icon: "calendar", title: "Oluşturulma", value: rule.createdAt)
+                        detailRow(icon: "bell.fill", title: "Bildirim Kanalları", value: rule.channelList.map { ch in
+                            switch ch { case "email": return "E-posta"; case "sms": return "SMS"; case "push": return "Mobil Bildirim"; default: return ch }
+                        }.joined(separator: ", "))
+                        Divider().padding(.leading, 44)
+                        detailRow(icon: "person.2.fill", title: "Alıcılar", value: "\(rule.recipientCount) kişi")
+                        Divider().padding(.leading, 44)
+                        detailRow(icon: "timer", title: "Bekleme Süresi", value: "\(rule.cooldownSec / 60) dk")
+                        Divider().padding(.leading, 44)
+                        detailRow(icon: "eye.fill", title: "Değerlendirme", value: rule.evaluationMode == "live" ? "Canlı Alarm" : "İzleme Modu")
+                        Divider().padding(.leading, 44)
+                        detailRow(icon: "calendar", title: "Oluşturulma", value: rule.formattedDate)
                     }
                     .padding(.top, 8)
 
                     // Actions
-                    VStack(spacing: 10) {
-                        Button(action: {}) {
-                            HStack {
-                                Image(systemName: "pencil")
-                                Text("Kuralı Düzenle")
+                    if rule.status != "archived" {
+                        VStack(spacing: 10) {
+                            // Activate/Pause toggle
+                            Button(action: {
+                                Task {
+                                    await toggleAlarmSet(rule)
+                                    selectedRule = nil
+                                }
+                            }) {
+                                HStack {
+                                    if actionLoadingId == rule.id {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                            .tint(.white)
+                                    } else {
+                                        Image(systemName: rule.status == "active" ? "pause.fill" : "play.fill")
+                                        Text(rule.status == "active" ? "Duraklatır" : "Aktifleştir")
+                                    }
+                                }
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(rule.status == "active" ? Color(red: 245/255, green: 158/255, blue: 11/255) : .green)
+                                .cornerRadius(10)
                             }
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(AppTheme.indigo)
-                            .cornerRadius(10)
-                        }
+                            .disabled(actionLoadingId == rule.id)
 
-                        Button(action: {}) {
-                            HStack {
-                                Image(systemName: "trash")
-                                Text("Kuralı Sil")
+                            // Archive
+                            Button(action: {
+                                Task {
+                                    await archiveAlarmSet(rule)
+                                    selectedRule = nil
+                                }
+                            }) {
+                                HStack {
+                                    Image(systemName: "archivebox")
+                                    Text("Arşivle")
+                                }
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.red)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.red.opacity(0.08))
+                                .cornerRadius(10)
                             }
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.red)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color.red.opacity(0.08))
-                            .cornerRadius(10)
+                            .disabled(actionLoadingId == rule.id)
                         }
+                        .padding(16)
                     }
-                    .padding(16)
                 }
             }
             .background(AppTheme.bg)
@@ -1199,6 +1434,338 @@ struct AlarmsView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+    }
+}
+
+// MARK: - Create Alarm Set View
+struct CreateAlarmSetView: View {
+    let catalog: AlarmCatalog?
+    let onCreated: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var selectedType = "speed_violation"
+    @State private var selectedVehicles = Set<Int>()  // assignment IDs
+    @State private var selectedChannels = Set<String>(["push"])
+    @State private var selectedRecipients = Set<Int>()
+    @State private var selectedGeofence: Int? = nil
+    @State private var speedLimit = "80"
+    @State private var idleAfterSec = "300"
+    @State private var isSaving = false
+    @State private var errorMsg: String? = nil
+
+    var typeOptions: [AlarmTypeOption] {
+        catalog?.types ?? [
+            AlarmTypeOption(value: "speed_violation", label: "Hız İhlali", description: ""),
+            AlarmTypeOption(value: "idle_alarm", label: "Rölanti", description: ""),
+            AlarmTypeOption(value: "movement_detection", label: "Hareket Algılama", description: ""),
+            AlarmTypeOption(value: "off_hours_usage", label: "Mesai Dışı Kullanım", description: ""),
+            AlarmTypeOption(value: "geofence_alarm", label: "Bölge Alarmı", description: "")
+        ]
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Kural Adı
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Kural Adı")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppTheme.textPrimary)
+                        TextField("Örn: Hız Limiti 80 km/s", text: $name)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 14))
+                    }
+
+                    // Alarm Türü
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Alarm Türü")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppTheme.textPrimary)
+
+                        ForEach(typeOptions) { type in
+                            Button(action: { selectedType = type.value }) {
+                                HStack(spacing: 10) {
+                                    Image(systemName: selectedType == type.value ? "largecircle.fill.circle" : "circle")
+                                        .foregroundColor(selectedType == type.value ? AppTheme.indigo : AppTheme.textMuted)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(type.label)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundColor(AppTheme.textPrimary)
+                                        if !type.description.isEmpty {
+                                            Text(type.description)
+                                                .font(.system(size: 10))
+                                                .foregroundColor(AppTheme.textMuted)
+                                                .lineLimit(1)
+                                        }
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 8)
+                                .background(selectedType == type.value ? AppTheme.indigo.opacity(0.06) : Color.clear)
+                                .cornerRadius(8)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    // Type-specific conditions
+                    if selectedType == "speed_violation" {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Hız Limiti (km/s)")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(AppTheme.textPrimary)
+                            TextField("80", text: $speedLimit)
+                                .textFieldStyle(.roundedBorder)
+                                .keyboardType(.numberPad)
+                                .font(.system(size: 14))
+                        }
+                    }
+
+                    if selectedType == "idle_alarm" {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Rölanti Süresi (saniye)")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(AppTheme.textPrimary)
+                            TextField("300", text: $idleAfterSec)
+                                .textFieldStyle(.roundedBorder)
+                                .keyboardType(.numberPad)
+                                .font(.system(size: 14))
+                        }
+                    }
+
+                    if selectedType == "geofence_alarm", let geofences = catalog?.geofences {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Bölge Seçin")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(AppTheme.textPrimary)
+                            ForEach(geofences) { gf in
+                                Button(action: { selectedGeofence = gf.id }) {
+                                    HStack {
+                                        Image(systemName: selectedGeofence == gf.id ? "largecircle.fill.circle" : "circle")
+                                            .foregroundColor(selectedGeofence == gf.id ? AppTheme.indigo : AppTheme.textMuted)
+                                        Text(gf.name)
+                                            .font(.system(size: 13))
+                                            .foregroundColor(AppTheme.textPrimary)
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    // Araçlar
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Araçlar")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppTheme.textPrimary)
+
+                        if let vehicles = catalog?.vehicles {
+                            ForEach(vehicles) { v in
+                                Button(action: {
+                                    if selectedVehicles.contains(v.assignmentId) {
+                                        selectedVehicles.remove(v.assignmentId)
+                                    } else {
+                                        selectedVehicles.insert(v.assignmentId)
+                                    }
+                                }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: selectedVehicles.contains(v.assignmentId) ? "checkmark.square.fill" : "square")
+                                            .foregroundColor(selectedVehicles.contains(v.assignmentId) ? AppTheme.indigo : AppTheme.textMuted)
+                                        Text(v.label)
+                                            .font(.system(size: 13))
+                                            .foregroundColor(AppTheme.textPrimary)
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        } else {
+                            Text("Araçlar yükleniyor...")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.textMuted)
+                        }
+                    }
+
+                    // Bildirim Kanalları
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Bildirim Kanalları")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppTheme.textPrimary)
+
+                        HStack(spacing: 8) {
+                            ForEach([("email", "E-posta"), ("sms", "SMS"), ("push", "Bildirim")], id: \.0) { (key, label) in
+                                Button(action: {
+                                    if selectedChannels.contains(key) {
+                                        selectedChannels.remove(key)
+                                    } else {
+                                        selectedChannels.insert(key)
+                                    }
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: selectedChannels.contains(key) ? "checkmark.square.fill" : "square")
+                                            .font(.system(size: 14))
+                                        Text(label)
+                                            .font(.system(size: 12))
+                                    }
+                                    .foregroundColor(selectedChannels.contains(key) ? AppTheme.indigo : AppTheme.textPrimary)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 8)
+                                    .background(selectedChannels.contains(key) ? AppTheme.indigo.opacity(0.1) : AppTheme.surface)
+                                    .cornerRadius(8)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(selectedChannels.contains(key) ? AppTheme.indigo : AppTheme.borderSoft, lineWidth: 1)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    // Alıcılar
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Alıcılar")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppTheme.textPrimary)
+
+                        if let recipients = catalog?.recipients {
+                            ForEach(recipients) { r in
+                                Button(action: {
+                                    if selectedRecipients.contains(r.id) {
+                                        selectedRecipients.remove(r.id)
+                                    } else {
+                                        selectedRecipients.insert(r.id)
+                                    }
+                                }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: selectedRecipients.contains(r.id) ? "checkmark.square.fill" : "square")
+                                            .foregroundColor(selectedRecipients.contains(r.id) ? AppTheme.indigo : AppTheme.textMuted)
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(r.name)
+                                                .font(.system(size: 13))
+                                                .foregroundColor(AppTheme.textPrimary)
+                                            Text(r.email)
+                                                .font(.system(size: 11))
+                                                .foregroundColor(AppTheme.textMuted)
+                                        }
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        } else {
+                            Text("Alıcılar yükleniyor...")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.textMuted)
+                        }
+                    }
+
+                    // Error
+                    if let error = errorMsg {
+                        Text(error)
+                            .font(.system(size: 12))
+                            .foregroundColor(.red)
+                    }
+
+                    // Save button
+                    Button(action: { Task { await save() } }) {
+                        HStack {
+                            if isSaving {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "checkmark")
+                                Text("Kaydet")
+                            }
+                        }
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(AppTheme.navy)
+                        .cornerRadius(12)
+                    }
+                    .disabled(isSaving)
+                }
+                .padding(16)
+            }
+            .background(AppTheme.bg)
+            .navigationTitle("Yeni Alarm Kuralı")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("İptal") { dismiss() }
+                }
+            }
+            .onAppear {
+                // Pre-select first recipient
+                if let first = catalog?.recipients.first {
+                    selectedRecipients.insert(first.id)
+                }
+            }
+        }
+        .presentationDetents([.large])
+    }
+
+    private func save() async {
+        guard !name.isEmpty else { errorMsg = "Kural adı gerekli"; return }
+        guard !selectedVehicles.isEmpty else { errorMsg = "En az bir araç seçin"; return }
+        guard !selectedChannels.isEmpty else { errorMsg = "En az bir bildirim kanalı seçin"; return }
+        guard !selectedRecipients.isEmpty else { errorMsg = "En az bir alıcı seçin"; return }
+
+        isSaving = true
+        errorMsg = nil
+
+        var body: [String: Any] = [
+            "name": name,
+            "alarm_type": selectedType,
+            "status": "active",
+            "evaluation_mode": "live",
+            "source_mode": selectedType == "speed_violation" ? "existing" : "derived",
+            "cooldown_sec": 300,
+            "is_active": true,
+            "condition_require_ignition": true,
+            "targets": selectedVehicles.map { ["scope": "assignment", "id": $0] },
+            "channels": Array(selectedChannels),
+            "recipient_ids": Array(selectedRecipients)
+        ]
+
+        // Type-specific conditions
+        switch selectedType {
+        case "speed_violation":
+            body["condition_speed_limit_kmh"] = Int(speedLimit) ?? 80
+            body["condition_speed_duration_sec"] = 5
+        case "idle_alarm":
+            body["condition_idle_after_sec"] = Int(idleAfterSec) ?? 300
+            body["condition_speed_threshold_kmh"] = 0
+        case "geofence_alarm":
+            if let gf = selectedGeofence { body["condition_geofence_id"] = gf }
+            body["condition_geofence_trigger"] = "both"
+        case "off_hours_usage":
+            body["condition_start_local"] = "08:00"
+            body["condition_end_local"] = "18:00"
+            body["condition_timezone"] = "Europe/Istanbul"
+            body["condition_min_speed_kmh"] = 1
+            body["condition_days"] = [1, 2, 3, 4, 5]
+        default: break
+        }
+
+        do {
+            _ = try await APIService.shared.post("/api/mobile/alarm-sets/", body: body)
+            onCreated()
+        } catch {
+            errorMsg = "Kayıt başarısız: \(error.localizedDescription)"
+        }
+
+        isSaving = false
     }
 }
 
