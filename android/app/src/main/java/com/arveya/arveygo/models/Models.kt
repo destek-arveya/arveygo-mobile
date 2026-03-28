@@ -112,9 +112,48 @@ data class Vehicle(
     var dailyKm: Double = 0.0,
     var fuelType: String = "",
     var dailyFuelLiters: Double = 0.0,
-    var dailyFuelPer100km: Double = 0.0
+    var dailyFuelPer100km: Double = 0.0,
+    var fuelPer100km: Double = 0.0
 ) {
     val isMotorcycle: Boolean get() = vehicleCategory == "motorcycle"
+
+    /** Estimated daily fuel consumption in liters: dailyKm * fuelPer100km / 100 */
+    val estimatedDailyFuelLiters: Double
+        get() {
+            val rate = if (dailyFuelPer100km > 0) dailyFuelPer100km else fuelPer100km
+            if (rate <= 0 || dailyKm <= 0) return 0.0
+            return dailyKm * rate / 100.0
+        }
+
+    /** Estimated daily fuel cost in TL */
+    val estimatedDailyFuelCostTL: Double
+        get() {
+            val liters = estimatedDailyFuelLiters
+            if (liters <= 0) return 0.0
+            val pricePerLiter = when {
+                fuelType.contains("Dizel", ignoreCase = true) || fuelType.contains("diesel", ignoreCase = true) -> 42.75
+                fuelType.contains("Benzin", ignoreCase = true) || fuelType.contains("gasoline", ignoreCase = true) -> 44.49
+                fuelType.contains("LPG", ignoreCase = true) -> 17.54
+                else -> 42.75 // default Dizel
+            }
+            return liters * pricePerLiter
+        }
+
+    val formattedDailyFuelCost: String
+        get() {
+            val cost = estimatedDailyFuelCostTL
+            if (cost <= 0) return "—"
+            val fmt = NumberFormat.getNumberInstance(Locale("tr", "TR"))
+            fmt.maximumFractionDigits = 0
+            return "\u20ba${fmt.format(cost)}"
+        }
+
+    val formattedDailyFuelLiters: String
+        get() {
+            val liters = estimatedDailyFuelLiters
+            if (liters <= 0) return "—"
+            return String.format("%.1f L", liters)
+        }
 
     val formattedTotalKm: String
         get() {
@@ -124,9 +163,15 @@ data class Vehicle(
 
     val formattedTodayKm: String
         get() {
-            val km = if (dailyKm > 0) dailyKm.toInt() else todayKm
-            val fmt = NumberFormat.getNumberInstance(Locale("tr", "TR"))
-            return fmt.format(km) + " km"
+            val kmVal = if (dailyKm > 0) dailyKm else todayKm.toDouble()
+            if (kmVal <= 0) return "0 km"
+            return if (kmVal < 1) {
+                String.format("%.0f m", kmVal * 1000)
+            } else {
+                val fmt = NumberFormat.getNumberInstance(Locale("tr", "TR"))
+                fmt.maximumFractionDigits = 1
+                fmt.format(kmVal) + " km"
+            }
         }
 
     val formattedSpeed: String get() = "${speed.toInt()} km/h"
@@ -284,6 +329,10 @@ data class Vehicle(
             val input2 = json.optBoolean("input2", false)
             val output = json.optBoolean("output", false)
             val odometer = json.optDouble("odometer", 0.0)
+            val dailyKmVal = json.optDouble("dailyKm", json.optDouble("daily_km", 0.0))
+            val todayKmVal = json.optDouble("todayKm", json.optDouble("today_km", 0.0))
+            val fuelPer100kmVal = json.optDouble("fuelPer100km", json.optDouble("fuel_per_100km", 0.0))
+            val fuelTypeVal = json.optString("fuelType", json.optString("fuel_type", ""))
             val speedLimit = json.optInt("speed_limit", 0)
             val companyId = json.optInt("company_id", 0)
             val driverId = if (json.has("driver_id")) json.optString("driver_id") else null
@@ -368,9 +417,11 @@ data class Vehicle(
                 else -> VehicleStatus.OFFLINE
             }
 
+            val effectiveDailyKm = if (dailyKmVal > 0) dailyKmVal else todayKmVal
+
             return Vehicle(
                 id = imei, plate = plate, model = name, status = status,
-                kontakOn = ignition, totalKm = odometer.toInt(), todayKm = 0,
+                kontakOn = ignition, totalKm = odometer.toInt(), todayKm = effectiveDailyKm.toInt(),
                 driver = driverId ?: "", city = "", lat = lat, lng = lon,
                 vehicleCategory = vehicleCategory,
                 imei = imei, companyId = companyId, name = name,
@@ -385,7 +436,10 @@ data class Vehicle(
                 firstIgnitionOnAtToday = firstIgnitionOnAtToday,
                 lastIgnitionOnAt = lastIgnitionOnAt,
                 lastIgnitionOffAt = lastIgnitionOffAt,
-                deviceId = deviceIdValue
+                deviceId = deviceIdValue,
+                dailyKm = effectiveDailyKm,
+                fuelType = fuelTypeVal,
+                dailyFuelPer100km = fuelPer100kmVal
             )
         }
     }
@@ -427,7 +481,8 @@ data class Vehicle(
             dailyKm = if (patch.dailyKm > 0) patch.dailyKm else dailyKm,
             fuelType = if (patch.fuelType.isNotEmpty()) patch.fuelType else fuelType,
             dailyFuelLiters = if (patch.dailyFuelLiters > 0) patch.dailyFuelLiters else dailyFuelLiters,
-            dailyFuelPer100km = if (patch.dailyFuelPer100km > 0) patch.dailyFuelPer100km else dailyFuelPer100km
+            dailyFuelPer100km = if (patch.dailyFuelPer100km > 0) patch.dailyFuelPer100km else dailyFuelPer100km,
+            fuelPer100km = if (patch.fuelPer100km > 0) patch.fuelPer100km else fuelPer100km
         )
     }
 }

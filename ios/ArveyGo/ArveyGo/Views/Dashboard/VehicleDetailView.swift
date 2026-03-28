@@ -42,7 +42,8 @@ class VehicleDetailObserver: ObservableObject {
     func enrichVehicleFromDetail(_ detail: [String: Any]) {
         let todayKmVal = (detail["todayKm"] as? Double) ?? (detail["todayKm"] as? Int).map { Double($0) } ?? 0
         let todayDistanceM = (detail["todayDistanceM"] as? Double) ?? (detail["todayDistanceM"] as? Int).map { Double($0) } ?? 0
-        let dailyKmVal = todayKmVal > 0 ? todayKmVal : (todayDistanceM > 0 ? todayDistanceM / 1000.0 : 0)
+        let dailyKmApi = (detail["dailyKm"] as? Double) ?? (detail["daily_km"] as? Double) ?? (detail["dailyKm"] as? Int).map { Double($0) } ?? (detail["daily_km"] as? Int).map { Double($0) } ?? 0
+        let dailyKmVal = dailyKmApi > 0 ? dailyKmApi : (todayKmVal > 0 ? todayKmVal : (todayDistanceM > 0 ? todayDistanceM / 1000.0 : 0))
         let groupNameVal = detail["groupName"] as? String ?? ""
         let vehicleBrandVal = detail["vehicleBrand"] as? String ?? ""
         let vehicleModelVal = detail["vehicleModel"] as? String ?? ""
@@ -51,6 +52,7 @@ class VehicleDetailObserver: ObservableObject {
         let fuelTypeVal = detail["fuelType"] as? String ?? ""
         let dailyFuelLitersVal = (detail["dailyFuelLiters"] as? Double) ?? (detail["dailyFuelLiters"] as? Int).map { Double($0) } ?? 0
         let dailyFuelPer100kmVal = (detail["dailyFuelPer100km"] as? Double) ?? (detail["dailyFuelPer100km"] as? Int).map { Double($0) } ?? 0
+        let fuelPer100kmVal = (detail["fuelPer100km"] as? Double) ?? (detail["fuelPer100km"] as? Int).map { Double($0) } ?? 0
         let odometerVal = (detail["odometer"] as? Double) ?? (detail["odometer"] as? Int).map { Double($0) } ?? 0
         let kmVal = (detail["km"] as? Double) ?? (detail["km"] as? Int).map { Double($0) } ?? 0
         let batteryVal = (detail["battery"] as? Double)
@@ -75,6 +77,7 @@ class VehicleDetailObserver: ObservableObject {
         if !fuelTypeVal.isEmpty && fuelTypeVal != "<null>" { vehicle.fuelType = fuelTypeVal }
         if dailyFuelLitersVal > 0 { vehicle.dailyFuelLiters = dailyFuelLitersVal }
         if dailyFuelPer100kmVal > 0 { vehicle.dailyFuelPer100km = dailyFuelPer100kmVal }
+        if fuelPer100kmVal > 0 { vehicle.fuelPer100km = fuelPer100kmVal }
         if odometerVal > 0 { vehicle.totalKm = Int(odometerVal); vehicle.odometer = odometerVal }
         else if kmVal > 0 { vehicle.totalKm = Int(kmVal); vehicle.odometer = kmVal }
         if let v = batteryVal { vehicle.batteryVoltage = v }
@@ -469,6 +472,24 @@ struct VehicleDetailView: View {
                     if let hum = vehicle.humidityPct {
                         detailRow(icon: "humidity.fill", label: "Nem", value: "%\(Int(hum))")
                     }
+                }
+            }
+
+            // ── Yakıt & Maliyet ──
+            if !vehicle.fuelType.isEmpty || vehicle.dailyFuelPer100km > 0 || vehicle.fuelPer100km > 0 {
+                cleanListCard {
+                    if !vehicle.fuelType.isEmpty {
+                        detailRow(icon: "fuelpump.fill", label: "Yakıt Tipi", value: vehicle.fuelType)
+                        listDivider
+                    }
+                    let rate = vehicle.dailyFuelPer100km > 0 ? vehicle.dailyFuelPer100km : vehicle.fuelPer100km
+                    if rate > 0 {
+                        detailRow(icon: "gauge.open.with.lines.needle.33percent", label: "Tüketim", value: String(format: "%.1f L/100km", rate))
+                        listDivider
+                    }
+                    detailRow(icon: "drop.fill", label: "Bugün Tahmini Yakıt", value: vehicle.formattedDailyFuelLiters)
+                    listDivider
+                    detailRow(icon: "turkishlirasign.circle.fill", label: "Bugün Tahmini Maliyet", value: vehicle.formattedDailyFuelCost)
                 }
             }
 

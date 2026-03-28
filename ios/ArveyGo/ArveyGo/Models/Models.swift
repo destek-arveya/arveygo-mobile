@@ -78,6 +78,7 @@ struct Vehicle: Identifiable, Hashable {
     var fuelType: String = ""
     var dailyFuelLiters: Double = 0
     var dailyFuelPer100km: Double = 0
+    var fuelPer100km: Double = 0
 
     var isMotorcycle: Bool { vehicleCategory == "motorcycle" }
 
@@ -96,15 +97,61 @@ struct Vehicle: Identifiable, Hashable {
     }
 
     var formattedTodayKm: String {
-        let km = dailyKm > 0 ? Int(dailyKm) : todayKm
+        let kmVal = dailyKm > 0 ? dailyKm : Double(todayKm)
+        if kmVal <= 0 { return "0 km" }
+        if kmVal < 1 {
+            return String(format: "%.0f m", kmVal * 1000)
+        }
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.groupingSeparator = "."
-        return (formatter.string(from: NSNumber(value: km)) ?? "\(km)") + " km"
+        formatter.maximumFractionDigits = 1
+        return (formatter.string(from: NSNumber(value: kmVal)) ?? "\(Int(kmVal))") + " km"
     }
 
     var formattedSpeed: String {
         return "\(Int(speed)) km/h"
+    }
+
+    /// Estimated daily fuel consumption in liters: dailyKm * fuelPer100km / 100
+    var estimatedDailyFuelLiters: Double {
+        let rate = dailyFuelPer100km > 0 ? dailyFuelPer100km : fuelPer100km
+        guard rate > 0, dailyKm > 0 else { return 0 }
+        return dailyKm * rate / 100.0
+    }
+
+    /// Estimated daily fuel cost in TL
+    var estimatedDailyFuelCostTL: Double {
+        let liters = estimatedDailyFuelLiters
+        guard liters > 0 else { return 0 }
+        let pricePerLiter: Double
+        let ft = fuelType.lowercased()
+        if ft.contains("dizel") || ft.contains("diesel") {
+            pricePerLiter = 42.75
+        } else if ft.contains("benzin") || ft.contains("gasoline") {
+            pricePerLiter = 44.49
+        } else if ft.contains("lpg") {
+            pricePerLiter = 17.54
+        } else {
+            pricePerLiter = 42.75 // default Dizel
+        }
+        return liters * pricePerLiter
+    }
+
+    var formattedDailyFuelCost: String {
+        let cost = estimatedDailyFuelCostTL
+        guard cost > 0 else { return "—" }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = "."
+        formatter.maximumFractionDigits = 0
+        return "\u{20BA}" + (formatter.string(from: NSNumber(value: cost)) ?? "\(Int(cost))")
+    }
+
+    var formattedDailyFuelLiters: String {
+        let liters = estimatedDailyFuelLiters
+        guard liters > 0 else { return "—" }
+        return String(format: "%.1f L", liters)
     }
 
     var kontakLabel: String {
@@ -213,6 +260,10 @@ struct Vehicle: Identifiable, Hashable {
         let input2 = (json["input2"] as? Bool) ?? false
         let output = (json["output"] as? Bool) ?? false
         let odometer = (json["odometer"] as? Double) ?? ((json["odometer"] as? Int).map { Double($0) } ?? 0)
+        let dailyKmVal = (json["dailyKm"] as? Double) ?? (json["daily_km"] as? Double) ?? ((json["dailyKm"] as? Int).map { Double($0) } ?? ((json["daily_km"] as? Int).map { Double($0) } ?? 0))
+        let todayKmVal = (json["todayKm"] as? Double) ?? (json["today_km"] as? Double) ?? ((json["todayKm"] as? Int).map { Double($0) } ?? ((json["today_km"] as? Int).map { Double($0) } ?? 0))
+        let fuelPer100kmVal = (json["fuelPer100km"] as? Double) ?? (json["fuel_per_100km"] as? Double) ?? 0
+        let fuelTypeVal = (json["fuelType"] as? String) ?? (json["fuel_type"] as? String) ?? ""
         let speedLimit = (json["speed_limit"] as? Int) ?? 0
         let companyId = (json["company_id"] as? Int) ?? 0
         let driverId = json["driver_id"] as? String
@@ -289,6 +340,8 @@ struct Vehicle: Identifiable, Hashable {
             status = .offline
         }
 
+        let effectiveDailyKm = dailyKmVal > 0 ? dailyKmVal : todayKmVal
+
         return Vehicle(
             id: imei,
             plate: plate,
@@ -296,7 +349,7 @@ struct Vehicle: Identifiable, Hashable {
             status: status,
             kontakOn: ignition,
             totalKm: Int(odometer),
-            todayKm: 0,
+            todayKm: Int(effectiveDailyKm),
             driver: driverId ?? "",
             city: "",
             lat: lat,
@@ -328,7 +381,11 @@ struct Vehicle: Identifiable, Hashable {
             deviceId: deviceIdValue,
             firstIgnitionOnAtToday: firstIgnitionOnAtToday,
             lastIgnitionOnAt: lastIgnitionOnAt,
-            lastIgnitionOffAt: lastIgnitionOffAt
+            lastIgnitionOffAt: lastIgnitionOffAt,
+            dailyKm: effectiveDailyKm,
+            fuelType: fuelTypeVal,
+            dailyFuelPer100km: fuelPer100kmVal,
+            fuelPer100km: fuelPer100kmVal
         )
     }
 
@@ -375,6 +432,7 @@ struct Vehicle: Identifiable, Hashable {
         if !patch.fuelType.isEmpty { fuelType = patch.fuelType }
         if patch.dailyFuelLiters > 0 { dailyFuelLiters = patch.dailyFuelLiters }
         if patch.dailyFuelPer100km > 0 { dailyFuelPer100km = patch.dailyFuelPer100km }
+        if patch.fuelPer100km > 0 { fuelPer100km = patch.fuelPer100km }
     }
 }
 

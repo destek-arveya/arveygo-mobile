@@ -63,7 +63,8 @@ fun VehicleDetailScreen(
     fun enrichVehicleFromDetail(detail: org.json.JSONObject) {
         val todayKmVal = detail.optDouble("todayKm", 0.0)
         val todayDistanceM = detail.optDouble("todayDistanceM", 0.0)
-        val dailyKmVal = if (todayKmVal > 0) todayKmVal else if (todayDistanceM > 0) todayDistanceM / 1000.0 else 0.0
+        val dailyKmApi = detail.optDouble("dailyKm", detail.optDouble("daily_km", 0.0))
+        val dailyKmVal = if (dailyKmApi > 0) dailyKmApi else if (todayKmVal > 0) todayKmVal else if (todayDistanceM > 0) todayDistanceM / 1000.0 else 0.0
         val groupNameVal = detail.optString("groupName", "")
         val vehicleBrandVal = detail.optString("vehicleBrand", "")
         val vehicleModelVal = detail.optString("vehicleModel", "")
@@ -72,6 +73,7 @@ fun VehicleDetailScreen(
         val fuelTypeVal = detail.optString("fuelType", "")
         val dailyFuelLitersVal = detail.optDouble("dailyFuelLiters", 0.0)
         val dailyFuelPer100kmVal = detail.optDouble("dailyFuelPer100km", 0.0)
+        val fuelPer100kmVal = detail.optDouble("fuelPer100km", 0.0)
         val odometerVal = detail.optDouble("odometer", 0.0)
         val kmVal = detail.optDouble("km", 0.0)
         val batteryVal = when {
@@ -105,6 +107,7 @@ fun VehicleDetailScreen(
             fuelType = if (fuelTypeVal.isNotEmpty() && fuelTypeVal != "null") fuelTypeVal else currentVehicle.fuelType,
             dailyFuelLiters = if (dailyFuelLitersVal > 0) dailyFuelLitersVal else currentVehicle.dailyFuelLiters,
             dailyFuelPer100km = if (dailyFuelPer100kmVal > 0) dailyFuelPer100kmVal else currentVehicle.dailyFuelPer100km,
+            fuelPer100km = if (fuelPer100kmVal > 0) fuelPer100kmVal else currentVehicle.fuelPer100km,
             totalKm = if (odometerVal > 0) odometerVal.toInt() else if (kmVal > 0) kmVal.toInt() else currentVehicle.totalKm,
             odometer = if (odometerVal > 0) odometerVal else if (kmVal > 0) kmVal else currentVehicle.odometer,
             batteryVoltage = if (!batteryVal.isNaN()) batteryVal else currentVehicle.batteryVoltage,
@@ -595,6 +598,24 @@ private fun OverviewTab(
             vehicle.humidityPct?.let { hum ->
                 DetailRow(Icons.Default.WaterDrop, "Nem", "%${hum.toInt()}")
             }
+        }
+    }
+
+    // ── Yakıt & Maliyet ──
+    if (vehicle.fuelType.isNotEmpty() || vehicle.dailyFuelPer100km > 0 || vehicle.fuelPer100km > 0) {
+        CleanListCard {
+            if (vehicle.fuelType.isNotEmpty()) {
+                DetailRow(Icons.Default.LocalGasStation, "Yakıt Tipi", vehicle.fuelType)
+                ListDivider()
+            }
+            val rate = if (vehicle.dailyFuelPer100km > 0) vehicle.dailyFuelPer100km else vehicle.fuelPer100km
+            if (rate > 0) {
+                DetailRow(Icons.Default.Speed, "Tüketim", String.format("%.1f L/100km", rate))
+                ListDivider()
+            }
+            DetailRow(Icons.Default.WaterDrop, "Bugün Tahmini Yakıt", vehicle.formattedDailyFuelLiters)
+            ListDivider()
+            DetailRow(Icons.Default.Payments, "Bugün Tahmini Maliyet", vehicle.formattedDailyFuelCost)
         }
     }
 
