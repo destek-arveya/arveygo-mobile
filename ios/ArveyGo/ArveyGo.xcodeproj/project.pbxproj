@@ -41,6 +41,7 @@
 		AA000034 /* GeofencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000034 /* GeofencesView.swift */; };
 		AA000035 /* DriversView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000035 /* DriversView.swift */; };
 		AA000036 /* FleetManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000036 /* FleetManagementView.swift */; };
+		AA000037 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000037 /* ReportsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -80,6 +81,7 @@
 		BB000034 /* GeofencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeofencesView.swift; sourceTree = "<group>"; };
 		BB000035 /* DriversView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriversView.swift; sourceTree = "<group>"; };
 		BB000036 /* FleetManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetManagementView.swift; sourceTree = "<group>"; };
+		BB000037 /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -230,6 +232,7 @@
 				BB000034 /* GeofencesView.swift */,
 				BB000035 /* DriversView.swift */,
 				BB000036 /* FleetManagementView.swift */,
+				BB000037 /* ReportsView.swift */,
 			);
 			path = Fleet;
 			sourceTree = "<group>";
@@ -363,6 +366,7 @@
 				AA000034 /* GeofencesView.swift in Sources */,
 				AA000035 /* DriversView.swift in Sources */,
 				AA000036 /* FleetManagementView.swift in Sources */,
+				AA000037 /* ReportsView.swift in Sources */,
 				AA000021 /* AppConfig.swift in Sources */,
 				AA000022 /* JWTHelper.swift in Sources */,
 				AA000023 /* WebSocketManager.swift in Sources */,
