@@ -11,186 +11,181 @@ struct VehiclesListView: View {
 
     var body: some View {
         NavigationStack {
-                ZStack {
-                    AppTheme.bg.ignoresSafeArea()
+            ZStack {
+                AppTheme.bg.ignoresSafeArea()
 
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 14) {
-                            // Search & Filter
-                            searchAndFilter
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 12) {
+                        // Status summary chips
+                        statusChips
 
-                            // Vehicle Table
-                            vehicleTable
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 6)
-                        .padding(.bottom, 20)
+                        // Search & Filter
+                        searchAndFilter
+
+                        // Vehicle Cards
+                        vehicleCards
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 6)
+                    .padding(.bottom, 24)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { withAnimation(.spring(response: 0.3)) { showSideMenu.toggle() } }) {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(AppTheme.navy)
                     }
                 }
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button(action: { withAnimation(.spring(response: 0.3)) { showSideMenu.toggle() } }) {
-                            Image(systemName: "line.3.horizontal")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(AppTheme.navy)
-                        }
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 1) {
+                        Text("Araçlarım")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(AppTheme.navy)
+                        Text("Filo Yönetimi / Araçlar")
+                            .font(.system(size: 10))
+                            .foregroundColor(AppTheme.textMuted)
                     }
-                    ToolbarItem(placement: .principal) {
-                        VStack(spacing: 1) {
-                            Text("Araçlarım")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(AppTheme.navy)
-                            Text("Filo Yönetimi / Araçlar")
-                                .font(.system(size: 10))
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack(spacing: 12) {
+                        Button(action: {}) {
+                            Image(systemName: "bell")
+                                .font(.system(size: 16))
                                 .foregroundColor(AppTheme.textMuted)
+                                .overlay(
+                                    Circle()
+                                        .fill(Color.red)
+                                        .frame(width: 7, height: 7)
+                                        .offset(x: 6, y: -6)
+                                )
                         }
+                        AvatarCircle(
+                            initials: authVM.currentUser?.avatar ?? "A",
+                            size: 30
+                        )
                     }
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        HStack(spacing: 12) {
-                            Button(action: {}) {
-                                Image(systemName: "bell")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(AppTheme.textMuted)
-                                    .overlay(
-                                        Circle()
-                                            .fill(Color.red)
-                                            .frame(width: 7, height: 7)
-                                            .offset(x: 6, y: -6)
-                                    )
-                            }
-                            AvatarCircle(
-                                initials: authVM.currentUser?.avatar ?? "A",
-                                size: 30
-                            )
-                        }
-                    }
-                }
-                .fullScreenCover(item: $selectedVehicle) { vehicle in
-                    VehicleDetailView(
-                        vehicle: vehicle,
-                        onNavigateToRouteHistory: { v in
-                            selectedVehicle = nil
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                selectedPage = .routeHistory
-                            }
-                        },
-                        onNavigateToAlarms: { plateText in
-                            selectedVehicle = nil
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                alarmsSearchText = plateText
-                                selectedPage = .alarms
-                            }
-                        }
-                    )
                 }
             }
+            .fullScreenCover(item: $selectedVehicle) { vehicle in
+                VehicleDetailView(
+                    vehicle: vehicle,
+                    onNavigateToRouteHistory: { v in
+                        selectedVehicle = nil
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            selectedPage = .routeHistory
+                        }
+                    },
+                    onNavigateToAlarms: { plateText in
+                        selectedVehicle = nil
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            alarmsSearchText = plateText
+                            selectedPage = .alarms
+                        }
+                    }
+                )
+            }
+        }
     }
 
-    // MARK: - Alert Summary Cards
-    var alertSummaryCards: some View {
+    // MARK: - Status Summary Chips
+    var statusChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                alertCard(icon: "exclamationmark.circle.fill", value: "\(vm.expiredDocs)", label: "Süresi Dolmuş Belge", iconBg: Color.red.opacity(0.1), iconColor: .red)
-                alertCard(icon: "exclamationmark.triangle.fill", value: "\(vm.criticalDocs)", label: "Yaklaşan Belge Süresi", iconBg: Color.orange.opacity(0.1), iconColor: .orange)
-                alertCard(icon: "circle.circle.fill", value: "\(vm.wornTires)", label: "Lastik Değişimi", iconBg: Color.red.opacity(0.1), iconColor: .red)
-                alertCard(icon: "wrench.and.screwdriver.fill", value: "\(vm.upcomingMaint)", label: "30 Gün Bakım", iconBg: Color.blue.opacity(0.1), iconColor: .blue)
+            HStack(spacing: 8) {
+                statusChip(label: "Toplam", count: vm.vehicles.count, color: AppTheme.navy, isSelected: vm.statusFilter == nil) {
+                    vm.statusFilter = nil
+                }
+                statusChip(label: "Kontak Açık", count: vm.onlineCount, color: AppTheme.online, isSelected: vm.statusFilter == .ignitionOn) {
+                    vm.statusFilter = vm.statusFilter == .ignitionOn ? nil : .ignitionOn
+                }
+                statusChip(label: "Kontak Kapalı", count: vm.offlineCount, color: AppTheme.offline, isSelected: vm.statusFilter == .ignitionOff) {
+                    vm.statusFilter = vm.statusFilter == .ignitionOff ? nil : .ignitionOff
+                }
+                statusChip(label: "Bilgi Yok", count: vm.noDataCount, color: AppTheme.textMuted, isSelected: vm.statusFilter == .noData) {
+                    vm.statusFilter = vm.statusFilter == .noData ? nil : .noData
+                }
+                statusChip(label: "Uyku", count: vm.sleepingCount, color: AppTheme.idle, isSelected: vm.statusFilter == .sleeping) {
+                    vm.statusFilter = vm.statusFilter == .sleeping ? nil : .sleeping
+                }
             }
         }
     }
 
-    func alertCard(icon: String, value: String, label: String, iconBg: Color, iconColor: Color) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 18))
-                .foregroundColor(iconColor)
-                .frame(width: 40, height: 40)
-                .background(iconBg)
-                .cornerRadius(10)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(value)
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(AppTheme.navy)
+    func statusChip(label: String, count: Int, color: Color, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 8, height: 8)
                 Text(label)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(AppTheme.textMuted)
-                    .lineLimit(1)
+                    .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
+                    .foregroundColor(isSelected ? color : AppTheme.textSecondary)
+                Text("\(count)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(isSelected ? color : AppTheme.textMuted)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(isSelected ? color.opacity(0.15) : AppTheme.bg)
+                    )
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(isSelected ? color.opacity(0.12) : AppTheme.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(isSelected ? color.opacity(0.3) : AppTheme.borderSoft, lineWidth: 1)
+            )
         }
-        .padding(14)
-        .background(AppTheme.surface)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
-        )
     }
 
     // MARK: - Search and Filter
     var searchAndFilter: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             // Search bar
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 13))
+                    .font(.system(size: 16))
                     .foregroundColor(AppTheme.textMuted)
                 TextField("Plaka, araç veya sürücü ara...", text: $vm.searchText)
-                    .font(.system(size: 13))
+                    .font(.system(size: 14))
                 if !vm.searchText.isEmpty {
                     Button(action: { vm.searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 14))
+                            .font(.system(size: 16))
                             .foregroundColor(AppTheme.textFaint)
                     }
                 }
             }
-            .padding(.horizontal, 12)
-            .frame(height: 40)
+            .padding(.horizontal, 14)
+            .frame(height: 44)
             .background(AppTheme.surface)
-            .cornerRadius(10)
+            .cornerRadius(12)
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(AppTheme.borderSoft, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(AppTheme.borderSoft, lineWidth: 1)
             )
 
-            // Filter row
+            // Group filter + count
             HStack(spacing: 8) {
-                // Status filter
-                Menu {
-                    Button("Tüm Durumlar") { vm.statusFilter = nil }
-                    Button("Kontak Açık") { vm.statusFilter = .ignitionOn }
-                    Button("Kontak Kapalı") { vm.statusFilter = .ignitionOff }
-                    Button("Bilgi Yok") { vm.statusFilter = .noData }
-                    Button("Cihaz Uykuda") { vm.statusFilter = .sleeping }
-                } label: {
-                    HStack(spacing: 5) {
-                        Text(vm.statusFilterLabel)
-                            .font(.system(size: 11, weight: .medium))
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 9, weight: .semibold))
-                    }
-                    .foregroundColor(AppTheme.navy)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(AppTheme.surface)
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(AppTheme.borderSoft, lineWidth: 1.5)
-                    )
-                }
-
-                // Group filter
                 Menu {
                     Button("Tüm Gruplar") { vm.groupFilter = nil }
                     ForEach(vm.groups, id: \.self) { group in
                         Button(group) { vm.groupFilter = group }
                     }
                 } label: {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "folder")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.textMuted)
                         Text(vm.groupFilter ?? "Tüm Gruplar")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                         Image(systemName: "chevron.down")
                             .font(.system(size: 9, weight: .semibold))
                     }
@@ -201,22 +196,22 @@ struct VehiclesListView: View {
                     .cornerRadius(8)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(AppTheme.borderSoft, lineWidth: 1.5)
+                            .stroke(AppTheme.borderSoft, lineWidth: 1)
                     )
                 }
 
                 Spacer()
 
-                Text("\(vm.filteredVehicles.count) / \(vm.vehicles.count) araç")
+                Text("\(vm.filteredVehicles.count) araç listeleniyor")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppTheme.textMuted)
             }
         }
     }
 
-    // MARK: - Vehicle Table
-    var vehicleTable: some View {
-        VStack(spacing: 10) {
+    // MARK: - Vehicle Cards
+    var vehicleCards: some View {
+        VStack(spacing: 12) {
             ForEach(vm.filteredVehicles) { vehicle in
                 Button(action: { selectedVehicle = vehicle }) {
                     vehicleCard(vehicle)
@@ -225,31 +220,49 @@ struct VehiclesListView: View {
             }
 
             if vm.filteredVehicles.isEmpty {
-                VStack(spacing: 12) {
+                VStack(spacing: 16) {
                     Image(systemName: "car.2.fill")
-                        .font(.system(size: 36))
-                        .foregroundColor(AppTheme.textFaint.opacity(0.5))
+                        .font(.system(size: 48))
+                        .foregroundColor(AppTheme.textFaint.opacity(0.4))
                     Text("Araç bulunamadı")
-                        .font(.system(size: 13))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundColor(AppTheme.textMuted)
+                    Text("Filtre veya arama kriterlerinizi değiştirin")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.textFaint)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 40)
+                .padding(.vertical, 60)
             }
         }
     }
 
+    // MARK: - Vehicle Card
     func vehicleCard(_ vehicle: Vehicle) -> some View {
         VStack(spacing: 0) {
-            // Top row: Plate + Status badge + Chevron
-            HStack {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(vehicle.status.color)
-                        .frame(width: 10, height: 10)
+            // ── Header: Status + Plate + Type + Fleet Badge + Chevron ──
+            HStack(spacing: 10) {
+                // Status indicator
+                Circle()
+                    .fill(vehicle.status.color)
+                    .frame(width: 12, height: 12)
+                    .overlay(
+                        Circle()
+                            .stroke(vehicle.status.color.opacity(0.3), lineWidth: 2)
+                            .frame(width: 16, height: 16)
+                    )
+
+                VStack(alignment: .leading, spacing: 1) {
                     Text(vehicle.plate)
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: 17, weight: .bold))
                         .foregroundColor(AppTheme.navy)
+
+                    if !vehicle.vehicleType.isEmpty && vehicle.vehicleType != "Ticari" {
+                        Text(vehicle.vehicleType)
+                            .font(.system(size: 11))
+                            .foregroundColor(AppTheme.textMuted)
+                            .lineLimit(1)
+                    }
                 }
 
                 Spacer()
@@ -257,53 +270,70 @@ struct VehiclesListView: View {
                 fleetStatusBadge(vehicle.fleetStatus)
 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppTheme.textFaint)
-                    .padding(.leading, 6)
+                    .padding(.leading, 4)
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 14)
-            .padding(.bottom, 10)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
 
-            // Info grid: Speed, Kontak, KM, Device Time
+            // ── Stats Grid: 4 columns ──
             HStack(spacing: 0) {
-                // Speed
-                vehicleInfoItem(
+                compactStatItem(
                     icon: "speedometer",
-                    label: "Hız",
                     value: vehicle.formattedSpeed,
+                    label: "Hız",
                     color: vehicle.speed > 0 ? AppTheme.online : AppTheme.textMuted
                 )
-
-                dividerVertical
-
-                // Kontak
-                vehicleInfoItem(
-                    icon: vehicle.kontakOn ? "key.fill" : "key",
-                    label: "Kontak",
-                    value: vehicle.kontakOn ? "Açık" : "Kapalı",
-                    color: vehicle.kontakOn ? AppTheme.online : AppTheme.offline
+                compactStatItem(
+                    icon: "calendar",
+                    value: vehicle.formattedTodayKm,
+                    label: "Bugün",
+                    color: AppTheme.indigo
                 )
-
-                dividerVertical
-
-                // Total KM
-                vehicleInfoItem(
+                compactStatItem(
                     icon: "road.lanes",
-                    label: "Toplam Km",
                     value: vehicle.formattedTotalKm,
+                    label: "Toplam",
                     color: AppTheme.navy
                 )
+                compactStatItem(
+                    icon: vehicle.kontakOn ? "key.fill" : "key",
+                    value: vehicle.kontakOn ? "Açık" : "Kapalı",
+                    label: "Kontak",
+                    color: vehicle.kontakOn ? AppTheme.online : AppTheme.offline
+                )
             }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 10)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(AppTheme.bg.opacity(0.7))
+            .cornerRadius(12)
+            .padding(.horizontal, 12)
 
-            // Bottom: Device Time + Temp (if available)
-            HStack(spacing: 6) {
+            Spacer().frame(height: 8)
+
+            // ── Location row (if available) ──
+            if !vehicle.locationDisplay.isEmpty && vehicle.locationDisplay != "—" {
+                HStack(spacing: 4) {
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.indigo.opacity(0.6))
+                    Text(vehicle.locationDisplay)
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.textSecondary)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+            }
+
+            // ── Footer: Time + Temp/Humidity + Driver ──
+            HStack(spacing: 0) {
+                // Device time
                 if vehicle.deviceTime != nil {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 3) {
                         Image(systemName: "clock")
-                            .font(.system(size: 9))
+                            .font(.system(size: 10))
                             .foregroundColor(AppTheme.textFaint)
                         Text(vehicle.formattedDeviceTime)
                             .font(.system(size: 10))
@@ -311,53 +341,77 @@ struct VehiclesListView: View {
                     }
                 }
 
+                // Temperature
                 if let temp = vehicle.temperatureC {
                     if vehicle.deviceTime != nil {
-                        Text("•")
-                            .font(.system(size: 8))
-                            .foregroundColor(AppTheme.textFaint)
+                        HStack(spacing: 0) {
+                            Spacer().frame(width: 8)
+                            Circle()
+                                .fill(AppTheme.borderSoft)
+                                .frame(width: 3, height: 3)
+                            Spacer().frame(width: 8)
+                        }
                     }
                     Text(String(format: "🌡️%.1f°C", temp))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(temp < 0 ? .blue : temp < 30 ? AppTheme.online : .red)
                 }
 
+                // Humidity
+                if let hum = vehicle.humidityPct {
+                    Spacer().frame(width: 6)
+                    Text(String(format: "💧%.0f%%", hum))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(AppTheme.indigo)
+                }
+
                 Spacer()
 
-                if !vehicle.driverName.isEmpty || !vehicle.driver.isEmpty {
+                // Driver
+                let driverText = !vehicle.driverName.isEmpty ? vehicle.driverName : vehicle.driver
+                if !driverText.isEmpty {
                     HStack(spacing: 3) {
                         Image(systemName: "person.fill")
-                            .font(.system(size: 9))
-                            .foregroundColor(AppTheme.textFaint)
-                        Text(!vehicle.driverName.isEmpty ? vehicle.driverName : vehicle.driver)
                             .font(.system(size: 10))
                             .foregroundColor(AppTheme.textFaint)
+                        Text(driverText)
+                            .font(.system(size: 10))
+                            .foregroundColor(AppTheme.textMuted)
                             .lineLimit(1)
                     }
+                    .frame(maxWidth: 120, alignment: .trailing)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(AppTheme.bg.opacity(0.5))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(AppTheme.bg.opacity(0.4))
         }
         .background(AppTheme.surface)
-        .cornerRadius(12)
+        .cornerRadius(16)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 16)
                 .stroke(AppTheme.borderSoft, lineWidth: 1)
         )
     }
 
-    func vehicleInfoItem(icon: String, label: String, value: String, color: Color) -> some View {
-        VStack(spacing: 3) {
-            Image(systemName: icon)
-                .font(.system(size: 13))
-                .foregroundColor(color)
+    // MARK: - Compact Stat Item
+    func compactStatItem(icon: String, value: String, label: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            RoundedRectangle(cornerRadius: 7)
+                .fill(color.opacity(0.1))
+                .frame(width: 28, height: 28)
+                .overlay(
+                    Image(systemName: icon)
+                        .font(.system(size: 12))
+                        .foregroundColor(color)
+                )
+
             Text(value)
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 12, weight: .bold))
                 .foregroundColor(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+
             Text(label)
                 .font(.system(size: 9))
                 .foregroundColor(AppTheme.textMuted)
@@ -365,12 +419,7 @@ struct VehiclesListView: View {
         .frame(maxWidth: .infinity)
     }
 
-    var dividerVertical: some View {
-        Rectangle()
-            .fill(AppTheme.borderSoft)
-            .frame(width: 1, height: 36)
-    }
-
+    // MARK: - Fleet Status Badge
     func fleetStatusBadge(_ status: FleetVehicleStatus) -> some View {
         Text(status.label)
             .font(.system(size: 11, weight: .semibold))
@@ -380,7 +429,6 @@ struct VehiclesListView: View {
             .background(status.color.opacity(0.1))
             .cornerRadius(20)
     }
-
 }
 
 // MARK: - Fleet Vehicle Status (for vehicles list page)
@@ -472,6 +520,12 @@ class VehiclesListViewModel: ObservableObject {
         return "Tüm Durumlar"
     }
 
+    // Status counts
+    var onlineCount: Int { vehicles.filter { $0.status == .ignitionOn }.count }
+    var offlineCount: Int { vehicles.filter { $0.status == .ignitionOff }.count }
+    var noDataCount: Int { vehicles.filter { $0.status == .noData }.count }
+    var sleepingCount: Int { vehicles.filter { $0.status == .sleeping }.count }
+
     var filteredVehicles: [Vehicle] {
         var result = vehicles
         if let filter = statusFilter {
@@ -506,7 +560,6 @@ class VehiclesListViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Also listen for individual events
         wsManager.eventSubject
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
@@ -524,7 +577,6 @@ class VehiclesListViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
-
     }
 }
 
