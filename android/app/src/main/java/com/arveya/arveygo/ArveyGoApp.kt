@@ -24,6 +24,7 @@ import com.arveya.arveygo.ui.screens.fleet.FleetManagementScreen
 import com.arveya.arveygo.ui.screens.fleet.GeofencesScreen
 import com.arveya.arveygo.ui.screens.fleet.RouteHistoryScreen
 import com.arveya.arveygo.ui.screens.fleet.VehiclesListScreen
+import com.arveya.arveygo.ui.screens.fleet.ReportsScreen
 import com.arveya.arveygo.ui.screens.livemap.LiveMapScreen
 import com.arveya.arveygo.ui.screens.settings.SettingsScreen
 import com.arveya.arveygo.ui.screens.support.SupportRequestScreen
@@ -120,6 +121,9 @@ fun MainContent(authVM: AuthViewModel) {
                 onMenuClick = { showSideMenu = true }
             )
             AppPage.FLEET_MANAGEMENT -> FleetManagementScreen(
+                onMenuClick = { showSideMenu = true }
+            )
+            AppPage.REPORTS -> ReportsScreen(
                 onMenuClick = { showSideMenu = true }
             )
             AppPage.SETTINGS -> SettingsScreen(

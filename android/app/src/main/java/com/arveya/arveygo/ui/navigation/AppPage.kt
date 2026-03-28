@@ -9,6 +9,7 @@ enum class AppPage(val label: String) {
     ALARMS("Alarmlar"),
     GEOFENCES("Geofence"),
     FLEET_MANAGEMENT("Filo Yönetimi"),
+    REPORTS("Raporlar"),
     SETTINGS("Ayarlar"),
     SUPPORT("Destek Talebi")
 }
