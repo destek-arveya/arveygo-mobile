@@ -50,7 +50,7 @@ fun VehicleDetailScreen(
     vehicle: Vehicle,
     onBack: () -> Unit,
     onNavigateToRouteHistory: ((Vehicle) -> Unit)? = null,
-    onNavigateToAlarms: (() -> Unit)? = null
+    onNavigateToAlarms: ((String) -> Unit)? = null
 ) {
     var selectedTab by remember { mutableStateOf(DetailTab.OVERVIEW) }
     val context = LocalContext.current
@@ -257,7 +257,7 @@ fun VehicleDetailScreen(
                     })
                     DetailTab.MAINTENANCE -> MaintenanceTab(currentVehicle)
                     DetailTab.COSTS -> CostsTab(currentVehicle)
-                    DetailTab.EVENTS -> EventsTab(currentVehicle)
+                    DetailTab.EVENTS -> EventsTab(currentVehicle, onNavigateToAlarms)
                 }
             }
         }
@@ -291,9 +291,10 @@ private fun MapHeader(vehicle: Vehicle, context: Context) {
                     marker.infoWindow = null
                     // Create colored marker icon
                     val statusColor = when (vehicle.status) {
-                        VehicleStatus.ONLINE -> android.graphics.Color.rgb(34, 197, 94)
-                        VehicleStatus.OFFLINE -> android.graphics.Color.rgb(239, 68, 68)
-                        VehicleStatus.IDLE -> android.graphics.Color.rgb(245, 158, 11)
+                        VehicleStatus.IGNITION_ON -> android.graphics.Color.rgb(34, 197, 94)
+                        VehicleStatus.IGNITION_OFF -> android.graphics.Color.rgb(239, 68, 68)
+                        VehicleStatus.NO_DATA -> android.graphics.Color.rgb(148, 163, 184)
+                        VehicleStatus.SLEEPING -> android.graphics.Color.rgb(245, 158, 11)
                     }
                     val density = ctx.resources.displayMetrics.density
                     val pinSize = (36 * density).toInt()
@@ -340,7 +341,6 @@ private fun MapHeader(vehicle: Vehicle, context: Context) {
                 Spacer(Modifier.width(5.dp))
                 Text(
                     if (vehicle.livenessStatus.isNotEmpty()) vehicle.livenessLabel
-                    else if (vehicle.status == VehicleStatus.ONLINE) "Canlı"
                     else vehicle.status.label,
                     fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = vehicle.status.color
                 )
@@ -501,7 +501,7 @@ private fun OverviewTab(
     context: Context,
     onBack: () -> Unit,
     onNavigateToRouteHistory: ((Vehicle) -> Unit)?,
-    onNavigateToAlarms: (() -> Unit)?,
+    onNavigateToAlarms: ((String) -> Unit)?,
     driverName: String = "",
     onDriverAssigned: (() -> Unit)? = null
 ) {
@@ -536,7 +536,7 @@ private fun OverviewTab(
             },
             QuickAction(Icons.Default.NotificationsActive, "Alarmlar", Color(0xFFFF9800)) {
                 onBack()
-                onNavigateToAlarms?.invoke()
+                onNavigateToAlarms?.invoke(vehicle.plate)
             },
             QuickAction(Icons.Default.Share, "Paylaş", AppColors.TextMuted) {
                 shareVehicleLocation(context, vehicle)
@@ -922,7 +922,7 @@ private fun CostsTab(vehicle: Vehicle) {
 
 // MARK: - Events Tab
 @Composable
-private fun EventsTab(vehicle: Vehicle) {
+private fun EventsTab(vehicle: Vehicle, onNavigateToAlarms: ((String) -> Unit)? = null) {
     var alarms by remember { mutableStateOf<List<AlarmEvent>>(emptyList()) }
     var isLoadingAlarms by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
@@ -942,7 +942,7 @@ private fun EventsTab(vehicle: Vehicle) {
                     }
                 }
             }
-            alarms = results.take(20)
+            alarms = results.take(10)
         } catch (_: Exception) {
             alarms = emptyList()
         }
@@ -980,6 +980,20 @@ private fun EventsTab(vehicle: Vehicle) {
                     )
                     if (index < alarms.size - 1) {
                         HorizontalDivider(modifier = Modifier.padding(start = 48.dp), color = AppColors.BorderSoft)
+                    }
+                }
+
+                // "Tümünü Gör" button
+                if (onNavigateToAlarms != null) {
+                    Spacer(Modifier.height(8.dp))
+                    HorizontalDivider(color = AppColors.BorderSoft)
+                    TextButton(
+                        onClick = { onNavigateToAlarms(vehicle.plate) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Tümünü Gör", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Indigo)
+                        Spacer(Modifier.width(4.dp))
+                        Icon(Icons.Default.ArrowForward, null, modifier = Modifier.size(14.dp), tint = AppColors.Indigo)
                     }
                 }
             }

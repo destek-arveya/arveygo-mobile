@@ -30,7 +30,7 @@ import com.arveya.arveygo.viewmodels.DashboardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}, onNavigateToVehicles: () -> Unit = {}, onNavigateToDrivers: () -> Unit = {}, onNavigateToAlarms: () -> Unit = {}, onNavigateToRouteHistory: (() -> Unit)? = null) {
+fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}, onNavigateToVehicles: () -> Unit = {}, onNavigateToDrivers: () -> Unit = {}, onNavigateToAlarms: (String) -> Unit = {}, onNavigateToRouteHistory: (() -> Unit)? = null) {
     val authVM = LocalAuthViewModel.current
     val vm: DashboardViewModel = viewModel()
     val user by authVM.currentUser.collectAsState()
@@ -122,7 +122,7 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}, o
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {
                 Column {
-                    vehicles.filter { it.status == VehicleStatus.ONLINE }.take(4).forEach { v ->
+                    vehicles.filter { it.status == VehicleStatus.IGNITION_ON }.take(4).forEach { v ->
                         DashboardVehicleRow(v, onClick = { selectedVehicle = v })
                     }
                 }
@@ -165,7 +165,7 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}, o
                 title = DL.recentAlarms,
                 count = "${alerts.size}",
                 actionLabel = DL.allLabel,
-                onAction = onNavigateToAlarms,
+                onAction = { onNavigateToAlarms("") },
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {
                 if (isLoadingAlerts && alerts.isEmpty()) {
@@ -234,9 +234,9 @@ fun DashboardScreen(onMenuClick: () -> Unit, onNavigateToMap: () -> Unit = {}, o
                 selectedVehicle = null
                 onNavigateToRouteHistory?.invoke()
             },
-            onNavigateToAlarms = {
+            onNavigateToAlarms = { plateText ->
                 selectedVehicle = null
-                onNavigateToAlarms()
+                onNavigateToAlarms(plateText)
             }
         )
     }

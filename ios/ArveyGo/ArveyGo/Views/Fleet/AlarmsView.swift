@@ -391,6 +391,7 @@ struct AlarmCatalog {
 // MARK: - Alarms View
 struct AlarmsView: View {
     @Binding var showSideMenu: Bool
+    var initialSearchText: String = ""
     @EnvironmentObject var authVM: AuthViewModel
     @StateObject private var vm = AlarmsViewModel()
     @State private var showFilters = false
@@ -510,6 +511,9 @@ struct AlarmsView: View {
             }
         }
         .task {
+            if !initialSearchText.isEmpty {
+                searchText = initialSearchText
+            }
             await vm.fetchAlarms()
             await fetchAlarmSets()
             await fetchCatalog()

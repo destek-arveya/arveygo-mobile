@@ -10,6 +10,7 @@ struct FleetManagementView: View {
     @State private var maintenanceList: [FleetMaintenance] = []
     @State private var costsList: [FleetCost] = []
     @State private var documentsList: [FleetDocument] = []
+    @State private var tiresList: [FleetTire] = []
     @State private var reminders: [FleetReminder] = []
     @State private var catalog: FleetCatalog? = nil
 
@@ -18,27 +19,60 @@ struct FleetManagementView: View {
     @State private var documentsPagination = PaginationMeta()
 
     @State private var isLoading = true
+    @State private var isRefreshing = false
     @State private var errorMessage: String? = nil
 
+    // Search & Filter
+    @State private var searchText = ""
+    @State private var selectedVehicleFilter: String? = nil // nil = all, else imei
+
     // CRUD states
-    @State private var showMaintenanceSheet = false
+    @State private var showFormSheet = false
     @State private var editingMaintenance: FleetMaintenance? = nil
-    @State private var showCostSheet = false
     @State private var editingCost: FleetCost? = nil
-    @State private var showDocumentSheet = false
     @State private var editingDocument: FleetDocument? = nil
+    @State private var editingTire: FleetTire? = nil
     @State private var deleteTarget: DeleteTarget? = nil
 
     enum FleetTab: String, CaseIterable {
         case maintenance = "Bakım"
-        case costs = "Masraflar"
-        case documents = "Belgeler"
+        case costs = "Masraf"
+        case documents = "Belge"
+        case tires = "Lastik"
+
+        var icon: String {
+            switch self {
+            case .maintenance: return "wrench.and.screwdriver"
+            case .costs: return "turkishlirasign.circle"
+            case .documents: return "doc.text"
+            case .tires: return "circle.circle"
+            }
+        }
     }
 
     struct DeleteTarget: Identifiable {
         let id = UUID()
-        let type: String // "maintenance", "cost", "document"
+        let type: String
         let itemId: String
+    }
+
+    // MARK: - Filtered Data
+    private func matchesFilter(_ imei: String, _ plate: String) -> Bool {
+        let matchesVehicle = selectedVehicleFilter == nil || imei == selectedVehicleFilter
+        let matchesSearch = searchText.isEmpty ||
+            plate.localizedCaseInsensitiveContains(searchText) ||
+            imei.localizedCaseInsensitiveContains(searchText)
+        return matchesVehicle && matchesSearch
+    }
+
+    var filteredMaintenance: [FleetMaintenance] { maintenanceList.filter { matchesFilter($0.imei, $0.plate) } }
+    var filteredCosts: [FleetCost] { costsList.filter { matchesFilter($0.imei, $0.plate) } }
+    var filteredDocuments: [FleetDocument] { documentsList.filter { matchesFilter($0.imei, $0.plate) } }
+    var filteredTires: [FleetTire] { tiresList.filter { matchesFilter($0.imei, $0.plate) } }
+
+    var selectedPlateLabel: String {
+        guard let imei = selectedVehicleFilter else { return "Tüm Araçlar" }
+        return catalog?.vehicles.first(where: { $0.imei == imei })?.plate ?? "Araç"
     }
 
     var body: some View {
@@ -52,22 +86,22 @@ struct FleetManagementView: View {
                 // Tab selector
                 tabSelector
 
+                // Search & Filter Bar
+                searchFilterBar
+
                 // Content
-                if isLoading {
+                if isLoading && maintenanceList.isEmpty {
                     Spacer()
-                    ProgressView()
-                        .tint(AppTheme.indigo)
+                    ProgressView().tint(AppTheme.indigo)
                     Spacer()
                 } else if let error = errorMessage {
                     errorView(error)
                 } else {
                     switch selectedTab {
-                    case .maintenance:
-                        maintenanceListTab
-                    case .costs:
-                        costsListTab
-                    case .documents:
-                        documentsListTab
+                    case .maintenance: maintenanceListTab
+                    case .costs: costsListTab
+                    case .documents: documentsListTab
+                    case .tires: tiresListTab
                     }
                 }
             }
@@ -84,64 +118,42 @@ struct FleetManagementView: View {
                     }
                 }
                 ToolbarItem(placement: .principal) {
-                    VStack(spacing: 1) {
-                        Text("Bakım / Belgeler / Masraflar")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(AppTheme.navy)
-                        Text("Filo Yönetimi")
-                            .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textMuted)
-                    }
+                    Text("Filo Yönetimi")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(AppTheme.navy)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 10) {
-                        Button(action: { loadData() }) {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 16))
-                                .foregroundColor(AppTheme.textMuted)
-                        }
-                        Button(action: {
-                            switch selectedTab {
-                            case .maintenance:
-                                editingMaintenance = nil; showMaintenanceSheet = true
-                            case .costs:
-                                editingCost = nil; showCostSheet = true
-                            case .documents:
-                                editingDocument = nil; showDocumentSheet = true
-                            }
-                        }) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(AppTheme.indigo)
-                        }
-                        AvatarCircle(
-                            initials: authVM.currentUser?.avatar ?? "A",
-                            size: 30
-                        )
+                    Button(action: {
+                        editingMaintenance = nil; editingCost = nil; editingDocument = nil; editingTire = nil
+                        showFormSheet = true
+                    }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(AppTheme.indigo)
                     }
                 }
             }
+            .refreshable { await loadDataAsync() }
         }
         .task { loadData() }
-        .sheet(isPresented: $showMaintenanceSheet) {
-            MaintenanceFormSheet(catalog: catalog, editing: editingMaintenance) {
-                showMaintenanceSheet = false; loadData()
-            } onCancel: {
-                showMaintenanceSheet = false
-            }
-        }
-        .sheet(isPresented: $showCostSheet) {
-            CostFormSheet(catalog: catalog, editing: editingCost) {
-                showCostSheet = false; loadData()
-            } onCancel: {
-                showCostSheet = false
-            }
-        }
-        .sheet(isPresented: $showDocumentSheet) {
-            DocumentFormSheet(catalog: catalog, editing: editingDocument) {
-                showDocumentSheet = false; loadData()
-            } onCancel: {
-                showDocumentSheet = false
+        .sheet(isPresented: $showFormSheet) {
+            switch selectedTab {
+            case .maintenance:
+                MaintenanceFormSheet(catalog: catalog, editing: editingMaintenance) {
+                    showFormSheet = false; loadData()
+                } onCancel: { showFormSheet = false }
+            case .costs:
+                CostFormSheet(catalog: catalog, editing: editingCost) {
+                    showFormSheet = false; loadData()
+                } onCancel: { showFormSheet = false }
+            case .documents:
+                DocumentFormSheet(catalog: catalog, editing: editingDocument) {
+                    showFormSheet = false; loadData()
+                } onCancel: { showFormSheet = false }
+            case .tires:
+                TireFormSheet(catalog: catalog, editing: editingTire) {
+                    showFormSheet = false; loadData()
+                } onCancel: { showFormSheet = false }
             }
         }
         .alert("Silme Onayı", isPresented: Binding(
@@ -151,7 +163,7 @@ struct FleetManagementView: View {
             Button("İptal", role: .cancel) { deleteTarget = nil }
             Button("Sil", role: .destructive) { performDelete() }
         } message: {
-            Text("Bu kaydı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")
+            Text("Bu kaydı silmek istediğinize emin misiniz?")
         }
     }
 
@@ -171,41 +183,128 @@ struct FleetManagementView: View {
                 case "document":
                     try await api.deleteFleetDocument(id: Int(target.itemId) ?? 0)
                     documentsList.removeAll { $0.id == target.itemId }
+                case "tire":
+                    let _ = try await api.httpDelete("/api/mobile/fleet/tires/\(target.itemId)")
+                    tiresList.removeAll { $0.id == target.itemId }
                 default: break
                 }
-            } catch {
-                // silently fail
-            }
+            } catch { /* silent */ }
             deleteTarget = nil
         }
     }
 
     // MARK: - Load Data
     private func loadData() {
-        Task {
-            isLoading = true
-            errorMessage = nil
+        Task { await loadDataAsync() }
+    }
+
+    private func loadDataAsync() async {
+        isLoading = true
+        errorMessage = nil
+        do {
+            let api = APIService.shared
+            catalog = try await api.fetchFleetCatalog()
+            reminders = (try? await api.fetchFleetReminders(days: 60)) ?? []
+
+            let (mList, mPag) = try await api.fetchFleetMaintenance()
+            maintenanceList = mList; maintenancePagination = mPag
+
+            let (cList, cPag) = try await api.fetchFleetCosts()
+            costsList = cList; costsPagination = cPag
+
+            let (dList, dPag) = try await api.fetchFleetDocuments()
+            documentsList = dList; documentsPagination = dPag
+
+            // Tires — endpoint may not exist
             do {
-                let api = APIService.shared
-                catalog = try await api.fetchFleetCatalog()
-                reminders = (try? await api.fetchFleetReminders(days: 60)) ?? []
-
-                let (mList, mPag) = try await api.fetchFleetMaintenance()
-                maintenanceList = mList
-                maintenancePagination = mPag
-
-                let (cList, cPag) = try await api.fetchFleetCosts()
-                costsList = cList
-                costsPagination = cPag
-
-                let (dList, dPag) = try await api.fetchFleetDocuments()
-                documentsList = dList
-                documentsPagination = dPag
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-            isLoading = false
+                let tiresJson = try await api.get("/api/mobile/fleet/tires?per_page=100")
+                if let dataArr = tiresJson["data"] as? [[String: Any]] {
+                    tiresList = dataArr.compactMap { FleetTire.fromDict($0) }
+                }
+            } catch { tiresList = [] }
+        } catch {
+            errorMessage = error.localizedDescription
         }
+        isLoading = false
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // MARK: - Search & Filter Bar
+    // ═══════════════════════════════════════════════════════════
+    var searchFilterBar: some View {
+        VStack(spacing: 8) {
+            // Search
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14))
+                    .foregroundColor(AppTheme.textMuted)
+                TextField("Plaka ara...", text: $searchText)
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.navy)
+                if !searchText.isEmpty {
+                    Button(action: { searchText = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(AppTheme.textMuted)
+                    }
+                }
+            }
+            .padding(10)
+            .background(Color.white)
+            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
+
+            // Vehicle filter
+            HStack(spacing: 8) {
+                Menu {
+                    Button(action: { selectedVehicleFilter = nil }) {
+                        Label("Tüm Araçlar", systemImage: "car.2")
+                    }
+                    Divider()
+                    ForEach(catalog?.vehicles ?? []) { v in
+                        Button(action: { selectedVehicleFilter = v.imei }) {
+                            Label(v.plate.isEmpty ? v.name : v.plate, systemImage: "car")
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "car")
+                            .font(.system(size: 10))
+                        Text(selectedPlateLabel)
+                            .font(.system(size: 12, weight: .medium))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 8))
+                    }
+                    .foregroundColor(selectedVehicleFilter != nil ? AppTheme.indigo : AppTheme.textMuted)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(selectedVehicleFilter != nil ? AppTheme.indigo.opacity(0.1) : Color.white)
+                    .cornerRadius(8)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.borderSoft, lineWidth: 1))
+                }
+
+                if selectedVehicleFilter != nil {
+                    Button(action: { selectedVehicleFilter = nil }) {
+                        HStack(spacing: 2) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 8))
+                            Text("Temizle")
+                                .font(.system(size: 11))
+                        }
+                        .foregroundColor(.red)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Color.red.opacity(0.08))
+                        .cornerRadius(8)
+                    }
+                }
+
+                Spacer()
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color.white)
     }
 
     // MARK: - Reminders Banner
@@ -219,7 +318,7 @@ struct FleetManagementView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 14))
                         .foregroundColor(.red)
-                    Text("\(urgent.count) acil hatırlatma (7 gün içinde)")
+                    Text("\(urgent.count) acil hatırlatma")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.red)
                     Spacer()
@@ -233,7 +332,7 @@ struct FleetManagementView: View {
                     Image(systemName: "clock.fill")
                         .font(.system(size: 14))
                         .foregroundColor(.orange)
-                    Text("\(upcoming.count) yaklaşan hatırlatma (30 gün içinde)")
+                    Text("\(upcoming.count) yaklaşan hatırlatma")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.orange)
                     Spacer()
@@ -253,13 +352,17 @@ struct FleetManagementView: View {
             ForEach(FleetTab.allCases, id: \.self) { tab in
                 let isActive = tab == selectedTab
                 Button(action: { selectedTab = tab }) {
-                    Text(tab.rawValue)
-                        .font(.system(size: 13, weight: isActive ? .bold : .medium))
-                        .foregroundColor(isActive ? AppTheme.indigo : AppTheme.textMuted)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(isActive ? Color.white : Color.clear)
-                        .cornerRadius(8)
+                    HStack(spacing: 4) {
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 11))
+                        Text(tab.rawValue)
+                            .font(.system(size: 12, weight: isActive ? .bold : .medium))
+                    }
+                    .foregroundColor(isActive ? AppTheme.indigo : AppTheme.textMuted)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(isActive ? Color.white : Color.clear)
+                    .cornerRadius(8)
                 }
             }
         }
@@ -273,443 +376,224 @@ struct FleetManagementView: View {
     // ═══════════════════════════════════════════════════════════
     // MARK: - Maintenance List
     // ═══════════════════════════════════════════════════════════
-
     var maintenanceListTab: some View {
         Group {
-            if maintenanceList.isEmpty {
-                emptyState(icon: "wrench.and.screwdriver.fill", title: "Bakım Kaydı Yok", subtitle: "Henüz bakım kaydı bulunmamaktadır.\nYeni kayıt eklemek için + butonuna dokunun.")
+            if filteredMaintenance.isEmpty {
+                emptyState(icon: "wrench.and.screwdriver.fill", title: "Bakım Kaydı Yok", subtitle: "Henüz bakım kaydı bulunmamaktadır.")
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 8) {
-                        Text("Toplam \(maintenancePagination.total) kayıt")
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.textMuted)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
-
-                        ForEach(maintenanceList) { item in
-                            maintenanceCard(item)
-                        }
-
-                        if maintenancePagination.hasMore {
-                            Button("Daha fazla yükle") {
-                                Task {
-                                    if let (mList, mPag) = try? await APIService.shared.fetchFleetMaintenance(page: maintenancePagination.currentPage + 1) {
-                                        maintenanceList.append(contentsOf: mList)
-                                        maintenancePagination = mPag
-                                    }
-                                }
-                            }
-                            .foregroundColor(AppTheme.indigo)
+                    LazyVStack(spacing: 10) {
+                        ForEach(filteredMaintenance) { item in
+                            fleetCard(
+                                topLabel: item.plate,
+                                title: item.maintenanceType.isEmpty ? "Bakım" : item.maintenanceType,
+                                subtitle: item.workshop.isEmpty ? nil : item.workshop,
+                                badge: item.statusLabel,
+                                badgeColor: maintenanceStatusColor(item.status),
+                                line1Icon: "calendar", line1: item.serviceDate ?? "—",
+                                line2Icon: "speedometer", line2: item.kmAtService.map { "\(NumberFormatter.localizedString(from: NSNumber(value: $0), number: .decimal)) km" } ?? "—",
+                                line3Icon: "turkishlirasign", line3: item.formattedCost,
+                                onEdit: { editingMaintenance = item; showFormSheet = true },
+                                onDelete: { deleteTarget = DeleteTarget(type: "maintenance", itemId: item.id) }
+                            )
                         }
                     }
-                    .padding(.bottom, 20)
+                    .padding(16)
                 }
             }
         }
     }
 
-    func maintenanceCard(_ item: FleetMaintenance) -> some View {
-        let statusColor: Color = {
-            switch item.status {
-            case "done": return .green
-            case "scheduled": return .blue
-            case "overdue": return .red
-            default: return .orange
+    // ═══════════════════════════════════════════════════════════
+    // MARK: - Costs List
+    // ═══════════════════════════════════════════════════════════
+    var costsListTab: some View {
+        Group {
+            if filteredCosts.isEmpty {
+                emptyState(icon: "turkishlirasign.circle.fill", title: "Masraf Kaydı Yok", subtitle: "Henüz masraf kaydı bulunmamaktadır.")
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 10) {
+                        ForEach(filteredCosts) { cost in
+                            fleetCard(
+                                topLabel: cost.plate,
+                                title: categoryLabel(cost.category),
+                                subtitle: cost.description.isEmpty ? nil : cost.description,
+                                badge: cost.formattedAmount,
+                                badgeColor: AppTheme.indigo,
+                                line1Icon: "calendar", line1: cost.costDate.isEmpty ? "—" : cost.costDate,
+                                line2Icon: "number", line2: cost.referenceNo.isEmpty ? "—" : cost.referenceNo,
+                                onEdit: { editingCost = cost; showFormSheet = true },
+                                onDelete: { deleteTarget = DeleteTarget(type: "cost", itemId: cost.id) }
+                            )
+                        }
+                    }
+                    .padding(16)
+                }
             }
-        }()
+        }
+    }
 
-        return VStack(alignment: .leading, spacing: 10) {
+    // ═══════════════════════════════════════════════════════════
+    // MARK: - Documents List
+    // ═══════════════════════════════════════════════════════════
+    var documentsListTab: some View {
+        Group {
+            if filteredDocuments.isEmpty {
+                emptyState(icon: "doc.text.fill", title: "Belge Kaydı Yok", subtitle: "Henüz belge kaydı bulunmamaktadır.")
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 10) {
+                        ForEach(filteredDocuments) { doc in
+                            let daysText: String = {
+                                guard let d = doc.daysLeft else { return "—" }
+                                if d < 0 { return "Süresi \(-d) gün geçmiş" }
+                                if d == 0 { return "Bugün doluyor" }
+                                return "\(d) gün kaldı"
+                            }()
+                            fleetCard(
+                                topLabel: doc.plate,
+                                title: doc.docTypeLabel,
+                                subtitle: doc.title.isEmpty ? nil : doc.title,
+                                badge: doc.statusLabel,
+                                badgeColor: documentStatusColor(doc.status),
+                                line1Icon: "calendar", line1: doc.expiryDate ?? "—",
+                                line2Icon: "timer", line2: daysText,
+                                onEdit: { editingDocument = doc; showFormSheet = true },
+                                onDelete: { deleteTarget = DeleteTarget(type: "document", itemId: doc.id) }
+                            )
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // MARK: - Tires List
+    // ═══════════════════════════════════════════════════════════
+    var tiresListTab: some View {
+        Group {
+            if filteredTires.isEmpty {
+                emptyState(icon: "circle.circle.fill", title: "Lastik Kaydı Yok", subtitle: "Henüz lastik kaydı bulunmamaktadır.")
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 10) {
+                        ForEach(filteredTires) { tire in
+                            fleetCard(
+                                topLabel: tire.plate,
+                                title: "\(tire.brand) \(tire.model)".trimmingCharacters(in: .whitespaces).isEmpty ? "Lastik" : "\(tire.brand) \(tire.model)".trimmingCharacters(in: .whitespaces),
+                                subtitle: tire.positionLabel.isEmpty ? nil : tire.positionLabel,
+                                badge: tire.statusLabel,
+                                badgeColor: tireStatusColor(tire.status),
+                                line1Icon: "ruler", line1: tire.size.isEmpty ? "—" : tire.size,
+                                line2Icon: "speedometer", line2: tire.kmAtInstall > 0 ? "\(NumberFormatter.localizedString(from: NSNumber(value: tire.kmAtInstall), number: .decimal)) km" : "—",
+                                line3Icon: "calendar", line3: tire.installDate.isEmpty ? "—" : tire.installDate,
+                                onEdit: { editingTire = tire; showFormSheet = true },
+                                onDelete: { deleteTarget = DeleteTarget(type: "tire", itemId: tire.id) }
+                            )
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // MARK: - Fleet Card (Shared)
+    // ═══════════════════════════════════════════════════════════
+    func fleetCard(
+        topLabel: String, title: String, subtitle: String?,
+        badge: String, badgeColor: Color,
+        line1Icon: String, line1: String,
+        line2Icon: String? = nil, line2: String? = nil,
+        line3Icon: String? = nil, line3: String? = nil,
+        onEdit: @escaping () -> Void,
+        onDelete: @escaping () -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Header
             HStack {
-                ZStack {
-                    Circle()
-                        .fill(statusColor.opacity(0.1))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "wrench.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(statusColor)
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.maintenanceType.isEmpty ? "Bakım" : item.maintenanceType)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(AppTheme.navy)
-                    Text(item.plate)
-                        .font(.system(size: 12))
-                        .foregroundColor(AppTheme.textMuted)
-                }
-
-                Spacer()
-
-                Text(item.statusLabel)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(statusColor)
+                Text(topLabel.isEmpty ? "—" : topLabel)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppTheme.indigo)
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(statusColor.opacity(0.1))
-                    .cornerRadius(20)
+                    .padding(.vertical, 3)
+                    .background(AppTheme.indigo.opacity(0.08))
+                    .cornerRadius(6)
+                Spacer()
+                Text(badge)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(badgeColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(badgeColor.opacity(0.12))
+                    .cornerRadius(6)
             }
 
-            HStack(spacing: 8) {
-                if let date = item.serviceDate {
-                    infoChip(icon: "calendar", text: "Servis: \(date)")
-                }
-                if let next = item.nextServiceDate {
-                    infoChip(icon: "calendar.badge.clock", text: "Sonraki: \(next)")
-                }
-                if let km = item.kmAtService {
-                    let fmt = NumberFormatter()
-                    let _ = (fmt.numberStyle = .decimal, fmt.locale = Locale(identifier: "tr_TR"))
-                    infoChip(icon: "speedometer", text: "\(fmt.string(from: NSNumber(value: km)) ?? "\(km)") km")
-                }
-            }
-
-            if !item.workshop.isEmpty {
-                Text("Atölye: \(item.workshop)")
-                    .font(.system(size: 11))
+            // Title
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(AppTheme.navy)
+            if let sub = subtitle, !sub.isEmpty {
+                Text(sub)
+                    .font(.system(size: 12))
                     .foregroundColor(AppTheme.textMuted)
+                    .lineLimit(1)
             }
 
-            if let cost = item.cost, cost > 0 {
-                Text("Tutar: \(item.formattedCost)")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(AppTheme.navy)
+            // Info lines
+            HStack(spacing: 12) {
+                infoChip(icon: line1Icon, text: line1)
+                if let l2 = line2, let l2Icon = line2Icon { infoChip(icon: l2Icon, text: l2) }
+                if let l3 = line3, let l3Icon = line3Icon { infoChip(icon: l3Icon, text: l3) }
             }
 
-            // Edit / Delete buttons
+            Divider()
+
+            // Actions
             HStack {
                 Spacer()
-                Button(action: { editingMaintenance = item; showMaintenanceSheet = true }) {
+                Button(action: onEdit) {
                     HStack(spacing: 4) {
                         Image(systemName: "pencil").font(.system(size: 11))
-                        Text("Düzenle").font(.system(size: 11))
+                        Text("Düzenle").font(.system(size: 12))
                     }
                     .foregroundColor(AppTheme.indigo)
                 }
-                Button(action: { deleteTarget = DeleteTarget(type: "maintenance", itemId: item.id) }) {
+                Button(action: onDelete) {
                     HStack(spacing: 4) {
                         Image(systemName: "trash").font(.system(size: 11))
-                        Text("Sil").font(.system(size: 11))
+                        Text("Sil").font(.system(size: 12))
                     }
-                    .foregroundColor(.red.opacity(0.7))
+                    .foregroundColor(.red)
                 }
                 .padding(.leading, 8)
             }
         }
         .padding(14)
         .background(Color.white)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
-        )
-        .padding(.horizontal, 16)
+        .cornerRadius(14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppTheme.borderSoft, lineWidth: 1))
+        .shadow(color: .black.opacity(0.03), radius: 2, y: 1)
     }
-
-    // ═══════════════════════════════════════════════════════════
-    // MARK: - Costs List
-    // ═══════════════════════════════════════════════════════════
-
-    var costsListTab: some View {
-        Group {
-            if costsList.isEmpty {
-                emptyState(icon: "turkishlirasign.circle.fill", title: "Masraf Kaydı Yok", subtitle: "Henüz masraf kaydı bulunmamaktadır.\nYeni kayıt eklemek için + butonuna dokunun.")
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        costSummaryCard
-
-                        Text("Toplam \(costsPagination.total) kayıt")
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.textMuted)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 8)
-
-                        ForEach(costsList) { cost in
-                            costCard(cost)
-                        }
-
-                        if costsPagination.hasMore {
-                            Button("Daha fazla yükle") {
-                                Task {
-                                    if let (cList, cPag) = try? await APIService.shared.fetchFleetCosts(page: costsPagination.currentPage + 1) {
-                                        costsList.append(contentsOf: cList)
-                                        costsPagination = cPag
-                                    }
-                                }
-                            }
-                            .foregroundColor(AppTheme.indigo)
-                        }
-                    }
-                    .padding(.bottom, 20)
-                }
-            }
-        }
-    }
-
-    var costSummaryCard: some View {
-        let totalAmount = costsList.reduce(0.0) { $0 + $1.amount }
-        let byCat = Dictionary(grouping: costsList, by: { $0.category }).mapValues { $0.reduce(0.0) { $0 + $1.amount } }
-        let fmt = NumberFormatter()
-        let _ = (fmt.numberStyle = .decimal, fmt.locale = Locale(identifier: "tr_TR"), fmt.maximumFractionDigits = 0)
-
-        return VStack(spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "chart.bar.fill")
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.indigo)
-                Text("MASRAF ÖZETİ")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(AppTheme.textMuted)
-                    .tracking(0.5)
-                Spacer()
-            }
-
-            if !byCat.isEmpty {
-                HStack(spacing: 0) {
-                    ForEach(Array(byCat.prefix(4)), id: \.key) { cat, amount in
-                        VStack(spacing: 2) {
-                            Text("₺\(fmt.string(from: NSNumber(value: amount)) ?? "0")")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(AppTheme.navy)
-                            Text(categoryLabel(cat))
-                                .font(.system(size: 9))
-                                .foregroundColor(AppTheme.textMuted)
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                }
-            }
-
-            HStack {
-                Text("TOPLAM")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(AppTheme.textMuted)
-                Spacer()
-                Text("₺\(fmt.string(from: NSNumber(value: totalAmount)) ?? "0")")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(AppTheme.navy)
-            }
-            .padding(12)
-            .background(AppTheme.navy.opacity(0.04))
-            .cornerRadius(10)
-        }
-        .padding(14)
-        .background(Color.white)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
-        )
-        .padding(.horizontal, 16)
-    }
-
-    func costCard(_ cost: FleetCost) -> some View {
-        let color = categoryColor(cost.category)
-        let icon = categoryIcon(cost.category)
-
-        return HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(color.opacity(0.1))
-                    .frame(width: 36, height: 36)
-                Image(systemName: icon)
-                    .font(.system(size: 14))
-                    .foregroundColor(color)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(categoryLabel(cost.category))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppTheme.navy)
-                Text("\(cost.plate) • \(cost.costDate)")
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.textMuted)
-                if !cost.description.isEmpty {
-                    Text(cost.description)
-                        .font(.system(size: 10))
-                        .foregroundColor(AppTheme.textFaint)
-                        .lineLimit(1)
-                }
-                // Edit / Delete buttons
-                HStack(spacing: 0) {
-                    Button(action: { editingCost = cost; showCostSheet = true }) {
-                        HStack(spacing: 2) {
-                            Image(systemName: "pencil").font(.system(size: 10))
-                            Text("Düzenle").font(.system(size: 10))
-                        }
-                        .foregroundColor(AppTheme.indigo)
-                    }
-                    Button(action: { deleteTarget = DeleteTarget(type: "cost", itemId: cost.id) }) {
-                        HStack(spacing: 2) {
-                            Image(systemName: "trash").font(.system(size: 10))
-                            Text("Sil").font(.system(size: 10))
-                        }
-                        .foregroundColor(.red.opacity(0.7))
-                    }
-                    .padding(.leading, 8)
-                }
-                .padding(.top, 4)
-            }
-
-            Spacer()
-
-            Text(cost.formattedAmount)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(AppTheme.navy)
-        }
-        .padding(14)
-        .background(Color.white)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
-        )
-        .padding(.horizontal, 16)
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // MARK: - Documents List
-    // ═══════════════════════════════════════════════════════════
-
-    var documentsListTab: some View {
-        Group {
-            if documentsList.isEmpty {
-                emptyState(icon: "doc.text.fill", title: "Belge Kaydı Yok", subtitle: "Henüz belge kaydı bulunmamaktadır.\nYeni kayıt eklemek için + butonuna dokunun.")
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        Text("Toplam \(documentsPagination.total) kayıt")
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.textMuted)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
-
-                        ForEach(documentsList) { doc in
-                            documentCard(doc)
-                        }
-
-                        if documentsPagination.hasMore {
-                            Button("Daha fazla yükle") {
-                                Task {
-                                    if let (dList, dPag) = try? await APIService.shared.fetchFleetDocuments(page: documentsPagination.currentPage + 1) {
-                                        documentsList.append(contentsOf: dList)
-                                        documentsPagination = dPag
-                                    }
-                                }
-                            }
-                            .foregroundColor(AppTheme.indigo)
-                        }
-                    }
-                    .padding(.bottom, 20)
-                }
-            }
-        }
-    }
-
-    func documentCard(_ doc: FleetDocument) -> some View {
-        let statusColor: Color = {
-            switch doc.status {
-            case "active": return .green
-            case "expiring_soon": return .orange
-            case "expired": return .red
-            default: return Color(red: 148/255, green: 163/255, blue: 184/255)
-            }
-        }()
-
-        return HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(statusColor.opacity(0.1))
-                    .frame(width: 36, height: 36)
-                Image(systemName: "doc.text.fill")
-                    .font(.system(size: 14))
-                    .foregroundColor(statusColor)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(doc.title.isEmpty ? doc.docTypeLabel : doc.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppTheme.navy)
-                Text("\(doc.plate) • \(doc.docTypeLabel)")
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.textMuted)
-                if let expiry = doc.expiryDate {
-                    Text("Bitiş: \(expiry)")
-                        .font(.system(size: 10))
-                        .foregroundColor(AppTheme.textFaint)
-                }
-                // Edit / Delete buttons
-                HStack(spacing: 0) {
-                    Button(action: { editingDocument = doc; showDocumentSheet = true }) {
-                        HStack(spacing: 2) {
-                            Image(systemName: "pencil").font(.system(size: 10))
-                            Text("Düzenle").font(.system(size: 10))
-                        }
-                        .foregroundColor(AppTheme.indigo)
-                    }
-                    Button(action: { deleteTarget = DeleteTarget(type: "document", itemId: doc.id) }) {
-                        HStack(spacing: 2) {
-                            Image(systemName: "trash").font(.system(size: 10))
-                            Text("Sil").font(.system(size: 10))
-                        }
-                        .foregroundColor(.red.opacity(0.7))
-                    }
-                    .padding(.leading, 8)
-                }
-                .padding(.top, 4)
-            }
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 2) {
-                if let daysLeft = doc.daysLeft {
-                    Text("\(daysLeft) gün")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(statusColor)
-                    Text("kalan")
-                        .font(.system(size: 9))
-                        .foregroundColor(AppTheme.textMuted)
-                }
-                Text(doc.statusLabel)
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundColor(statusColor)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(statusColor.opacity(0.1))
-                    .cornerRadius(20)
-            }
-        }
-        .padding(14)
-        .background(Color.white)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
-        )
-        .padding(.horizontal, 16)
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // MARK: - Shared Views
-    // ═══════════════════════════════════════════════════════════
 
     func infoChip(icon: String, text: String) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 8))
+                .font(.system(size: 9))
                 .foregroundColor(AppTheme.textMuted)
             Text(text)
-                .font(.system(size: 10))
-                .foregroundColor(AppTheme.textMuted)
+                .font(.system(size: 11))
+                .foregroundColor(AppTheme.textSecondary)
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .background(AppTheme.bg)
-        .cornerRadius(6)
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // MARK: - Empty / Error
+    // ═══════════════════════════════════════════════════════════
     func emptyState(icon: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 16) {
             Spacer()
@@ -721,13 +605,8 @@ struct FleetManagementView: View {
                     .font(.system(size: 24))
                     .foregroundColor(AppTheme.indigo.opacity(0.5))
             }
-            Text(title)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(AppTheme.navy)
-            Text(subtitle)
-                .font(.system(size: 13))
-                .foregroundColor(AppTheme.textMuted)
-                .multilineTextAlignment(.center)
+            Text(title).font(.system(size: 16, weight: .semibold)).foregroundColor(AppTheme.navy)
+            Text(subtitle).font(.system(size: 13)).foregroundColor(AppTheme.textMuted).multilineTextAlignment(.center)
             Spacer()
         }
         .padding(32)
@@ -736,60 +615,29 @@ struct FleetManagementView: View {
     func errorView(_ message: String) -> some View {
         VStack(spacing: 12) {
             Spacer()
-            Image(systemName: "exclamationmark.circle")
-                .font(.system(size: 36))
-                .foregroundColor(.red)
-            Text("Veri yüklenirken hata oluştu")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(AppTheme.navy)
-            Text(message)
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.textMuted)
-                .multilineTextAlignment(.center)
-            Button("Tekrar Dene") { loadData() }
-                .foregroundColor(AppTheme.indigo)
-                .fontWeight(.semibold)
+            Image(systemName: "exclamationmark.circle").font(.system(size: 36)).foregroundColor(.red)
+            Text(message).font(.system(size: 13)).foregroundColor(AppTheme.textMuted).multilineTextAlignment(.center)
+            Button("Tekrar Dene") { loadData() }.foregroundColor(AppTheme.indigo).fontWeight(.semibold)
             Spacer()
         }
         .padding(32)
     }
 
     // MARK: - Helpers
-
-    func categoryColor(_ cat: String) -> Color {
-        switch cat.lowercased() {
-        case "fuel": return .orange
-        case "maintenance": return .blue
-        case "tire": return Color(red: 96/255, green: 125/255, blue: 139/255)
-        case "insurance": return .purple
-        case "tax": return Color(red: 0, green: 150/255, blue: 136/255)
-        case "fine": return .red
-        default: return Color(red: 148/255, green: 163/255, blue: 184/255)
-        }
+    func maintenanceStatusColor(_ status: String) -> Color {
+        switch status { case "done": return .green; case "scheduled": return .blue; case "overdue": return .red; default: return .orange }
     }
-
-    func categoryIcon(_ cat: String) -> String {
-        switch cat.lowercased() {
-        case "fuel": return "fuelpump.fill"
-        case "maintenance": return "wrench.fill"
-        case "tire": return "circle.circle.fill"
-        case "insurance": return "shield.fill"
-        case "tax": return "building.columns.fill"
-        case "fine": return "exclamationmark.triangle.fill"
-        default: return "ellipsis"
-        }
+    func documentStatusColor(_ status: String) -> Color {
+        switch status { case "active": return .green; case "expiring_soon": return .orange; case "expired": return .red; default: return Color(red: 148/255, green: 163/255, blue: 184/255) }
     }
-
+    func tireStatusColor(_ status: String) -> Color {
+        switch status { case "active": return .green; case "worn": return .orange; case "replaced": return Color(red: 148/255, green: 163/255, blue: 184/255); case "critical": return .red; default: return Color(red: 148/255, green: 163/255, blue: 184/255) }
+    }
     func categoryLabel(_ cat: String) -> String {
         switch cat.lowercased() {
-        case "fuel": return "Yakıt"
-        case "maintenance": return "Bakım"
-        case "tire": return "Lastik"
-        case "insurance": return "Sigorta"
-        case "tax": return "Vergi"
-        case "fine": return "Ceza"
-        case "other": return "Diğer"
-        default: return cat.prefix(1).uppercased() + cat.dropFirst()
+        case "fuel": return "Yakıt"; case "maintenance": return "Bakım"; case "tire": return "Lastik"
+        case "insurance": return "Sigorta"; case "tax": return "Vergi"; case "fine": return "Ceza"
+        case "other": return "Diğer"; default: return cat.prefix(1).uppercased() + cat.dropFirst()
         }
     }
 }
@@ -797,7 +645,6 @@ struct FleetManagementView: View {
 // ═══════════════════════════════════════════════════════════
 // MARK: - Maintenance Form Sheet
 // ═══════════════════════════════════════════════════════════
-
 struct MaintenanceFormSheet: View {
     let catalog: FleetCatalog?
     let editing: FleetMaintenance?
@@ -817,10 +664,6 @@ struct MaintenanceFormSheet: View {
     @State private var description: String
     @State private var status: String
 
-    private let types: [(String, String)] = [
-        ("periodic", "Periyodik Bakım"), ("oil_change", "Yağ Değişimi"), ("tire_change", "Lastik Değişimi"),
-        ("brake_service", "Fren Bakımı"), ("filter_change", "Filtre Değişimi"), ("battery", "Akü Kontrolü"), ("other", "Diğer")
-    ]
     private let statuses: [(String, String)] = [("done", "Tamamlandı"), ("scheduled", "Planlandı"), ("overdue", "Gecikmiş")]
 
     init(catalog: FleetCatalog?, editing: FleetMaintenance?, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
@@ -841,68 +684,47 @@ struct MaintenanceFormSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+                    sectionHeader("Araç Bilgileri", icon: "car")
                     formLabel("Araç *")
                     vehiclePicker(catalog: catalog, selected: $selectedImei)
 
+                    sectionHeader("Bakım Detayları", icon: "wrench")
                     formLabel("Bakım Türü *")
-                    dropdownPicker(options: types, selected: $maintenanceType)
-
-                    formLabel("Servis Tarihi *")
-                    formTextField(text: $serviceDate, placeholder: "2026-03-28")
-
-                    formLabel("Sonraki Servis Tarihi")
-                    formTextField(text: $nextServiceDate, placeholder: "2026-06-28")
-
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading) {
-                            formLabel("Servis KM")
-                            formTextField(text: $kmAtService, placeholder: "45000", keyboard: .numberPad)
-                        }
-                        VStack(alignment: .leading) {
-                            formLabel("Sonraki KM")
-                            formTextField(text: $nextServiceKm, placeholder: "55000", keyboard: .numberPad)
-                        }
-                    }
-
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading) {
-                            formLabel("Tutar (₺)")
-                            formTextField(text: $cost, placeholder: "1500", keyboard: .decimalPad)
-                        }
-                        VStack(alignment: .leading) {
-                            formLabel("Atölye")
-                            formTextField(text: $workshop, placeholder: "Oto Servis")
-                        }
-                    }
-
+                    formTextField(text: $maintenanceType, placeholder: "Yağ değişimi, fren bakımı...")
                     formLabel("Durum")
                     dropdownPicker(options: statuses, selected: $status)
+                    formLabel("Servis Tarihi *")
+                    formTextField(text: $serviceDate, placeholder: "2025-01-15")
+                    formLabel("Sonraki Servis Tarihi")
+                    formTextField(text: $nextServiceDate, placeholder: "2025-07-15")
 
+                    sectionHeader("Kilometre & Maliyet", icon: "speedometer")
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading) { formLabel("Servis KM"); formTextField(text: $kmAtService, placeholder: "45000", keyboard: .numberPad) }
+                        VStack(alignment: .leading) { formLabel("Sonraki KM"); formTextField(text: $nextServiceKm, placeholder: "55000", keyboard: .numberPad) }
+                    }
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading) { formLabel("Tutar (₺)"); formTextField(text: $cost, placeholder: "1500", keyboard: .decimalPad) }
+                        VStack(alignment: .leading) { formLabel("Atölye"); formTextField(text: $workshop, placeholder: "Oto Servis") }
+                    }
+
+                    sectionHeader("Notlar", icon: "note.text")
                     formLabel("Açıklama")
                     formTextField(text: $description, placeholder: "Opsiyonel açıklama...", axis: .vertical)
 
-                    if let err = errorMsg {
-                        Text(err).font(.system(size: 12)).foregroundColor(.red)
-                    }
-
+                    if let err = errorMsg { Text(err).font(.system(size: 12)).foregroundColor(.red) }
                     saveButton(isEdit: editing != nil, isSaving: isSaving) { save() }
                 }
                 .padding(20)
             }
             .navigationTitle(editing != nil ? "Bakım Düzenle" : "Yeni Bakım")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("İptal") { onCancel() }
-                }
-            }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("İptal") { onCancel() } } }
         }
     }
 
     private func save() {
-        guard !selectedImei.isEmpty, !maintenanceType.isEmpty, !serviceDate.isEmpty else {
-            errorMsg = "Araç, bakım türü ve servis tarihi zorunludur."; return
-        }
+        guard !selectedImei.isEmpty, !maintenanceType.isEmpty, !serviceDate.isEmpty else { errorMsg = "Araç, bakım türü ve servis tarihi zorunludur."; return }
         isSaving = true; errorMsg = nil
         Task {
             do {
@@ -920,16 +742,12 @@ struct MaintenanceFormSheet: View {
             isSaving = false
         }
     }
-
-    static func todayStr() -> String {
-        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: Date())
-    }
+    static func todayStr() -> String { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: Date()) }
 }
 
 // ═══════════════════════════════════════════════════════════
 // MARK: - Cost Form Sheet
 // ═══════════════════════════════════════════════════════════
-
 struct CostFormSheet: View {
     let catalog: FleetCatalog?
     let editing: FleetCost?
@@ -964,51 +782,39 @@ struct CostFormSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+                    sectionHeader("Araç Bilgileri", icon: "car")
                     formLabel("Araç *")
                     vehiclePicker(catalog: catalog, selected: $selectedImei)
 
+                    sectionHeader("Masraf Detayları", icon: "turkishlirasign.circle")
                     formLabel("Kategori *")
                     dropdownPicker(options: categories, selected: $category)
+                    formLabel("Tarih *")
+                    formTextField(text: $costDate, placeholder: "2025-01-15")
 
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading) {
-                            formLabel("Tutar (₺) *")
-                            formTextField(text: $amount, placeholder: "2500", keyboard: .decimalPad)
-                        }
-                        VStack(alignment: .leading) {
-                            formLabel("Tarih *")
-                            formTextField(text: $costDate, placeholder: "2026-03-28")
-                        }
-                    }
+                    sectionHeader("Tutar", icon: "banknote")
+                    formLabel("Tutar (₺) *")
+                    formTextField(text: $amount, placeholder: "2500", keyboard: .decimalPad)
 
+                    sectionHeader("Ek Bilgiler", icon: "info.circle")
                     formLabel("Referans No")
                     formTextField(text: $referenceNo, placeholder: "Fatura no, fiş no vb.")
-
                     formLabel("Açıklama")
                     formTextField(text: $description, placeholder: "Opsiyonel açıklama...", axis: .vertical)
 
-                    if let err = errorMsg {
-                        Text(err).font(.system(size: 12)).foregroundColor(.red)
-                    }
-
+                    if let err = errorMsg { Text(err).font(.system(size: 12)).foregroundColor(.red) }
                     saveButton(isEdit: editing != nil, isSaving: isSaving) { save() }
                 }
                 .padding(20)
             }
             .navigationTitle(editing != nil ? "Masraf Düzenle" : "Yeni Masraf")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("İptal") { onCancel() }
-                }
-            }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("İptal") { onCancel() } } }
         }
     }
 
     private func save() {
-        guard !selectedImei.isEmpty, !category.isEmpty, !amount.isEmpty, !costDate.isEmpty else {
-            errorMsg = "Araç, kategori, tutar ve tarih zorunludur."; return
-        }
+        guard !selectedImei.isEmpty, !category.isEmpty, !amount.isEmpty, !costDate.isEmpty else { errorMsg = "Araç, kategori, tutar ve tarih zorunludur."; return }
         isSaving = true; errorMsg = nil
         Task {
             do {
@@ -1027,7 +833,6 @@ struct CostFormSheet: View {
 // ═══════════════════════════════════════════════════════════
 // MARK: - Document Form Sheet
 // ═══════════════════════════════════════════════════════════
-
 struct DocumentFormSheet: View {
     let catalog: FleetCatalog?
     let editing: FleetDocument?
@@ -1064,54 +869,41 @@ struct DocumentFormSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+                    sectionHeader("Araç Bilgileri", icon: "car")
                     formLabel("Araç *")
                     vehiclePicker(catalog: catalog, selected: $selectedImei)
 
+                    sectionHeader("Belge Bilgileri", icon: "doc.text")
                     formLabel("Belge Türü *")
                     dropdownPicker(options: docTypes, selected: $docType)
-
                     formLabel("Başlık *")
                     formTextField(text: $title, placeholder: "Belge adı")
 
+                    sectionHeader("Tarihler", icon: "calendar")
                     HStack(spacing: 12) {
-                        VStack(alignment: .leading) {
-                            formLabel("Düzenleme Tarihi")
-                            formTextField(text: $issueDate, placeholder: "2026-01-01")
-                        }
-                        VStack(alignment: .leading) {
-                            formLabel("Bitiş Tarihi")
-                            formTextField(text: $expiryDate, placeholder: "2027-01-01")
-                        }
+                        VStack(alignment: .leading) { formLabel("Düzenleme Tarihi"); formTextField(text: $issueDate, placeholder: "2025-01-15") }
+                        VStack(alignment: .leading) { formLabel("Bitiş Tarihi"); formTextField(text: $expiryDate, placeholder: "2026-01-15") }
                     }
-
                     formLabel("Hatırlatma (gün)")
                     formTextField(text: $reminderDays, placeholder: "30", keyboard: .numberPad)
 
+                    sectionHeader("Notlar", icon: "note.text")
                     formLabel("Notlar")
                     formTextField(text: $notes, placeholder: "Opsiyonel notlar...", axis: .vertical)
 
-                    if let err = errorMsg {
-                        Text(err).font(.system(size: 12)).foregroundColor(.red)
-                    }
-
+                    if let err = errorMsg { Text(err).font(.system(size: 12)).foregroundColor(.red) }
                     saveButton(isEdit: editing != nil, isSaving: isSaving) { save() }
                 }
                 .padding(20)
             }
             .navigationTitle(editing != nil ? "Belge Düzenle" : "Yeni Belge")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("İptal") { onCancel() }
-                }
-            }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("İptal") { onCancel() } } }
         }
     }
 
     private func save() {
-        guard !selectedImei.isEmpty, !docType.isEmpty, !title.isEmpty else {
-            errorMsg = "Araç, belge türü ve başlık zorunludur."; return
-        }
+        guard !selectedImei.isEmpty, !docType.isEmpty, !title.isEmpty else { errorMsg = "Araç, belge türü ve başlık zorunludur."; return }
         isSaving = true; errorMsg = nil
         Task {
             do {
@@ -1130,8 +922,133 @@ struct DocumentFormSheet: View {
 }
 
 // ═══════════════════════════════════════════════════════════
+// MARK: - Tire Form Sheet
+// ═══════════════════════════════════════════════════════════
+struct TireFormSheet: View {
+    let catalog: FleetCatalog?
+    let editing: FleetTire?
+    let onSaved: () -> Void
+    let onCancel: () -> Void
+
+    @State private var isSaving = false
+    @State private var errorMsg: String? = nil
+    @State private var selectedImei: String
+    @State private var position: String
+    @State private var brand: String
+    @State private var model: String
+    @State private var size: String
+    @State private var dotCode: String
+    @State private var installDate: String
+    @State private var kmAtInstall: String
+    @State private var kmLimit: String
+    @State private var status: String
+    @State private var notes: String
+
+    private let positions: [(String, String)] = [
+        ("sol_on", "Sol Ön"), ("sag_on", "Sağ Ön"),
+        ("sol_arka", "Sol Arka"), ("sag_arka", "Sağ Arka"),
+        ("yedek", "Yedek")
+    ]
+    private let statuses: [(String, String)] = [
+        ("active", "Aktif"), ("worn", "Aşınmış"),
+        ("replaced", "Değiştirildi"), ("critical", "Kritik")
+    ]
+
+    init(catalog: FleetCatalog?, editing: FleetTire?, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
+        self.catalog = catalog; self.editing = editing; self.onSaved = onSaved; self.onCancel = onCancel
+        _selectedImei = State(initialValue: editing?.imei ?? "")
+        _position = State(initialValue: editing?.position ?? "")
+        _brand = State(initialValue: editing?.brand ?? "")
+        _model = State(initialValue: editing?.model ?? "")
+        _size = State(initialValue: editing?.size ?? "")
+        _dotCode = State(initialValue: editing?.dotCode ?? "")
+        _installDate = State(initialValue: editing?.installDate ?? MaintenanceFormSheet.todayStr())
+        _kmAtInstall = State(initialValue: (editing != nil && editing!.kmAtInstall > 0) ? "\(editing!.kmAtInstall)" : "")
+        _kmLimit = State(initialValue: (editing != nil && editing!.kmLimit > 0) ? "\(editing!.kmLimit)" : "")
+        _status = State(initialValue: editing?.status ?? "active")
+        _notes = State(initialValue: editing?.notes ?? "")
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    sectionHeader("Araç Bilgileri", icon: "car")
+                    formLabel("Araç *")
+                    vehiclePicker(catalog: catalog, selected: $selectedImei)
+
+                    sectionHeader("Lastik Bilgileri", icon: "circle.circle")
+                    formLabel("Pozisyon")
+                    dropdownPicker(options: positions, selected: $position)
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading) { formLabel("Marka"); formTextField(text: $brand, placeholder: "Michelin") }
+                        VStack(alignment: .leading) { formLabel("Model"); formTextField(text: $model, placeholder: "Primacy 4") }
+                    }
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading) { formLabel("Ebat"); formTextField(text: $size, placeholder: "205/55R16") }
+                        VStack(alignment: .leading) { formLabel("DOT Kodu"); formTextField(text: $dotCode, placeholder: "2024") }
+                    }
+
+                    sectionHeader("Kilometre & Tarih", icon: "speedometer")
+                    formLabel("Montaj Tarihi")
+                    formTextField(text: $installDate, placeholder: "2025-01-15")
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading) { formLabel("Montaj KM"); formTextField(text: $kmAtInstall, placeholder: "45000", keyboard: .numberPad) }
+                        VStack(alignment: .leading) { formLabel("KM Limiti"); formTextField(text: $kmLimit, placeholder: "80000", keyboard: .numberPad) }
+                    }
+                    formLabel("Durum")
+                    dropdownPicker(options: statuses, selected: $status)
+
+                    sectionHeader("Notlar", icon: "note.text")
+                    formLabel("Notlar")
+                    formTextField(text: $notes, placeholder: "Opsiyonel notlar...", axis: .vertical)
+
+                    if let err = errorMsg { Text(err).font(.system(size: 12)).foregroundColor(.red) }
+                    saveButton(isEdit: editing != nil, isSaving: isSaving) { save() }
+                }
+                .padding(20)
+            }
+            .navigationTitle(editing != nil ? "Lastik Düzenle" : "Yeni Lastik")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("İptal") { onCancel() } } }
+        }
+    }
+
+    private func save() {
+        guard !selectedImei.isEmpty else { errorMsg = "Araç seçimi zorunludur."; return }
+        isSaving = true; errorMsg = nil
+        Task {
+            do {
+                var body: [String: Any] = ["device_imei": selectedImei, "position": position, "brand": brand, "model": model, "size": size, "dot_code": dotCode, "install_date": installDate, "status": status, "notes": notes]
+                if let v = Int(kmAtInstall) { body["km_at_install"] = v }
+                if let v = Int(kmLimit) { body["km_limit"] = v }
+                if let e = editing {
+                    let _ = try await APIService.shared.put("/api/mobile/fleet/tires/\(e.id)", body: body)
+                } else {
+                    let _ = try await APIService.shared.post("/api/mobile/fleet/tires", body: body)
+                }
+                onSaved()
+            } catch { errorMsg = error.localizedDescription }
+            isSaving = false
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
 // MARK: - Shared Form Components
 // ═══════════════════════════════════════════════════════════
+private func sectionHeader(_ title: String, icon: String) -> some View {
+    HStack(spacing: 6) {
+        Image(systemName: icon)
+            .font(.system(size: 11))
+            .foregroundColor(AppTheme.indigo)
+        Text(title.uppercased())
+            .font(.system(size: 11, weight: .bold))
+            .foregroundColor(AppTheme.textMuted)
+            .tracking(0.5)
+    }
+    .padding(.top, 12)
+}
 
 private func formLabel(_ text: String) -> some View {
     Text(text)
@@ -1144,12 +1061,9 @@ private func formTextField(text: Binding<String>, placeholder: String, keyboard:
         .font(.system(size: 13))
         .foregroundColor(AppTheme.navy)
         .padding(10)
-        .background(Color.white)
-        .cornerRadius(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
-        )
+        .background(Color(red: 250/255, green: 251/255, blue: 254/255))
+        .cornerRadius(10)
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
         .keyboardType(keyboard)
         .frame(minHeight: axis == .vertical ? 60 : nil, alignment: .top)
 }
@@ -1161,27 +1075,21 @@ private func vehiclePicker(catalog: FleetCatalog?, selected: Binding<String>) ->
 
     return Menu {
         ForEach(vehicles) { v in
-            Button("\(v.plate) - \(v.name)") {
-                selected.wrappedValue = v.imei
-            }
+            Button("\(v.plate) - \(v.name)") { selected.wrappedValue = v.imei }
         }
     } label: {
         HStack {
+            Image(systemName: "car").font(.system(size: 12)).foregroundColor(AppTheme.indigo)
             Text(label)
                 .font(.system(size: 13))
                 .foregroundColor(sel != nil ? AppTheme.navy : AppTheme.textMuted)
             Spacer()
-            Image(systemName: "chevron.down")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.textMuted)
+            Image(systemName: "chevron.down").font(.system(size: 11)).foregroundColor(AppTheme.textMuted)
         }
         .padding(10)
-        .background(Color.white)
-        .cornerRadius(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
-        )
+        .background(Color(red: 250/255, green: 251/255, blue: 254/255))
+        .cornerRadius(10)
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
     }
 }
 
@@ -1197,17 +1105,12 @@ private func dropdownPicker(options: [(String, String)], selected: Binding<Strin
                 .font(.system(size: 13))
                 .foregroundColor(selected.wrappedValue.isEmpty ? AppTheme.textMuted : AppTheme.navy)
             Spacer()
-            Image(systemName: "chevron.down")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.textMuted)
+            Image(systemName: "chevron.down").font(.system(size: 11)).foregroundColor(AppTheme.textMuted)
         }
         .padding(10)
-        .background(Color.white)
-        .cornerRadius(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
-        )
+        .background(Color(red: 250/255, green: 251/255, blue: 254/255))
+        .cornerRadius(10)
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
     }
 }
 
@@ -1215,11 +1118,12 @@ private func saveButton(isEdit: Bool, isSaving: Bool, action: @escaping () -> Vo
     Button(action: action) {
         Group {
             if isSaving {
-                ProgressView()
-                    .tint(.white)
+                ProgressView().tint(.white)
             } else {
-                Text(isEdit ? "Güncelle" : "Kaydet")
-                    .fontWeight(.semibold)
+                HStack(spacing: 8) {
+                    Image(systemName: isEdit ? "checkmark" : "plus")
+                    Text(isEdit ? "Güncelle" : "Kaydet").fontWeight(.semibold)
+                }
             }
         }
         .frame(maxWidth: .infinity)
@@ -1227,8 +1131,9 @@ private func saveButton(isEdit: Bool, isSaving: Bool, action: @escaping () -> Vo
     }
     .buttonStyle(.borderedProminent)
     .tint(AppTheme.indigo)
-    .cornerRadius(10)
+    .cornerRadius(12)
     .disabled(isSaving)
+    .padding(.top, 8)
 }
 
 #Preview {

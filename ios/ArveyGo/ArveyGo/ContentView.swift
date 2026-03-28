@@ -20,6 +20,7 @@ struct ContentView: View {
     @State private var selectedPage: AppPage = .dashboard
     @State private var showSideMenu = false
     @State private var showSupportRequest = false
+    @State private var alarmsSearchText = ""
 
     var body: some View {
         Group {
@@ -42,17 +43,17 @@ struct ContentView: View {
             Group {
                 switch selectedPage {
                 case .dashboard:
-                    DashboardView(showSideMenu: $showSideMenu, selectedPage: $selectedPage)
+                    DashboardView(showSideMenu: $showSideMenu, selectedPage: $selectedPage, alarmsSearchText: $alarmsSearchText)
                 case .liveMap:
-                    LiveMapView(showSideMenu: $showSideMenu, selectedPage: $selectedPage)
+                    LiveMapView(showSideMenu: $showSideMenu, selectedPage: $selectedPage, alarmsSearchText: $alarmsSearchText)
                 case .vehicles:
-                    VehiclesListView(showSideMenu: $showSideMenu, selectedPage: $selectedPage)
+                    VehiclesListView(showSideMenu: $showSideMenu, selectedPage: $selectedPage, alarmsSearchText: $alarmsSearchText)
                 case .drivers:
                     DriversView(showSideMenu: $showSideMenu)
                 case .routeHistory:
                     RouteHistoryView(showSideMenu: $showSideMenu)
                 case .alarms:
-                    AlarmsView(showSideMenu: $showSideMenu)
+                    AlarmsView(showSideMenu: $showSideMenu, initialSearchText: alarmsSearchText)
                 case .geofences:
                     GeofencesView(showSideMenu: $showSideMenu)
                 case .fleetManagement:
@@ -81,6 +82,14 @@ struct ContentView: View {
             SideMenuView(isShowing: $showSideMenu, selectedPage: $selectedPage)
         }
         .animation(.spring(response: 0.3), value: showSideMenu)
+        .onChange(of: selectedPage) { oldPage, newPage in
+            // Clear alarms search text when navigating away from alarms
+            // or when navigating to alarms from side menu (not from VehicleDetail)
+            if oldPage == .alarms { alarmsSearchText = "" }
+            if newPage == .alarms && oldPage != .alarms {
+                // alarmsSearchText already set by VehicleDetailView callback or stays ""
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // WebSocketManager handles foreground reconnection internally now
             // This is a backup in case the internal observer missed it

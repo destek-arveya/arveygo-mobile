@@ -155,11 +155,11 @@ struct VehicleDetailView: View {
 
     /// Navigation callbacks for quick actions
     var onNavigateToRouteHistory: ((Vehicle) -> Void)?
-    var onNavigateToAlarms: (() -> Void)?
+    var onNavigateToAlarms: ((String) -> Void)?
 
     private var vehicle: Vehicle { observer.vehicle }
 
-    init(vehicle: Vehicle, onNavigateToRouteHistory: ((Vehicle) -> Void)? = nil, onNavigateToAlarms: (() -> Void)? = nil) {
+    init(vehicle: Vehicle, onNavigateToRouteHistory: ((Vehicle) -> Void)? = nil, onNavigateToAlarms: ((String) -> Void)? = nil) {
         _observer = StateObject(wrappedValue: VehicleDetailObserver(vehicle: vehicle))
         self.onNavigateToRouteHistory = onNavigateToRouteHistory
         self.onNavigateToAlarms = onNavigateToAlarms
@@ -271,7 +271,7 @@ struct VehicleDetailView: View {
                     Circle()
                         .fill(vehicle.status.color)
                         .frame(width: 7, height: 7)
-                    Text(!vehicle.livenessStatus.isEmpty ? vehicle.livenessLabel : (vehicle.status == .online ? "Canlı" : vehicle.status.label))
+                    Text(!vehicle.livenessStatus.isEmpty ? vehicle.livenessLabel : vehicle.status.label)
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(vehicle.status.color)
                 }
@@ -429,7 +429,7 @@ struct VehicleDetailView: View {
                 quickActionButton(icon: "bell.fill", label: "Alarmlar", color: .orange) {
                     dismiss()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                        onNavigateToAlarms?()
+                        onNavigateToAlarms?(vehicle.plate)
                     }
                 }
                 quickActionButton(icon: "square.and.arrow.up", label: "Paylaş", color: AppTheme.textMuted) {
@@ -804,7 +804,7 @@ struct VehicleDetailView: View {
 
     // MARK: - Events Tab
     var eventsTab: some View {
-        EventsTabContent(vehicle: observer.vehicle)
+        EventsTabContent(vehicle: observer.vehicle, onNavigateToAlarms: onNavigateToAlarms)
     }
 
     // MARK: - Helper Views
@@ -1124,6 +1124,7 @@ struct VehicleMapPinDetail: View {
 // MARK: - Events Tab Content (fetches real alarms)
 struct EventsTabContent: View {
     let vehicle: Vehicle
+    var onNavigateToAlarms: ((String) -> Void)?
     @State private var alarms: [AlarmEvent] = []
     @State private var isLoading = true
 
@@ -1163,6 +1164,26 @@ struct EventsTabContent: View {
                             }
                         }
                     }
+
+                    // "Tümünü Gör" button
+                    if let onNavigateToAlarms = onNavigateToAlarms {
+                        Button(action: {
+                            onNavigateToAlarms(vehicle.plate)
+                        }) {
+                            HStack(spacing: 6) {
+                                Text("Tümünü Gör")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 11))
+                            }
+                            .foregroundColor(AppTheme.indigo)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(AppTheme.indigo.opacity(0.06))
+                            .cornerRadius(10)
+                        }
+                        .padding(.top, 4)
+                    }
                 }
             }
         }
@@ -1188,7 +1209,7 @@ struct EventsTabContent: View {
                 guard a.imei == vehicle.imei || a.plate == vehicle.plate else { return nil }
                 return a
             }
-            alarms = Array(results.prefix(20))
+            alarms = Array(results.prefix(10))
         } catch {
             alarms = []
         }
@@ -1250,7 +1271,7 @@ struct EventsTabContent: View {
 #Preview {
     VehicleDetailView(vehicle: Vehicle(
         id: "1", plate: "34 ABC 123", model: "Ford Transit",
-        status: .online, kontakOn: true, totalKm: 48320, todayKm: 312,
+        status: .ignitionOn, kontakOn: true, totalKm: 48320, todayKm: 312,
         driver: "Ahmet Yılmaz", city: "İstanbul", lat: 41.0082, lng: 28.9784
     ))
 }

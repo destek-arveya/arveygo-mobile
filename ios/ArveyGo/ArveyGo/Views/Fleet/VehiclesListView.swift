@@ -6,6 +6,7 @@ struct VehiclesListView: View {
     @StateObject private var vm = VehiclesListViewModel()
     @Binding var showSideMenu: Bool
     @Binding var selectedPage: AppPage
+    @Binding var alarmsSearchText: String
     @State private var selectedVehicle: Vehicle?
 
     var body: some View {
@@ -74,9 +75,10 @@ struct VehiclesListView: View {
                                 selectedPage = .routeHistory
                             }
                         },
-                        onNavigateToAlarms: {
+                        onNavigateToAlarms: { plateText in
                             selectedVehicle = nil
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                alarmsSearchText = plateText
                                 selectedPage = .alarms
                             }
                         }
@@ -157,9 +159,10 @@ struct VehiclesListView: View {
                 // Status filter
                 Menu {
                     Button("Tüm Durumlar") { vm.statusFilter = nil }
-                    Button("Aktif") { vm.statusFilter = .online }
-                    Button("Pasif / Çevrimdışı") { vm.statusFilter = .offline }
-                    Button("Bakımda") { vm.statusFilter = .idle }
+                    Button("Kontak Açık") { vm.statusFilter = .ignitionOn }
+                    Button("Kontak Kapalı") { vm.statusFilter = .ignitionOff }
+                    Button("Bilgi Yok") { vm.statusFilter = .noData }
+                    Button("Cihaz Uykuda") { vm.statusFilter = .sleeping }
                 } label: {
                     HStack(spacing: 5) {
                         Text(vm.statusFilterLabel)
@@ -405,9 +408,10 @@ enum FleetVehicleStatus: String {
 extension Vehicle {
     var fleetStatus: FleetVehicleStatus {
         switch status {
-        case .online: return .active
-        case .offline: return .passive
-        case .idle: return .maintenance
+        case .ignitionOn: return .active
+        case .ignitionOff: return .passive
+        case .noData: return .passive
+        case .sleeping: return .maintenance
         }
     }
 
@@ -459,9 +463,10 @@ class VehiclesListViewModel: ObservableObject {
     var statusFilterLabel: String {
         if let f = statusFilter {
             switch f {
-            case .online: return "Aktif"
-            case .offline: return "Pasif"
-            case .idle: return "Bakımda"
+            case .ignitionOn: return "Kontak Açık"
+            case .ignitionOff: return "Kontak Kapalı"
+            case .noData: return "Bilgi Yok"
+            case .sleeping: return "Cihaz Uykuda"
             }
         }
         return "Tüm Durumlar"
@@ -524,6 +529,6 @@ class VehiclesListViewModel: ObservableObject {
 }
 
 #Preview {
-    VehiclesListView(showSideMenu: .constant(false), selectedPage: Binding.constant(AppPage.vehicles))
+    VehiclesListView(showSideMenu: .constant(false), selectedPage: Binding.constant(AppPage.vehicles), alarmsSearchText: .constant(""))
         .environmentObject(AuthViewModel())
 }

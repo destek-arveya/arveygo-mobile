@@ -49,9 +49,10 @@ class VehiclesListViewModel {
 
     val statusFilterLabel: String
         get() = when (statusFilter) {
-            VehicleStatus.ONLINE -> "Aktif"
-            VehicleStatus.OFFLINE -> "Pasif"
-            VehicleStatus.IDLE -> "Bakımda"
+            VehicleStatus.IGNITION_ON -> "Kontak Açık"
+            VehicleStatus.IGNITION_OFF -> "Kontak Kapalı"
+            VehicleStatus.NO_DATA -> "Bilgi Yok"
+            VehicleStatus.SLEEPING -> "Cihaz Uykuda"
             null -> "Tüm Durumlar"
         }
 
@@ -126,7 +127,7 @@ fun VehiclesListScreen(
                 selectedVehicle = null
                 onNavigateToRouteHistory?.invoke(v)
             },
-            onNavigateToAlarms = {
+            onNavigateToAlarms = { _ ->
                 selectedVehicle = null
                 onNavigateToAlarms?.invoke()
             }
@@ -238,9 +239,10 @@ fun VehiclesListScreen(
                     }
                     DropdownMenu(expanded = statusMenuExpanded, onDismissRequest = { statusMenuExpanded = false }) {
                         DropdownMenuItem(text = { Text("Tüm Durumlar", fontSize = 12.sp) }, onClick = { vm.statusFilter = null; statusMenuExpanded = false })
-                        DropdownMenuItem(text = { Text("Aktif", fontSize = 12.sp) }, onClick = { vm.statusFilter = VehicleStatus.ONLINE; statusMenuExpanded = false })
-                        DropdownMenuItem(text = { Text("Pasif / Çevrimdışı", fontSize = 12.sp) }, onClick = { vm.statusFilter = VehicleStatus.OFFLINE; statusMenuExpanded = false })
-                        DropdownMenuItem(text = { Text("Bakımda", fontSize = 12.sp) }, onClick = { vm.statusFilter = VehicleStatus.IDLE; statusMenuExpanded = false })
+                        DropdownMenuItem(text = { Text("Kontak Açık", fontSize = 12.sp) }, onClick = { vm.statusFilter = VehicleStatus.IGNITION_ON; statusMenuExpanded = false })
+                        DropdownMenuItem(text = { Text("Kontak Kapalı", fontSize = 12.sp) }, onClick = { vm.statusFilter = VehicleStatus.IGNITION_OFF; statusMenuExpanded = false })
+                        DropdownMenuItem(text = { Text("Bilgi Yok", fontSize = 12.sp) }, onClick = { vm.statusFilter = VehicleStatus.NO_DATA; statusMenuExpanded = false })
+                        DropdownMenuItem(text = { Text("Cihaz Uykuda", fontSize = 12.sp) }, onClick = { vm.statusFilter = VehicleStatus.SLEEPING; statusMenuExpanded = false })
                     }
                 }
 

@@ -414,13 +414,13 @@ struct Vehicle: Identifiable, Equatable {
         let sensorsArr = json["sensors"] as? [[String: Any]]
         let sensorCount = (json["sensor_count"] as? Int) ?? 0
 
-        // Status derivation — matches web deriveVehicleStatus(isOnline, ignition, speed)
-        // livenessStatus is stored separately for UI badges/labels
+        // Status derivation — 4 states: Kontak Açık, Kontak Kapalı, Bilgi Yok, Cihaz Uykuda
         let status: VehicleStatus
-        if !isOnline { status = .offline }
-        else if ignition && speed > 5 { status = .online }
-        else if ignition { status = .idle }
-        else { status = .offline }
+        let effectiveOfflineAfterSec = offlineAfterSec ?? 3600
+        if !isOnline && secondsSinceLastPacket != nil && secondsSinceLastPacket! > effectiveOfflineAfterSec { status = .noData }
+        else if !isOnline { status = .ignitionOff }
+        else if ignition { status = .ignitionOn }
+        else { status = .ignitionOff }
 
         let effectiveDailyKm = dailyKmVal > 0 ? dailyKmVal : todayKmVal
 
@@ -558,31 +558,35 @@ struct Vehicle: Identifiable, Equatable {
 }
 
 enum VehicleStatus: String, CaseIterable {
-    case online = "online"
-    case offline = "offline"
-    case idle = "idle"
+    case ignitionOn = "ignition_on"
+    case ignitionOff = "ignition_off"
+    case noData = "no_data"
+    case sleeping = "sleeping"
 
     var color: SwiftUI.Color {
         switch self {
-        case .online: return AppTheme.online
-        case .offline: return AppTheme.offline
-        case .idle: return AppTheme.idle
+        case .ignitionOn: return AppTheme.online
+        case .ignitionOff: return AppTheme.offline
+        case .noData: return Color(red: 148/255, green: 163/255, blue: 184/255)
+        case .sleeping: return AppTheme.idle
         }
     }
 
     var label: String {
         switch self {
-        case .online: return "Aktif"
-        case .offline: return "Çevrimdışı"
-        case .idle: return "Rölanti"
+        case .ignitionOn: return "Kontak Açık"
+        case .ignitionOff: return "Kontak Kapalı"
+        case .noData: return "Bilgi Yok"
+        case .sleeping: return "Cihaz Uykuda"
         }
     }
 
     var icon: String {
         switch self {
-        case .online: return "checkmark.circle.fill"
-        case .offline: return "xmark.circle.fill"
-        case .idle: return "pause.circle.fill"
+        case .ignitionOn: return "checkmark.circle.fill"
+        case .ignitionOff: return "xmark.circle.fill"
+        case .noData: return "questionmark.circle.fill"
+        case .sleeping: return "moon.fill"
         }
     }
 }
@@ -1022,6 +1026,73 @@ struct FleetReminder: Identifiable {
     let label: String
     let dueDate: String?
     let daysLeft: Int
+}
+
+// MARK: - Fleet Tire
+struct FleetTire: Identifiable {
+    let id: String
+    let imei: String
+    let plate: String
+    let position: String
+    let brand: String
+    let model: String
+    let size: String
+    let dotCode: String
+    let installDate: String
+    let kmAtInstall: Int
+    let kmLimit: Int
+    let status: String
+    let notes: String
+
+    var statusLabel: String {
+        switch status {
+        case "active": return "Aktif"
+        case "worn": return "Aşınmış"
+        case "replaced": return "Değiştirildi"
+        case "critical": return "Kritik"
+        default: return status.prefix(1).uppercased() + status.dropFirst()
+        }
+    }
+
+    var statusColor: Color {
+        switch status {
+        case "active": return .green
+        case "worn": return .orange
+        case "replaced": return Color(red: 148/255, green: 163/255, blue: 184/255)
+        case "critical": return .red
+        default: return Color(red: 148/255, green: 163/255, blue: 184/255)
+        }
+    }
+
+    var positionLabel: String {
+        switch position {
+        case "sol_on": return "Sol Ön"
+        case "sag_on": return "Sağ Ön"
+        case "sol_arka": return "Sol Arka"
+        case "sag_arka": return "Sağ Arka"
+        case "yedek": return "Yedek"
+        default: return position
+        }
+    }
+
+    static func fromDict(_ d: [String: Any]) -> FleetTire? {
+        guard let id = d["id"] else { return nil }
+        return FleetTire(
+            id: "\(id)",
+            imei: d["device_imei"] as? String ?? d["imei"] as? String ?? "",
+            plate: d["plate"] as? String ?? "",
+            position: d["position"] as? String ?? "",
+            brand: d["brand"] as? String ?? "",
+            model: d["model"] as? String ?? "",
+            size: d["size"] as? String ?? "",
+            dotCode: d["dot_code"] as? String ?? "",
+            installDate: d["install_date"] as? String ?? "",
+            kmAtInstall: d["km_at_install"] as? Int ?? 0,
+            kmLimit: d["km_limit"] as? Int ?? 0,
+            status: d["status"] as? String ?? "active",
+            notes: d["notes"] as? String ?? ""
+        )
+    }
 }
 
 // MARK: - Pagination

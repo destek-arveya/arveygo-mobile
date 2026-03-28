@@ -33,29 +33,33 @@ data class AppUser(
 
 // MARK: - Vehicle Status
 enum class VehicleStatus(val key: String) {
-    ONLINE("online"),
-    OFFLINE("offline"),
-    IDLE("idle");
+    IGNITION_ON("ignition_on"),
+    IGNITION_OFF("ignition_off"),
+    NO_DATA("no_data"),
+    SLEEPING("sleeping");
 
     val color: Color
         get() = when (this) {
-            ONLINE -> AppColors.Online
-            OFFLINE -> AppColors.Offline
-            IDLE -> AppColors.Idle
+            IGNITION_ON -> AppColors.Online
+            IGNITION_OFF -> AppColors.Offline
+            NO_DATA -> Color(0xFF94A3B8)
+            SLEEPING -> AppColors.Idle
         }
 
     val label: String
         get() = when (this) {
-            ONLINE -> "Aktif"
-            OFFLINE -> "Çevrimdışı"
-            IDLE -> "Rölanti"
+            IGNITION_ON -> "Kontak Açık"
+            IGNITION_OFF -> "Kontak Kapalı"
+            NO_DATA -> "Bilgi Yok"
+            SLEEPING -> "Cihaz Uykuda"
         }
 
     val icon: String
         get() = when (this) {
-            ONLINE -> "check_circle"
-            OFFLINE -> "cancel"
-            IDLE -> "pause_circle"
+            IGNITION_ON -> "check_circle"
+            IGNITION_OFF -> "cancel"
+            NO_DATA -> "help"
+            SLEEPING -> "bedtime"
         }
 }
 
@@ -277,9 +281,10 @@ data class Vehicle(
     // Fleet extensions
     val fleetStatus: FleetVehicleStatus
         get() = when (status) {
-            VehicleStatus.ONLINE -> FleetVehicleStatus.ACTIVE
-            VehicleStatus.OFFLINE -> FleetVehicleStatus.PASSIVE
-            VehicleStatus.IDLE -> FleetVehicleStatus.MAINTENANCE
+            VehicleStatus.IGNITION_ON -> FleetVehicleStatus.ACTIVE
+            VehicleStatus.IGNITION_OFF -> FleetVehicleStatus.PASSIVE
+            VehicleStatus.NO_DATA -> FleetVehicleStatus.PASSIVE
+            VehicleStatus.SLEEPING -> FleetVehicleStatus.MAINTENANCE
         }
 
     val group: String
@@ -436,13 +441,12 @@ data class Vehicle(
             val sensorsArr: org.json.JSONArray? = if (json.has("sensors") && !json.isNull("sensors")) json.optJSONArray("sensors") else null
             val sensorCount = json.optInt("sensor_count", 0)
 
-            // Status derivation — matches web deriveVehicleStatus(isOnline, ignition, speed)
-            // livenessStatus is stored separately for UI badges/labels
+            // Status derivation — 4 states: Kontak Açık, Kontak Kapalı, Bilgi Yok, Cihaz Uykuda
             val status = when {
-                !isOnline -> VehicleStatus.OFFLINE
-                ignition && speed > 5 -> VehicleStatus.ONLINE
-                ignition -> VehicleStatus.IDLE
-                else -> VehicleStatus.OFFLINE
+                !isOnline && secondsSinceLastPacket != null && secondsSinceLastPacket > (offlineAfterSec ?: 3600) -> VehicleStatus.NO_DATA
+                !isOnline -> VehicleStatus.IGNITION_OFF
+                ignition -> VehicleStatus.IGNITION_ON
+                else -> VehicleStatus.IGNITION_OFF
             }
 
             val effectiveDailyKm = if (dailyKmVal > 0) dailyKmVal else todayKmVal
@@ -549,6 +553,75 @@ enum class FleetVehicleStatus(val label: String, val color: Color) {
     ACTIVE("Aktif", AppColors.Online),
     PASSIVE("Pasif", Color(0xFF94A3B8)),
     MAINTENANCE("Bakımda", AppColors.Idle)
+}
+
+// MARK: - Fleet Tire
+data class FleetTire(
+    val id: String,
+    val imei: String = "",
+    val plate: String = "",
+    val position: String = "",
+    val brand: String = "",
+    val model: String = "",
+    val size: String = "",
+    val dotCode: String = "",
+    val installDate: String = "",
+    val kmAtInstall: Int = 0,
+    val kmLimit: Int = 0,
+    val status: String = "active",
+    val notes: String = "",
+    val createdAt: String? = null,
+    val updatedAt: String? = null
+) {
+    val statusLabel: String
+        get() = when (status) {
+            "active" -> "Aktif"
+            "worn" -> "Aşınmış"
+            "replaced" -> "Değiştirildi"
+            "critical" -> "Kritik"
+            else -> status
+        }
+
+    val statusColor: Color
+        get() = when (status) {
+            "active" -> Color(0xFF22C55E)
+            "worn" -> Color(0xFFF59E0B)
+            "replaced" -> Color(0xFF94A3B8)
+            "critical" -> Color(0xFFEF4444)
+            else -> Color(0xFF94A3B8)
+        }
+
+    val positionLabel: String
+        get() = when (position) {
+            "sol_on" -> "Sol Ön"
+            "sag_on" -> "Sağ Ön"
+            "sol_arka" -> "Sol Arka"
+            "sag_arka" -> "Sağ Arka"
+            "yedek" -> "Yedek"
+            else -> position
+        }
+
+    companion object {
+        fun fromJson(json: org.json.JSONObject): FleetTire {
+            return FleetTire(
+                id = json.optString("id", "0"),
+                imei = json.optString("imei", ""),
+                plate = json.optString("plate", ""),
+                position = json.optString("position", ""),
+                brand = json.optString("brand", ""),
+                model = json.optString("model", ""),
+                size = json.optString("size", ""),
+                dotCode = json.optString("dot_code", ""),
+                installDate = json.optString("install_date", ""),
+                kmAtInstall = json.optInt("km_at_install", 0),
+                kmLimit = json.optInt("km_limit", 0),
+                status = json.optString("status", "active"),
+                notes = json.optString("notes", ""),
+                createdAt = json.optString("created_at", null),
+                updatedAt = json.optString("updated_at", null)
+            )
+        }
+    }
 }
 
 // MARK: - Vehicle Cost (API-backed)

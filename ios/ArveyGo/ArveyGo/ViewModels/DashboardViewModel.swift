@@ -23,9 +23,9 @@ class DashboardViewModel: ObservableObject {
     var kontakOffCount: Int { vehicles.filter { $0.isOnline && !$0.ignition }.count }
     /// Bilgi yok: isOnline == false (cihazdan veri gelmiyor)
     var bilgiYokCount: Int { vehicles.filter { !$0.isOnline }.count }
-    var onlineCount: Int { vehicles.filter { $0.status == .online }.count }
-    var offlineCount: Int { vehicles.filter { $0.status == .offline }.count }
-    var idleCount: Int { vehicles.filter { $0.status == .idle }.count }
+    var onlineCount: Int { vehicles.filter { $0.status == .ignitionOn }.count }
+    var offlineCount: Int { vehicles.filter { $0.status == .ignitionOff || $0.status == .noData }.count }
+    var idleCount: Int { vehicles.filter { $0.status == .sleeping }.count }
     var totalKm: Int { vehicles.reduce(0) { $0 + $1.totalKm } }
     var todayKm: Int { vehicles.reduce(0) { $0 + $1.todayKm } }
     var avgScore: Int {
@@ -138,14 +138,14 @@ class DashboardViewModel: ObservableObject {
     func loadDummyData() {
         // Same dummy data as the Laravel dashboard (vehicle fallback)
         vehicles = [
-            Vehicle(id: "1", plate: "34 ABC 123", model: "Ford Transit", status: .online, kontakOn: true, totalKm: 48320, todayKm: 312, driver: "Ahmet Yılmaz", city: "İstanbul", lat: 41.0082, lng: 28.9784),
-            Vehicle(id: "2", plate: "06 XYZ 789", model: "Mercedes Sprinter", status: .offline, kontakOn: false, totalKm: 92100, todayKm: 0, driver: "Mehmet Demir", city: "Ankara", lat: 39.9334, lng: 32.8597),
-            Vehicle(id: "3", plate: "35 DEF 456", model: "Renault Master", status: .online, kontakOn: true, totalKm: 31540, todayKm: 187, driver: "Ayşe Kaya", city: "İzmir", lat: 38.4192, lng: 27.1287),
-            Vehicle(id: "4", plate: "16 GHI 321", model: "Volkswagen Crafter", status: .idle, kontakOn: false, totalKm: 67890, todayKm: 0, driver: "Can Öztürk", city: "Bursa", lat: 40.1885, lng: 29.0610),
-            Vehicle(id: "5", plate: "41 JKL 654", model: "Fiat Ducato", status: .online, kontakOn: true, totalKm: 22430, todayKm: 95, driver: "Zeynep Şahin", city: "Kocaeli", lat: 40.7654, lng: 29.9408),
-            Vehicle(id: "6", plate: "07 MNO 987", model: "Peugeot Boxer", status: .offline, kontakOn: false, totalKm: 55670, todayKm: 0, driver: "Ali Çelik", city: "Antalya", lat: 36.8969, lng: 30.7133),
-            Vehicle(id: "7", plate: "34 PRS 111", model: "Iveco Daily", status: .online, kontakOn: true, totalKm: 14220, todayKm: 241, driver: "Fatma Arslan", city: "İstanbul", lat: 41.0422, lng: 29.0083),
-            Vehicle(id: "8", plate: "06 TUV 222", model: "Ford Transit Custom", status: .idle, kontakOn: false, totalKm: 38900, todayKm: 0, driver: "Hasan Koç", city: "Ankara", lat: 39.9208, lng: 32.8541),
+            Vehicle(id: "1", plate: "34 ABC 123", model: "Ford Transit", status: .ignitionOn, kontakOn: true, totalKm: 48320, todayKm: 312, driver: "Ahmet Yılmaz", city: "İstanbul", lat: 41.0082, lng: 28.9784),
+            Vehicle(id: "2", plate: "06 XYZ 789", model: "Mercedes Sprinter", status: .ignitionOff, kontakOn: false, totalKm: 92100, todayKm: 0, driver: "Mehmet Demir", city: "Ankara", lat: 39.9334, lng: 32.8597),
+            Vehicle(id: "3", plate: "35 DEF 456", model: "Renault Master", status: .ignitionOn, kontakOn: true, totalKm: 31540, todayKm: 187, driver: "Ayşe Kaya", city: "İzmir", lat: 38.4192, lng: 27.1287),
+            Vehicle(id: "4", plate: "16 GHI 321", model: "Volkswagen Crafter", status: .noData, kontakOn: false, totalKm: 67890, todayKm: 0, driver: "Can Öztürk", city: "Bursa", lat: 40.1885, lng: 29.0610),
+            Vehicle(id: "5", plate: "41 JKL 654", model: "Fiat Ducato", status: .ignitionOn, kontakOn: true, totalKm: 22430, todayKm: 95, driver: "Zeynep Şahin", city: "Kocaeli", lat: 40.7654, lng: 29.9408),
+            Vehicle(id: "6", plate: "07 MNO 987", model: "Peugeot Boxer", status: .ignitionOff, kontakOn: false, totalKm: 55670, todayKm: 0, driver: "Ali Çelik", city: "Antalya", lat: 36.8969, lng: 30.7133),
+            Vehicle(id: "7", plate: "34 PRS 111", model: "Iveco Daily", status: .ignitionOn, kontakOn: true, totalKm: 14220, todayKm: 241, driver: "Fatma Arslan", city: "İstanbul", lat: 41.0422, lng: 29.0083),
+            Vehicle(id: "8", plate: "06 TUV 222", model: "Ford Transit Custom", status: .sleeping, kontakOn: false, totalKm: 38900, todayKm: 0, driver: "Hasan Koç", city: "Ankara", lat: 39.9208, lng: 32.8541),
         ]
     }
 

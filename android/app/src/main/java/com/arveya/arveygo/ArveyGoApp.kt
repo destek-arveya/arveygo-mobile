@@ -55,6 +55,7 @@ fun MainContent(authVM: AuthViewModel) {
     var selectedPage by remember { mutableStateOf(AppPage.DASHBOARD) }
     var showSideMenu by remember { mutableStateOf(false) }
     var showSupportRequest by remember { mutableStateOf(false) }
+    var alarmsSearchText by remember { mutableStateOf("") }
 
     // Observe consecutive failures to trigger support request page
     val consecutiveFailures by WebSocketManager.consecutiveFailures.collectAsState()
@@ -78,18 +79,18 @@ fun MainContent(authVM: AuthViewModel) {
                 onNavigateToMap = { selectedPage = AppPage.LIVE_MAP },
                 onNavigateToVehicles = { selectedPage = AppPage.VEHICLES },
                 onNavigateToDrivers = { selectedPage = AppPage.DRIVERS },
-                onNavigateToAlarms = { selectedPage = AppPage.ALARMS },
+                onNavigateToAlarms = { searchText -> alarmsSearchText = searchText; selectedPage = AppPage.ALARMS },
                 onNavigateToRouteHistory = { selectedPage = AppPage.ROUTE_HISTORY }
             )
             AppPage.LIVE_MAP -> LiveMapScreen(
                 onMenuClick = { showSideMenu = true },
                 onNavigateToRouteHistory = { _ -> selectedPage = AppPage.ROUTE_HISTORY },
-                onNavigateToAlarms = { selectedPage = AppPage.ALARMS }
+                onNavigateToAlarms = { alarmsSearchText = ""; selectedPage = AppPage.ALARMS }
             )
             AppPage.VEHICLES -> VehiclesListScreen(
                 onMenuClick = { showSideMenu = true },
                 onNavigateToRouteHistory = { _ -> selectedPage = AppPage.ROUTE_HISTORY },
-                onNavigateToAlarms = { selectedPage = AppPage.ALARMS }
+                onNavigateToAlarms = { alarmsSearchText = ""; selectedPage = AppPage.ALARMS }
             )
             AppPage.DRIVERS -> DriversScreen(
                 onMenuClick = { showSideMenu = true }
@@ -98,7 +99,8 @@ fun MainContent(authVM: AuthViewModel) {
                 onMenuClick = { showSideMenu = true }
             )
             AppPage.ALARMS -> AlarmsScreen(
-                onMenuClick = { showSideMenu = true }
+                onMenuClick = { showSideMenu = true },
+                initialSearchText = alarmsSearchText
             )
             AppPage.GEOFENCES -> GeofencesScreen(
                 onMenuClick = { showSideMenu = true }
@@ -137,6 +139,7 @@ fun MainContent(authVM: AuthViewModel) {
             isShowing = showSideMenu,
             selectedPage = selectedPage,
             onPageSelected = {
+                if (it == AppPage.ALARMS) alarmsSearchText = ""
                 selectedPage = it
                 showSideMenu = false
             },

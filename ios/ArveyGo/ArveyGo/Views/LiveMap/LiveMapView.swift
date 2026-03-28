@@ -7,6 +7,7 @@ struct LiveMapView: View {
     @StateObject private var vm = LiveMapViewModel()
     @Binding var showSideMenu: Bool
     @Binding var selectedPage: AppPage
+    @Binding var alarmsSearchText: String
     @State private var selectedVehicle: Vehicle?
     @State private var showVehicleDetail = false
     @State private var detailVehicle: Vehicle?
@@ -94,9 +95,10 @@ struct LiveMapView: View {
                                 selectedPage = .routeHistory
                             }
                         },
-                        onNavigateToAlarms: {
+                        onNavigateToAlarms: { plateText in
                             detailVehicle = nil
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                alarmsSearchText = plateText
                                 selectedPage = .alarms
                             }
                         }
@@ -161,7 +163,7 @@ struct LiveMapView: View {
     var mapContent: some View {
         Map(position: $mapCameraPosition) {
             // Trail polylines for online + idle vehicles (keep trail visible during rölanti)
-            ForEach(vm.filteredVehicles.filter { $0.status == .online || $0.status == .idle }) { vehicle in
+            ForEach(vm.filteredVehicles.filter { $0.status == .ignitionOn }) { vehicle in
                 if let trail = vm.trailHistory[vehicle.id], trail.count >= 2 {
                     MapPolyline(coordinates: trail)
                         .stroke(vehicle.status.color.opacity(0.6), lineWidth: 3)
@@ -214,9 +216,9 @@ struct LiveMapView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     statusChip(label: "Tümü", count: vm.vehicles.count, filter: nil, color: AppTheme.navy)
-                    statusChip(label: "Aktif", count: vm.onlineCount, filter: .online, color: AppTheme.online)
-                    statusChip(label: "Çevrimdışı", count: vm.offlineCount, filter: .offline, color: AppTheme.offline)
-                    statusChip(label: "Rölanti", count: vm.idleCount, filter: .idle, color: AppTheme.idle)
+                    statusChip(label: "Kontak Açık", count: vm.onlineCount, filter: .ignitionOn, color: AppTheme.online)
+                    statusChip(label: "Kontak Kapalı", count: vm.offlineCount, filter: .ignitionOff, color: AppTheme.offline)
+                    statusChip(label: "Bilgi Yok", count: vm.idleCount, filter: .noData, color: Color(red: 148/255, green: 163/255, blue: 184/255))
                     
                     Spacer()
                     
@@ -631,9 +633,9 @@ class LiveMapViewModel: ObservableObject {
     private let wsManager = WebSocketManager.shared
     private var animationTimers: [String: Timer] = [:]
 
-    var onlineCount: Int { vehicles.filter { $0.status == .online }.count }
-    var offlineCount: Int { vehicles.filter { $0.status == .offline }.count }
-    var idleCount: Int { vehicles.filter { $0.status == .idle }.count }
+    var onlineCount: Int { vehicles.filter { $0.status == .ignitionOn }.count }
+    var offlineCount: Int { vehicles.filter { $0.status == .ignitionOff }.count }
+    var idleCount: Int { vehicles.filter { $0.status == .noData || $0.status == .sleeping }.count }
 
     var filteredVehicles: [Vehicle] {
         var result = vehicles
@@ -688,7 +690,7 @@ class LiveMapViewModel: ObservableObject {
 
         // Update trail history for online/idle vehicles (keep trail visible during rölanti)
         let newPos = CLLocationCoordinate2D(latitude: targetLat, longitude: targetLng)
-        if (vehicle.status == .online || vehicle.status == .idle) && targetLat != 0 && targetLng != 0 {
+        if vehicle.status == .ignitionOn && targetLat != 0 && targetLng != 0 {
             var trail = trailHistory[vehicleId] ?? []
             if let last = trail.last {
                 if abs(last.latitude - targetLat) > 0.000001 || abs(last.longitude - targetLng) > 0.000001 {
@@ -864,6 +866,6 @@ struct EnrichedPopupWrapper<Content: View>: View {
 }
 
 #Preview {
-    LiveMapView(showSideMenu: .constant(false), selectedPage: .constant(.liveMap))
+    LiveMapView(showSideMenu: .constant(false), selectedPage: .constant(.liveMap), alarmsSearchText: .constant(""))
         .environmentObject(AuthViewModel())
 }

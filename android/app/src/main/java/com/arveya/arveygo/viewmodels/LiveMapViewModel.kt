@@ -28,9 +28,9 @@ class LiveMapViewModel : ViewModel() {
     private val _wsStatus = MutableStateFlow<WSConnectionStatus>(WSConnectionStatus.Idle)
     val wsStatus: StateFlow<WSConnectionStatus> = _wsStatus
 
-    val onlineCount: Int get() = _vehicles.value.count { it.status == VehicleStatus.ONLINE }
-    val offlineCount: Int get() = _vehicles.value.count { it.status == VehicleStatus.OFFLINE }
-    val idleCount: Int get() = _vehicles.value.count { it.status == VehicleStatus.IDLE }
+    val onlineCount: Int get() = _vehicles.value.count { it.status == VehicleStatus.IGNITION_ON }
+    val offlineCount: Int get() = _vehicles.value.count { it.status == VehicleStatus.IGNITION_OFF || it.status == VehicleStatus.NO_DATA }
+    val idleCount: Int get() = _vehicles.value.count { it.status == VehicleStatus.SLEEPING }
 
     fun filteredVehicles(): List<Vehicle> {
         var result = _vehicles.value

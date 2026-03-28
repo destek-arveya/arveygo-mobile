@@ -337,7 +337,7 @@ private val ALARM_TYPES = listOf(
 // MARK: - Alarms Screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AlarmsScreen(onMenuClick: () -> Unit) {
+fun AlarmsScreen(onMenuClick: () -> Unit, initialSearchText: String = "") {
     val authVM = LocalAuthViewModel.current
     val user by authVM.currentUser.collectAsState()
     val scope = rememberCoroutineScope()
@@ -346,8 +346,8 @@ fun AlarmsScreen(onMenuClick: () -> Unit) {
     // Tab state
     var selectedTab by remember { mutableIntStateOf(0) }
 
-    // Search
-    var searchText by remember { mutableStateOf("") }
+    // Search — initialize with passed text (e.g. from VehicleDetail "Tümünü Gör")
+    var searchText by remember { mutableStateOf(initialSearchText) }
 
     // Detail sheets
     var selectedAlarm by remember { mutableStateOf<AlarmEvent?>(null) }

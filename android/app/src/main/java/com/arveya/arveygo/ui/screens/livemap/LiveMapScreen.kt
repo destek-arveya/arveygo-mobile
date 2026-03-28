@@ -253,7 +253,7 @@ fun LiveMapScreen(
                 detailVehicle = null
                 onNavigateToRouteHistory?.invoke(v)
             },
-            onNavigateToAlarms = {
+            onNavigateToAlarms = { _ ->
                 detailVehicle = null
                 onNavigateToAlarms?.invoke()
             }
@@ -339,9 +339,10 @@ fun LiveMapScreen(
             val target = GeoPoint(vehicle.lat, vehicle.lng)
             val isSel = selectedVehicle?.id == vehicle.id
             val statusColor = when (vehicle.status) {
-                VehicleStatus.ONLINE -> AppColors.Online.toArgb()
-                VehicleStatus.OFFLINE -> AppColors.Offline.toArgb()
-                VehicleStatus.IDLE -> AppColors.Idle.toArgb()
+                VehicleStatus.IGNITION_ON -> AppColors.Online.toArgb()
+                VehicleStatus.IGNITION_OFF -> AppColors.Offline.toArgb()
+                VehicleStatus.NO_DATA -> Color(0xFF94A3B8).toArgb()
+                VehicleStatus.SLEEPING -> AppColors.Idle.toArgb()
             }
 
             val existing = animatedMarkers[vehicle.id]
@@ -385,7 +386,7 @@ fun LiveMapScreen(
                 if (history.size > 20) history.removeAt(0)
             }
             // Draw polyline if vehicle is online/idle and has 2+ points (keep trail during rölanti)
-            if ((vehicle.status == VehicleStatus.ONLINE || vehicle.status == VehicleStatus.IDLE) && history.size >= 2) {
+            if (vehicle.status == VehicleStatus.IGNITION_ON && history.size >= 2) {
                 val existing = trailPolylines[vehicle.id]
                 if (existing != null) {
                     existing.setPoints(history.toList())
@@ -510,9 +511,9 @@ fun LiveMapScreen(
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 StatusFilterChip("T\u00fcm\u00fc (${vehicles.size})", null, statusFilter) { vm.setFilter(null) }
-                StatusFilterChip("Aktif (${vm.onlineCount})", VehicleStatus.ONLINE, statusFilter) { vm.setFilter(VehicleStatus.ONLINE) }
-                StatusFilterChip("\u00c7evrimd\u0131\u015f\u0131 (${vm.offlineCount})", VehicleStatus.OFFLINE, statusFilter) { vm.setFilter(VehicleStatus.OFFLINE) }
-                StatusFilterChip("R\u00f6lanti (${vm.idleCount})", VehicleStatus.IDLE, statusFilter) { vm.setFilter(VehicleStatus.IDLE) }
+                StatusFilterChip("Kontak Açık (${vm.onlineCount})", VehicleStatus.IGNITION_ON, statusFilter) { vm.setFilter(VehicleStatus.IGNITION_ON) }
+                StatusFilterChip("Kontak Kapalı (${vm.offlineCount})", VehicleStatus.IGNITION_OFF, statusFilter) { vm.setFilter(VehicleStatus.IGNITION_OFF) }
+                StatusFilterChip("Bilgi Yok (${vm.idleCount})", VehicleStatus.NO_DATA, statusFilter) { vm.setFilter(VehicleStatus.NO_DATA) }
             }
 
             // Zoom controls

@@ -7,6 +7,7 @@ struct DashboardView: View {
     @ObservedObject private var DL = DashboardStrings.shared
     @Binding var showSideMenu: Bool
     @Binding var selectedPage: AppPage
+    @Binding var alarmsSearchText: String
     @State private var selectedVehicle: Vehicle?
 
     var body: some View {
@@ -97,9 +98,10 @@ struct DashboardView: View {
                         selectedPage = .routeHistory
                     }
                 },
-                onNavigateToAlarms: {
+                onNavigateToAlarms: { plateText in
                     selectedVehicle = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        alarmsSearchText = plateText
                         selectedPage = .alarms
                     }
                 }
@@ -512,6 +514,6 @@ struct DashboardView: View {
 }
 
 #Preview {
-    DashboardView(showSideMenu: .constant(false), selectedPage: .constant(.dashboard))
+    DashboardView(showSideMenu: .constant(false), selectedPage: .constant(.dashboard), alarmsSearchText: .constant(""))
         .environmentObject(AuthViewModel())
 }
