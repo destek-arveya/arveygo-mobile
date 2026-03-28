@@ -471,16 +471,9 @@ data class Vehicle(
             val sensorsArr: org.json.JSONArray? = if (json.has("sensors") && !json.isNull("sensors")) json.optJSONArray("sensors") else null
             val sensorCount = json.optInt("sensor_count", 0)
 
-            // Use liveness_status for status when available
+            // Status derivation — matches web deriveVehicleStatus(isOnline, ignition, speed)
+            // livenessStatus is stored separately for UI badges/labels
             val status = when {
-                livenessStatus == "connected" || livenessStatus == "reporting" -> {
-                    if (ignition && speed > 5) VehicleStatus.ONLINE
-                    else if (ignition) VehicleStatus.IDLE
-                    else VehicleStatus.ONLINE // connected but ignition off
-                }
-                livenessStatus == "sleeping" || livenessStatus == "late" -> VehicleStatus.IDLE
-                livenessStatus == "offline" -> VehicleStatus.OFFLINE
-                // Fallback: original logic
                 !isOnline -> VehicleStatus.OFFLINE
                 ignition && speed > 5 -> VehicleStatus.ONLINE
                 ignition -> VehicleStatus.IDLE

@@ -414,24 +414,13 @@ struct Vehicle: Identifiable, Equatable {
         let sensorsArr = json["sensors"] as? [[String: Any]]
         let sensorCount = (json["sensor_count"] as? Int) ?? 0
 
-        // Use liveness_status for status when available
+        // Status derivation — matches web deriveVehicleStatus(isOnline, ignition, speed)
+        // livenessStatus is stored separately for UI badges/labels
         let status: VehicleStatus
-        switch livenessStatus {
-        case "connected", "reporting":
-            if ignition && speed > 5 { status = .online }
-            else if ignition { status = .idle }
-            else { status = .online } // connected but ignition off
-        case "sleeping", "late":
-            status = .idle
-        case "offline":
-            status = .offline
-        default:
-            // Fallback: original logic
-            if !isOnline { status = .offline }
-            else if ignition && speed > 5 { status = .online }
-            else if ignition { status = .idle }
-            else { status = .offline }
-        }
+        if !isOnline { status = .offline }
+        else if ignition && speed > 5 { status = .online }
+        else if ignition { status = .idle }
+        else { status = .offline }
 
         let effectiveDailyKm = dailyKmVal > 0 ? dailyKmVal : todayKmVal
 
