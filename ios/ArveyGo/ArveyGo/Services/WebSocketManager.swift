@@ -102,13 +102,13 @@ final class WebSocketManager: ObservableObject {
             forName: UIApplication.didEnterBackgroundNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
-            self?.handleDidEnterBackground()
+            Task { @MainActor in self?.handleDidEnterBackground() }
         }
         NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
-            self?.handleWillEnterForeground()
+            Task { @MainActor in self?.handleWillEnterForeground() }
         }
     }
 

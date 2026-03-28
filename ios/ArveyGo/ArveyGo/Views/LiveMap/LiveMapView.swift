@@ -812,30 +812,27 @@ class LiveMapViewModel: ObservableObject {
         let duration: Double = 1.0
         let steps = 30 // 30 frames over 1 second
         let interval = duration / Double(steps)
-        var currentStep = 0
 
-        let timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
-            guard let self = self else { timer.invalidate(); return }
-            currentStep += 1
-            let t = min(Double(currentStep) / Double(steps), 1.0)
-            // Ease-in-out curve
-            let ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+        nonisolated(unsafe) var currentStepRef = 0
+        let timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] t in
+            guard self != nil else { t.invalidate(); return }
+            currentStepRef += 1
+            let progress = min(Double(currentStepRef) / Double(steps), 1.0)
+            let ease = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress
 
             let lat = startPos.latitude + (targetLat - startPos.latitude) * ease
             let lng = startPos.longitude + (targetLng - startPos.longitude) * ease
             let dir = startDir + (targetDir - startDir) * ease
 
-            Task { @MainActor in
-                self.animatedPositions[vehicleId] = CLLocationCoordinate2D(latitude: lat, longitude: lng)
-                self.animatedDirections[vehicleId] = dir
-            }
-
-            if currentStep >= steps {
-                timer.invalidate()
-                Task { @MainActor in
-                    self.animationTimers.removeValue(forKey: vehicleId)
+            let done = currentStepRef >= steps
+            Task { @MainActor [weak self] in
+                self?.animatedPositions[vehicleId] = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                self?.animatedDirections[vehicleId] = dir
+                if done {
+                    self?.animationTimers.removeValue(forKey: vehicleId)
                 }
             }
+            if done { t.invalidate() }
         }
         RunLoop.main.add(timer, forMode: .common)
         animationTimers[vehicleId] = timer
