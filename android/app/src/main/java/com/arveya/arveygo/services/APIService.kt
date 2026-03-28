@@ -181,6 +181,17 @@ object APIService {
         Log.d(TAG, "Logged out, token cleared")
     }
 
+    // MARK: - Push Token Registration
+    suspend fun registerPushToken(pushToken: String) = withContext(Dispatchers.IO) {
+        try {
+            val json = JSONObject().put("mobilepushid", pushToken)
+            post("/api/mobile/auth/push-id", json)
+            Log.d(TAG, "Push token registered: ${pushToken.take(16)}…")
+        } catch (e: Exception) {
+            Log.d(TAG, "Push token registration failed: ${e.localizedMessage}")
+        }
+    }
+
     // MARK: - Generic Authenticated GET
     suspend fun get(path: String): JSONObject = withContext(Dispatchers.IO) {
         suspend fun execute(): JSONObject {

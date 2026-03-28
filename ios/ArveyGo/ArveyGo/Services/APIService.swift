@@ -182,6 +182,16 @@ final class APIService {
         print("[API] Logged out, token cleared")
     }
 
+    /// POST /api/mobile/auth/push-id — register APNs device token with backend
+    func registerPushToken(_ pushToken: String) async {
+        do {
+            let _ = try await post("/api/mobile/auth/push-id", body: ["mobilepushid": pushToken])
+            print("[API] Push token registered: \(pushToken.prefix(16))…")
+        } catch {
+            print("[API] Push token registration failed: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - Generic Authenticated Requests
 
     /// GET any authenticated endpoint — returns JSON dict

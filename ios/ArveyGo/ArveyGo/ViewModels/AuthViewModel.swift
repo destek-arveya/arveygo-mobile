@@ -109,6 +109,9 @@ class AuthViewModel: ObservableObject {
                 // Auto-connect WebSocket
                 connectWebSocket()
 
+                // Request push permission & register device token with backend
+                registerPushToken()
+
                 print("[Auth] Login OK: \(response.user.name)")
 
             } catch let error as APIError {
@@ -200,6 +203,32 @@ class AuthViewModel: ObservableObject {
 
     func disconnectWebSocket() {
         WebSocketManager.shared.disconnect()
+    }
+
+    // MARK: - Push Token Registration
+    /// Request push permission, then send device token to backend
+    private func registerPushToken() {
+        AppDelegate.requestPushPermission()
+
+        // Observe token changes — when Apple delivers the token, send it to backend
+        var cancellable: AnyCancellable?
+        cancellable = DeviceTokenStore.shared.$token
+            .compactMap { $0 }          // wait for non-nil
+            .first()                     // only once
+            .sink { token in
+                Task {
+                    await APIService.shared.registerPushToken(token)
+                }
+                cancellable?.cancel()
+            }
+
+        // If token is already available (e.g. from previous session), send immediately
+        if let existingToken = DeviceTokenStore.shared.token {
+            Task {
+                await APIService.shared.registerPushToken(existingToken)
+            }
+            cancellable?.cancel()
+        }
     }
 
     // MARK: - Login via Phone + OTP

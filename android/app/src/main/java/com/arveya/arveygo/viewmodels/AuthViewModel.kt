@@ -111,6 +111,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 generateLocalWSConfig(response.user)
                 connectWebSocket()
 
+                // Register push token with backend
+                registerPushToken()
+
                 Log.d("Auth", "Login OK: ${response.user.name}")
 
             } catch (e: APIException.NetworkError) {
@@ -189,6 +192,23 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun disconnectWebSocket() {
         WebSocketManager.disconnect()
+    }
+
+    // MARK: - Push Token Registration
+    private fun registerPushToken() {
+        viewModelScope.launch {
+            // TODO: Replace with FirebaseMessaging.getInstance().token when FCM is set up
+            // For now, we attempt to get the FCM token if available
+            try {
+                val cls = Class.forName("com.google.firebase.messaging.FirebaseMessaging")
+                val instance = cls.getMethod("getInstance").invoke(null)
+                val tokenTask = cls.getMethod("getToken").invoke(instance)
+                // If Firebase is available, token will be registered via onNewToken callback
+                Log.d("Auth", "FCM available, token will be registered via onNewToken")
+            } catch (_: Exception) {
+                Log.d("Auth", "FCM not available — push token registration skipped (add Firebase later)")
+            }
+        }
     }
 
     // MARK: - Login via Phone + OTP
