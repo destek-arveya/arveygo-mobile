@@ -16,7 +16,49 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        registerNotificationCategories()
         return true
+    }
+
+    private func registerNotificationCategories() {
+        // ALARM category — "Görüntüle" + "Kapat"
+        let viewAction = UNNotificationAction(
+            identifier: "ALARM_VIEW",
+            title: "Görüntüle",
+            options: [.foreground]
+        )
+        let dismissAction = UNNotificationAction(
+            identifier: "ALARM_DISMISS",
+            title: "Kapat",
+            options: [.destructive]
+        )
+        let alarmCategory = UNNotificationCategory(
+            identifier: "ALARM",
+            actions: [viewAction, dismissAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        // GEOFENCE category — "Haritada Gör" + "Yoksay"
+        let mapAction = UNNotificationAction(
+            identifier: "GEOFENCE_MAP",
+            title: "Haritada Gör",
+            options: [.foreground]
+        )
+        let ignoreAction = UNNotificationAction(
+            identifier: "GEOFENCE_IGNORE",
+            title: "Yoksay",
+            options: []
+        )
+        let geofenceCategory = UNNotificationCategory(
+            identifier: "GEOFENCE",
+            actions: [mapAction, ignoreAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        UNUserNotificationCenter.current().setNotificationCategories([alarmCategory, geofenceCategory])
+        print("[APNs] Notification categories registered: ALARM, GEOFENCE")
     }
 
     /// Call this from SettingsView (or anywhere) to request permission + register.
@@ -71,7 +113,39 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        print("[APNs] Notification tapped: \(userInfo)")
+        let actionId = response.actionIdentifier
+
+        print("[APNs] Action: \(actionId), userInfo: \(userInfo)")
+
+        switch actionId {
+        case "ALARM_VIEW":
+            let alarmId = userInfo["alarm_id"]
+            let vehicleId = userInfo["vehicle_id"]
+            print("[APNs] → Alarm görüntüle: alarm=\(alarmId ?? "?"), vehicle=\(vehicleId ?? "?")")
+            NotificationCenter.default.post(
+                name: .init("apns.alarm.view"),
+                object: nil,
+                userInfo: ["alarm_id": alarmId ?? 0, "vehicle_id": vehicleId ?? 0]
+            )
+        case "ALARM_DISMISS":
+            print("[APNs] → Alarm kapatıldı")
+        case "GEOFENCE_MAP":
+            let vehicleId = userInfo["vehicle_id"]
+            print("[APNs] → Geofence haritada göster: vehicle=\(vehicleId ?? "?")")
+            NotificationCenter.default.post(
+                name: .init("apns.geofence.map"),
+                object: nil,
+                userInfo: ["vehicle_id": vehicleId ?? 0]
+            )
+        case "GEOFENCE_IGNORE":
+            print("[APNs] → Geofence yoksayıldı")
+        case UNNotificationDefaultActionIdentifier:
+            // Bildirime direkt tıklandı (buton değil)
+            print("[APNs] → Bildirime tıklandı")
+        default:
+            break
+        }
+
         completionHandler()
     }
 }
