@@ -512,11 +512,12 @@ struct Vehicle: Identifiable, Equatable {
         input1 = patch.input1
         input2 = patch.input2
         output = patch.output
-        batteryVoltage = patch.batteryVoltage
-        externalVoltage = patch.externalVoltage
-        deviceBattery = patch.deviceBattery
-        temperatureC = patch.temperatureC
-        humidityPct = patch.humidityPct
+        // Sensör/batarya verileri her pakette gelmeyebilir, nil ise eski değeri koru
+        if let v = patch.batteryVoltage { batteryVoltage = v }
+        if let v = patch.externalVoltage { externalVoltage = v }
+        if let v = patch.deviceBattery { deviceBattery = v }
+        if let v = patch.temperatureC { temperatureC = v }
+        if let v = patch.humidityPct { humidityPct = v }
         // driver_id null olabilir (kart çıkarılınca), eski değeri tutma
         driverId = patch.driverId
         if patch.driverId == nil { driverName = "" } else if !patch.driverName.isEmpty { driverName = patch.driverName }
@@ -526,10 +527,10 @@ struct Vehicle: Identifiable, Equatable {
         lastIgnitionOffAt = patch.lastIgnitionOffAt
         if patch.deviceId > 0 { deviceId = patch.deviceId }
         if let ai = patch.assignmentId { assignmentId = ai }
-        pdop = patch.pdop
-        satellites = patch.satellites
-        gsmSignal = patch.gsmSignal
-        altitude = patch.altitude
+        if let v = patch.pdop { pdop = v }
+        if let v = patch.satellites { satellites = v }
+        if let v = patch.gsmSignal { gsmSignal = v }
+        if let v = patch.altitude { altitude = v }
         if let lpa = patch.lastPacketAt { lastPacketAt = lpa }
         if patch.lastPacketTs > 0 { lastPacketTs = patch.lastPacketTs }
         if let ri = patch.reportIntervalSec { reportIntervalSec = ri }
