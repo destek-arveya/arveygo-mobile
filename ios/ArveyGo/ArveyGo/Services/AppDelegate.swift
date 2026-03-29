@@ -17,6 +17,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         registerNotificationCategories()
+
+        // Request push permission immediately on app launch
+        AppDelegate.requestPushPermission()
+
         return true
     }
 

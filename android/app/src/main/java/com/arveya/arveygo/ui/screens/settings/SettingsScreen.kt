@@ -27,6 +27,13 @@ private data class LangItem(val code: String, val flag: String, val name: String
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onMenuClick: () -> Unit) {
+    var showNotifSettings by remember { mutableStateOf(false) }
+
+    if (showNotifSettings) {
+        NotificationSettingsScreen(onBack = { showNotifSettings = false })
+        return
+    }
+
     val currentLang by LoginStrings.currentLang.collectAsState()
     val DL = DashboardStrings
     val dlLang by DashboardStrings.currentLang.collectAsState()
@@ -141,6 +148,38 @@ fun SettingsScreen(onMenuClick: () -> Unit) {
                 SettingsInfoRow(Icons.Default.PhoneAndroid, "Platform", "Android")
                 HorizontalDivider(modifier = Modifier.padding(start = 44.dp))
                 SettingsInfoRow(Icons.Default.Business, "Arveya Teknoloji", "© 2026")
+            }
+
+            // Bildirim Ayarları Section
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.NotificationsActive, null, tint = AppColors.Indigo, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("BİLDİRİM AYARLARI", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = AppColors.TextMuted, letterSpacing = 1.sp)
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(AppColors.Surface, RoundedCornerShape(12.dp))
+                    .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
+                    .clickable { showNotifSettings = true }
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(AppColors.Indigo, RoundedCornerShape(7.dp))
+                ) {
+                    Icon(Icons.Default.NotificationsActive, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Bildirim Ayarları", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
+                    Text("Push bildirim, kategoriler ve sessiz saatler", fontSize = 11.sp, color = AppColors.TextMuted)
+                }
+                Icon(Icons.Default.ChevronRight, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp))
             }
 
             Spacer(Modifier.height(16.dp))

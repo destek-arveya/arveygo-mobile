@@ -43,6 +43,7 @@
 		AA000036 /* FleetManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000036 /* FleetManagementView.swift */; };
 		AA000037 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000037 /* ReportsView.swift */; };
 		AA000038 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000038 /* AppDelegate.swift */; };
+		AA000039 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000039 /* NotificationSettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -84,6 +85,7 @@
 		BB000036 /* FleetManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetManagementView.swift; sourceTree = "<group>"; };
 		BB000037 /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
 		BB000038 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		BB000039 /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
 		F523685C2F7879A7006D9B54 /* ArveyGoDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ArveyGoDebug.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -267,6 +269,7 @@
 			isa = PBXGroup;
 			children = (
 				BB000030 /* SettingsView.swift */,
+				BB000039 /* NotificationSettingsView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -384,6 +387,7 @@
 				AA000030 /* SettingsView.swift in Sources */,
 				AA000031 /* SupportRequestView.swift in Sources */,
 				AA000038 /* AppDelegate.swift in Sources */,
+				AA000039 /* NotificationSettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

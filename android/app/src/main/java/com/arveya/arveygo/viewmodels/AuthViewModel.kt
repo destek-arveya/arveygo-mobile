@@ -197,17 +197,31 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     // MARK: - Push Token Registration
     private fun registerPushToken() {
         viewModelScope.launch {
-            // TODO: Replace with FirebaseMessaging.getInstance().token when FCM is set up
-            // For now, we attempt to get the FCM token if available
             try {
-                val cls = Class.forName("com.google.firebase.messaging.FirebaseMessaging")
-                val instance = cls.getMethod("getInstance").invoke(null)
-                val tokenTask = cls.getMethod("getToken").invoke(instance)
-                // If Firebase is available, token will be registered via onNewToken callback
-                Log.d("Auth", "FCM available, token will be registered via onNewToken")
-            } catch (_: Exception) {
-                Log.d("Auth", "FCM not available — push token registration skipped (add Firebase later)")
+                val token = com.google.firebase.messaging.FirebaseMessaging.getInstance().token.await()
+                Log.d("Auth", "FCM token: ${token.take(24)}…")
+
+                // Save locally
+                ctx.getSharedPreferences("arveygo_push", android.content.Context.MODE_PRIVATE)
+                    .edit()
+                    .putString("fcm_token", token)
+                    .apply()
+
+                // Register with backend
+                APIService.registerPushToken(token)
+                Log.d("Auth", "FCM token registered with backend")
+            } catch (e: Exception) {
+                Log.d("Auth", "FCM token registration failed: ${e.localizedMessage}")
             }
+        }
+    }
+
+    // Helper: Kotlin coroutine wrapper for Google Tasks
+    private suspend fun <T> com.google.android.gms.tasks.Task<T>.await(): T {
+        return kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+            addOnSuccessListener { result -> cont.resume(result) {} }
+            addOnFailureListener { exception -> cont.resume(null as T) {} }
+            addOnCanceledListener { cont.cancel() }
         }
     }
 
