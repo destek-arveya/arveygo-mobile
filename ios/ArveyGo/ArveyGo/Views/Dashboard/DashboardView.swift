@@ -76,7 +76,7 @@ struct DashboardView: View {
                     // ── 5. Son 5 Alarm ──
                     recentAlarmsCard
                         .padding(.horizontal, 20)
-                        .padding(.bottom, 32)
+                        .padding(.bottom, 100) // Extra space for bottom tab bar
                 }
                 .padding(.top, 4)
             }
@@ -88,21 +88,8 @@ struct DashboardView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                            showSideMenu.toggle()
-                        }
-                    } label: {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(DS.primary)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                }
-                ToolbarItem(placement: .principal) {
                     Text(DL.title)
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundStyle(DS.primary)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
