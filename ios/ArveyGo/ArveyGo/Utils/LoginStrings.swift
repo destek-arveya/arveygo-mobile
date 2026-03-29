@@ -4,7 +4,13 @@ import SwiftUI
 class LoginStrings: ObservableObject {
     static let shared = LoginStrings()
 
-    @Published var currentLang: String = "TR"
+    @Published var currentLang: String {
+        didSet { UserDefaults.standard.set(currentLang, forKey: "arveygo_lang") }
+    }
+
+    init() {
+        self.currentLang = UserDefaults.standard.string(forKey: "arveygo_lang") ?? "TR"
+    }
 
     var appTitle: String { "ArveyGo" }
     var appSubtitle: String { s("ARAÇ TAKİP SİSTEMİ", "VEHICLE TRACKING SYSTEM", "SISTEMA DE RASTREO", "SYSTÈME DE SUIVI") }

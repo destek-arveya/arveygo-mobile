@@ -4,13 +4,12 @@ struct SettingsView: View {
     @Binding var showSideMenu: Bool
     @ObservedObject private var DL = DashboardStrings.shared
     @ObservedObject private var LS = LoginStrings.shared
-    @State private var isChangingLang = false
 
-    private let languages: [(code: String, flag: String, name: String)] = [
-        ("TR", "🇹🇷", "Türkçe"),
-        ("EN", "🇬🇧", "English"),
-        ("ES", "🇪🇸", "Español"),
-        ("FR", "🇫🇷", "Français")
+    private let languages: [(code: String, flag: String)] = [
+        ("TR", "🇹🇷"),
+        ("EN", "🇬🇧"),
+        ("ES", "🇪🇸"),
+        ("FR", "🇫🇷")
     ]
 
     var body: some View {
@@ -19,163 +18,93 @@ struct SettingsView: View {
                 AppTheme.bg.ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-                        // Language Section
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "globe")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(AppTheme.indigo)
-                                Text(DL.languageLabel.uppercased())
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(AppTheme.textMuted)
-                                    .tracking(1)
-                            }
+                    VStack(spacing: 20) {
 
+                        // ── GENEL ──
+                        sectionCard(title: DL.settingsTitle.uppercased()) {
+                            // Language — compact horizontal chips
                             VStack(spacing: 0) {
-                                ForEach(languages, id: \.code) { lang in
-                                    Button(action: {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
-                                            LS.currentLang = lang.code
-                                            DL.currentLang = lang.code
-                                        }
-                                    }) {
-                                        HStack(spacing: 12) {
-                                            Text(lang.flag)
-                                                .font(.system(size: 22))
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(lang.name)
-                                                    .font(.system(size: 14, weight: .medium))
-                                                    .foregroundColor(AppTheme.navy)
-                                                Text(lang.code)
-                                                    .font(.system(size: 11))
-                                                    .foregroundColor(AppTheme.textMuted)
-                                            }
-                                            Spacer()
-                                            if LS.currentLang == lang.code {
-                                                Image(systemName: "checkmark.circle.fill")
-                                                    .font(.system(size: 20))
-                                                    .foregroundColor(AppTheme.indigo)
-                                            } else {
-                                                Circle()
-                                                    .stroke(AppTheme.borderSoft, lineWidth: 1.5)
-                                                    .frame(width: 20, height: 20)
-                                            }
-                                        }
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 14)
-                                        .background(LS.currentLang == lang.code ? AppTheme.indigo.opacity(0.06) : Color.clear)
-                                    }
-                                    .buttonStyle(.plain)
-
-                                    if lang.code != languages.last?.code {
-                                        Divider().padding(.leading, 52)
-                                    }
-                                }
-                            }
-                            .background(AppTheme.surface)
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(AppTheme.borderSoft, lineWidth: 1)
-                            )
-                        }
-
-                        // App Info Section
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "info.circle")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(AppTheme.indigo)
-                                Text(DL.appInfoTitle.uppercased())
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(AppTheme.textMuted)
-                                    .tracking(1)
-                            }
-
-                            VStack(spacing: 0) {
-                                settingsRow(icon: "app.badge", label: "ArveyGo", value: "v1.0.0")
-                                Divider().padding(.leading, 44)
-                                settingsRow(icon: "apple.logo", label: "Platform", value: "iOS")
-                                Divider().padding(.leading, 44)
-                                settingsRow(icon: "building.2", label: "Arveya Teknoloji", value: "© 2026")
-                            }
-                            .background(AppTheme.surface)
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(AppTheme.borderSoft, lineWidth: 1)
-                            )
-                        }
-
-                        // ── Bildirim Ayarları ──
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "bell.badge")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(AppTheme.indigo)
-                                Text("BİLDİRİM AYARLARI".uppercased())
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(AppTheme.textMuted)
-                                    .tracking(1)
-                            }
-
-                            NavigationLink(destination: NotificationSettingsView()) {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "bell.and.waves.left.and.right")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(.white)
-                                        .frame(width: 28, height: 28)
-                                        .background(AppTheme.indigo)
-                                        .cornerRadius(7)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Bildirim Ayarları")
-                                            .font(.system(size: 14, weight: .medium))
-                                            .foregroundColor(AppTheme.navy)
-                                        Text("Push bildirim, kategoriler ve sessiz saatler")
-                                            .font(.system(size: 11))
-                                            .foregroundColor(AppTheme.textMuted)
-                                    }
+                                HStack(spacing: 10) {
+                                    sectionIcon("globe", color: AppTheme.indigo)
+                                    Text(DL.languageLabel)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(AppTheme.navy)
                                     Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 13, weight: .medium))
-                                        .foregroundColor(AppTheme.textMuted)
                                 }
                                 .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
+                                .padding(.top, 13)
+                                .padding(.bottom, 10)
+
+                                HStack(spacing: 8) {
+                                    ForEach(languages, id: \.code) { lang in
+                                        Button {
+                                            withAnimation(.easeInOut(duration: 0.15)) {
+                                                LS.currentLang = lang.code
+                                                DL.currentLang = lang.code
+                                            }
+                                        } label: {
+                                            HStack(spacing: 5) {
+                                                Text(lang.flag).font(.system(size: 14))
+                                                Text(lang.code)
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .foregroundColor(LS.currentLang == lang.code ? .white : AppTheme.navy)
+                                            }
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 7)
+                                            .background(LS.currentLang == lang.code ? AppTheme.indigo : AppTheme.bg)
+                                            .cornerRadius(8)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 13)
+                            }
+
+                            Divider().padding(.leading, 52)
+
+                            // Bildirim Ayarları
+                            NavigationLink(destination: NotificationSettingsView()) {
+                                rowContent(icon: "bell.badge.fill", iconColor: Color(hex: "#EF4444"),
+                                           title: "Bildirim Ayarları",
+                                           subtitle: "Push, kategoriler, sessiz saatler",
+                                           showChevron: true)
                             }
                             .buttonStyle(.plain)
-                            .background(AppTheme.surface)
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(AppTheme.borderSoft, lineWidth: 1)
-                            )
                         }
+
+                        // ── UYGULAMA BİLGİSİ ──
+                        sectionCard(title: DL.appInfoTitle.uppercased()) {
+                            infoRow(icon: "app.badge", label: "Uygulama", value: "ArveyGo v1.0.0")
+                            Divider().padding(.leading, 52)
+                            infoRow(icon: "apple.logo", label: "Platform", value: "iOS \(UIDevice.current.systemVersion)")
+                            Divider().padding(.leading, 52)
+                            infoRow(icon: "building.2", label: "Geliştirici", value: "Arveya Teknoloji")
+                        }
+
+                        // ── YASAL ──
+                        sectionCard(title: "YASAL") {
+                            rowContent(icon: "doc.text", iconColor: AppTheme.indigo,
+                                       title: "Kullanım Koşulları", subtitle: nil, showChevron: true)
+                            Divider().padding(.leading, 52)
+                            rowContent(icon: "hand.raised.fill", iconColor: AppTheme.indigo,
+                                       title: "Gizlilik Politikası", subtitle: nil, showChevron: true)
+                        }
+
+                        // Footer
+                        VStack(spacing: 4) {
+                            Text("© 2026 Arveya Teknoloji A.Ş.")
+                                .font(.system(size: 11))
+                                .foregroundColor(AppTheme.textMuted)
+                            Text("Tüm hakları saklıdır.")
+                                .font(.system(size: 10))
+                                .foregroundColor(AppTheme.textMuted.opacity(0.6))
+                        }
+                        .padding(.top, 8)
+                        .padding(.bottom, 20)
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 6)
-                    .padding(.bottom, 20)
-                }
-            }
-            .overlay {
-                if isChangingLang {
-                    ZStack {
-                        Color.black.opacity(0.3)
-                            .ignoresSafeArea()
-                        VStack(spacing: 14) {
-                            ProgressView()
-                                .scaleEffect(1.3)
-                                .tint(.white)
-                            Text(DL.languageLabel)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.white)
-                        }
-                        .padding(28)
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(16)
-                    }
-                    .transition(.opacity)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -188,22 +117,72 @@ struct SettingsView: View {
                     }
                 }
                 ToolbarItem(placement: .principal) {
-                    VStack(spacing: 1) {
-                        Text(DL.settingsTitle)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(AppTheme.navy)
-                    }
+                    Text(DL.settingsTitle)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(AppTheme.navy)
                 }
             }
         }
     }
 
-    func settingsRow(icon: String, label: String, value: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 14))
-                .foregroundColor(AppTheme.indigo)
-                .frame(width: 28)
+    // MARK: - Components
+
+    @ViewBuilder
+    private func sectionCard(title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(AppTheme.textMuted)
+                .tracking(0.5)
+                .padding(.leading, 4)
+
+            VStack(spacing: 0) {
+                content()
+            }
+            .background(AppTheme.surface)
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(AppTheme.borderSoft, lineWidth: 1)
+            )
+        }
+    }
+
+    private func sectionIcon(_ name: String, color: Color) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 14))
+            .foregroundColor(color)
+            .frame(width: 28, height: 28)
+    }
+
+    @ViewBuilder
+    private func rowContent(icon: String, iconColor: Color, title: String, subtitle: String?, showChevron: Bool) -> some View {
+        HStack(spacing: 10) {
+            sectionIcon(icon, color: iconColor)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(AppTheme.navy)
+                if let sub = subtitle {
+                    Text(sub)
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.textMuted)
+                }
+            }
+            Spacer()
+            if showChevron {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppTheme.textMuted.opacity(0.5))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    private func infoRow(icon: String, label: String, value: String) -> some View {
+        HStack(spacing: 10) {
+            sectionIcon(icon, color: AppTheme.indigo)
             Text(label)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(AppTheme.navy)
@@ -213,7 +192,7 @@ struct SettingsView: View {
                 .foregroundColor(AppTheme.textMuted)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.vertical, 12)
     }
 }
 

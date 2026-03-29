@@ -2,15 +2,12 @@ package com.arveya.arveygo.ui.screens.settings
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -22,7 +19,7 @@ import com.arveya.arveygo.ui.theme.AppColors
 import com.arveya.arveygo.utils.DashboardStrings
 import com.arveya.arveygo.utils.LoginStrings
 
-private data class LangItem(val code: String, val flag: String, val name: String)
+private data class LangChip(val code: String, val flag: String)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,14 +34,12 @@ fun SettingsScreen(onMenuClick: () -> Unit) {
     val currentLang by LoginStrings.currentLang.collectAsState()
     val DL = DashboardStrings
     val dlLang by DashboardStrings.currentLang.collectAsState()
-    var isChangingLang by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
 
     val languages = listOf(
-        LangItem("TR", "🇹🇷", "Türkçe"),
-        LangItem("EN", "🇬🇧", "English"),
-        LangItem("ES", "🇪🇸", "Español"),
-        LangItem("FR", "🇫🇷", "Français")
+        LangChip("TR", "🇹🇷"),
+        LangChip("EN", "🇬🇧"),
+        LangChip("ES", "🇪🇸"),
+        LangChip("FR", "🇫🇷")
     )
 
     Scaffold(
@@ -62,167 +57,161 @@ fun SettingsScreen(onMenuClick: () -> Unit) {
             )
         }
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(AppColors.Bg)
+                .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Language Section Header
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Language, null, tint = AppColors.Indigo, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(DL.languageLabel.uppercase(), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = AppColors.TextMuted, letterSpacing = 1.sp)
-            }
-
-            // Language list
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(AppColors.Surface, RoundedCornerShape(12.dp))
-                    .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
-            ) {
-                languages.forEachIndexed { index, lang ->
+            // ── GENEL ──
+            SectionCard(title = DL.settingsTitle.uppercase()) {
+                // Language — compact horizontal chips
+                Column {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(enabled = !isChangingLang) {
-                                if (currentLang != lang.code) {
-                                    isChangingLang = true
-                                    coroutineScope.launch {
-                                        delay(600)
+                        modifier = Modifier.padding(start = 16.dp, top = 13.dp, bottom = 10.dp)
+                    ) {
+                        Icon(Icons.Default.Language, null, tint = AppColors.Indigo, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text(DL.languageLabel, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 13.dp)
+                    ) {
+                        languages.forEach { lang ->
+                            val selected = currentLang == lang.code
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (selected) AppColors.Indigo else AppColors.Bg)
+                                    .clickable {
                                         LoginStrings.setLanguage(lang.code)
                                         DashboardStrings.setLanguage(lang.code)
-                                        delay(300)
-                                        isChangingLang = false
                                     }
-                                }
+                                    .padding(horizontal = 12.dp, vertical = 7.dp)
+                            ) {
+                                Text(lang.flag, fontSize = 14.sp)
+                                Text(
+                                    lang.code,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (selected) Color.White else AppColors.Navy
+                                )
                             }
-                            .background(
-                                if (currentLang == lang.code) AppColors.Indigo.copy(alpha = 0.06f)
-                                else AppColors.Surface
-                            )
-                            .padding(horizontal = 16.dp, vertical = 14.dp)
-                    ) {
-                        Text(lang.flag, fontSize = 22.sp)
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(lang.name, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
-                            Text(lang.code, fontSize = 11.sp, color = AppColors.TextMuted)
-                        }
-                        if (currentLang == lang.code) {
-                            Icon(Icons.Default.CheckCircle, null, tint = AppColors.Indigo, modifier = Modifier.size(20.dp))
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .border(1.5.dp, AppColors.BorderSoft, CircleShape)
-                            )
                         }
                     }
-                    if (index < languages.size - 1) {
-                        HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
+
+                // Bildirim Ayarları
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showNotifSettings = true }
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Icon(Icons.Default.NotificationsActive, null, tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Bildirim Ayarları", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
+                        Text("Push, kategoriler, sessiz saatler", fontSize = 11.sp, color = AppColors.TextMuted)
                     }
+                    Icon(Icons.Default.ChevronRight, null, tint = AppColors.TextMuted.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                 }
             }
 
-            // App Info Section
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Info, null, tint = AppColors.Indigo, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(DL.appInfoTitle.uppercase(), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = AppColors.TextMuted, letterSpacing = 1.sp)
+            // ── UYGULAMA BİLGİSİ ──
+            SectionCard(title = DL.appInfoTitle.uppercase()) {
+                InfoRow(Icons.Default.Apps, "Uygulama", "ArveyGo v1.0.0")
+                HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
+                InfoRow(Icons.Default.PhoneAndroid, "Platform", "Android ${android.os.Build.VERSION.RELEASE}")
+                HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
+                InfoRow(Icons.Default.Business, "Geliştirici", "Arveya Teknoloji")
             }
 
+            // ── YASAL ──
+            SectionCard(title = "YASAL") {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { }
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Icon(Icons.Default.Description, null, tint = AppColors.Indigo, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text("Kullanım Koşulları", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy, modifier = Modifier.weight(1f))
+                    Icon(Icons.Default.ChevronRight, null, tint = AppColors.TextMuted.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                }
+                HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { }
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Icon(Icons.Default.PrivacyTip, null, tint = AppColors.Indigo, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text("Gizlilik Politikası", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy, modifier = Modifier.weight(1f))
+                    Icon(Icons.Default.ChevronRight, null, tint = AppColors.TextMuted.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                }
+            }
+
+            // Footer
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(AppColors.Surface, RoundedCornerShape(12.dp))
-                    .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 20.dp)
             ) {
-                SettingsInfoRow(Icons.Default.Apps, "ArveyGo", "v1.0.0")
-                HorizontalDivider(modifier = Modifier.padding(start = 44.dp))
-                SettingsInfoRow(Icons.Default.PhoneAndroid, "Platform", "Android")
-                HorizontalDivider(modifier = Modifier.padding(start = 44.dp))
-                SettingsInfoRow(Icons.Default.Business, "Arveya Teknoloji", "© 2026")
+                Text("© 2026 Arveya Teknoloji A.Ş.", fontSize = 11.sp, color = AppColors.TextMuted)
+                Spacer(Modifier.height(4.dp))
+                Text("Tüm hakları saklıdır.", fontSize = 10.sp, color = AppColors.TextMuted.copy(alpha = 0.6f))
             }
-
-            // Bildirim Ayarları Section
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.NotificationsActive, null, tint = AppColors.Indigo, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("BİLDİRİM AYARLARI", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = AppColors.TextMuted, letterSpacing = 1.sp)
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(AppColors.Surface, RoundedCornerShape(12.dp))
-                    .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
-                    .clickable { showNotifSettings = true }
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .background(AppColors.Indigo, RoundedCornerShape(7.dp))
-                ) {
-                    Icon(Icons.Default.NotificationsActive, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Bildirim Ayarları", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
-                    Text("Push bildirim, kategoriler ve sessiz saatler", fontSize = 11.sp, color = AppColors.TextMuted)
-                }
-                Icon(Icons.Default.ChevronRight, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp))
-            }
-
-            Spacer(Modifier.height(16.dp))
-        }
-
-        // Loading overlay
-        if (isChangingLang) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f))
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier
-                        .background(AppColors.Surface, RoundedCornerShape(16.dp))
-                        .padding(28.dp)
-                ) {
-                    CircularProgressIndicator(
-                        color = AppColors.Indigo,
-                        modifier = Modifier.size(32.dp),
-                        strokeWidth = 3.dp
-                    )
-                    Text(DL.languageLabel, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-                }
-            }
-        }
         }
     }
 }
 
 @Composable
-private fun SettingsInfoRow(icon: ImageVector, label: String, value: String) {
+private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column {
+        Text(
+            title,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = AppColors.TextMuted,
+            letterSpacing = 0.5.sp,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(AppColors.Surface, RoundedCornerShape(12.dp))
+                .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun InfoRow(icon: ImageVector, label: String, value: String) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Icon(icon, null, tint = AppColors.Indigo, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(10.dp))
         Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
         Spacer(Modifier.weight(1f))
         Text(value, fontSize = 12.sp, color = AppColors.TextMuted)

@@ -49,6 +49,10 @@ class MainActivity : ComponentActivity() {
         // Request notification permission immediately on launch (Android 13+)
         requestNotificationPermission()
 
+        // Restore saved language preference
+        com.arveya.arveygo.utils.LoginStrings.initialize(this)
+        com.arveya.arveygo.utils.DashboardStrings.initialize(this)
+
         // Lifecycle observer for WebSocket reconnection
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {

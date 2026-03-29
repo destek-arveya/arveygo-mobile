@@ -4,7 +4,13 @@ import SwiftUI
 class DashboardStrings: ObservableObject {
     static let shared = DashboardStrings()
 
-    @Published var currentLang: String = "TR"
+    @Published var currentLang: String {
+        didSet { UserDefaults.standard.set(currentLang, forKey: "arveygo_lang") }
+    }
+
+    init() {
+        self.currentLang = UserDefaults.standard.string(forKey: "arveygo_lang") ?? "TR"
+    }
 
     // Navigation
     var title: String { s("Dashboard", "Dashboard", "Panel", "Tableau de bord") }

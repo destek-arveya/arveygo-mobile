@@ -1,5 +1,6 @@
 package com.arveya.arveygo.utils
 
+import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -10,8 +11,19 @@ object DashboardStrings {
     private val _currentLang = MutableStateFlow("TR")
     val currentLang: StateFlow<String> = _currentLang
 
+    private var appContext: Context? = null
+
+    fun initialize(context: Context) {
+        appContext = context.applicationContext
+        val saved = context.getSharedPreferences("arveygo_prefs", Context.MODE_PRIVATE)
+            .getString("app_lang", "TR") ?: "TR"
+        _currentLang.value = saved
+    }
+
     fun setLanguage(lang: String) {
         _currentLang.value = lang
+        appContext?.getSharedPreferences("arveygo_prefs", Context.MODE_PRIVATE)
+            ?.edit()?.putString("app_lang", lang)?.apply()
     }
 
     // Navigation
