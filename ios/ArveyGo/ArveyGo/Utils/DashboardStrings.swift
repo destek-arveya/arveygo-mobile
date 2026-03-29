@@ -73,6 +73,37 @@ class DashboardStrings: ObservableObject {
     var settingsTitle: String { s("Ayarlar", "Settings", "Configuración", "Paramètres") }
     var languageLabel: String { s("Dil", "Language", "Idioma", "Langue") }
     var appInfoTitle: String { s("Uygulama Bilgisi", "App Info", "Info de la App", "Info de l'App") }
+    var appInfoApp: String { s("Uygulama", "Application", "Aplicación", "Application") }
+    var appInfoPlatform: String { s("Platform", "Platform", "Plataforma", "Plateforme") }
+    var appInfoDeveloper: String { s("Geliştirici", "Developer", "Desarrollador", "Développeur") }
+    var legalTitle: String { s("Yasal", "Legal", "Legal", "Légal") }
+    var termsOfUse: String { s("Kullanım Koşulları", "Terms of Use", "Términos de Uso", "Conditions d'utilisation") }
+    var privacyPolicy: String { s("Gizlilik Politikası", "Privacy Policy", "Política de Privacidad", "Politique de confidentialité") }
+    var allRightsReserved: String { s("Tüm hakları saklıdır.", "All rights reserved.", "Todos los derechos reservados.", "Tous droits réservés.") }
+    var notificationSettings: String { s("Bildirim Ayarları", "Notification Settings", "Configuración de Notificaciones", "Paramètres de notifications") }
+    var notificationSettingsSubtitle: String { s("Push, kategoriler, sessiz saatler", "Push, categories, quiet hours", "Push, categorías, horas silenciosas", "Push, catégories, heures silencieuses") }
+
+    // Sidebar menu sections
+    var menuSectionMain: String { s("ANA MENÜ", "MAIN MENU", "MENÚ PRINCIPAL", "MENU PRINCIPAL") }
+    var menuSectionFleet: String { s("FİLO YÖNETİMİ", "FLEET MANAGEMENT", "GESTIÓN DE FLOTA", "GESTION DE FLOTTE") }
+    var menuSectionMonitor: String { s("İZLEME", "MONITORING", "MONITOREO", "SURVEILLANCE") }
+    var menuSectionSettings: String { s("AYARLAR", "SETTINGS", "CONFIGURACIÓN", "PARAMÈTRES") }
+    var menuSectionSupport: String { s("DESTEK", "SUPPORT", "SOPORTE", "ASSISTANCE") }
+
+    // Sidebar menu items
+    var menuDashboard: String { s("Dashboard", "Dashboard", "Panel", "Tableau de bord") }
+    var menuLiveMap: String { s("Canlı Harita", "Live Map", "Mapa en Vivo", "Carte en Direct") }
+    var menuRouteHistory: String { s("Rota Geçmişi", "Route History", "Historial de Rutas", "Historique des Trajets") }
+    var menuVehicles: String { s("Araçlar", "Vehicles", "Vehículos", "Véhicules") }
+    var menuDrivers: String { s("Sürücüler", "Drivers", "Conductores", "Conducteurs") }
+    var menuMaintenance: String { s("Bakım / Belgeler / Masraflar", "Maintenance / Docs / Expenses", "Mantenimiento / Docs / Gastos", "Maintenance / Docs / Dépenses") }
+    var menuAlarms: String { s("Alarmlar", "Alarms", "Alarmas", "Alarmes") }
+    var menuGeofence: String { s("Geofence", "Geofence", "Geocerca", "Géofence") }
+    var menuReports: String { s("Raporlar", "Reports", "Informes", "Rapports") }
+    var menuSettings: String { s("Ayarlar", "Settings", "Configuración", "Paramètres") }
+    var menuSupport: String { s("Destek Talebi", "Support Request", "Solicitud de Soporte", "Demande d'assistance") }
+    var menuLogout: String { s("Çıkış Yap", "Log Out", "Cerrar Sesión", "Se déconnecter") }
+    var menuCompany: String { s("Arveya Teknoloji", "Arveya Technology", "Arveya Tecnología", "Arveya Technologie") }
 
     // ---------- Helper ----------
     private func s(_ tr: String, _ en: String, _ es: String, _ fr: String) -> String {

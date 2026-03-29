@@ -66,8 +66,8 @@ struct SettingsView: View {
                             // Bildirim Ayarları
                             NavigationLink(destination: NotificationSettingsView()) {
                                 rowContent(icon: "bell.badge.fill", iconColor: Color(hex: "#EF4444"),
-                                           title: "Bildirim Ayarları",
-                                           subtitle: "Push, kategoriler, sessiz saatler",
+                                           title: DL.notificationSettings,
+                                           subtitle: DL.notificationSettingsSubtitle,
                                            showChevron: true)
                             }
                             .buttonStyle(.plain)
@@ -75,20 +75,20 @@ struct SettingsView: View {
 
                         // ── UYGULAMA BİLGİSİ ──
                         sectionCard(title: DL.appInfoTitle.uppercased()) {
-                            infoRow(icon: "app.badge", label: "Uygulama", value: "ArveyGo v1.0.0")
+                            infoRow(icon: "app.badge", label: DL.appInfoApp, value: "ArveyGo v1.0.0")
                             Divider().padding(.leading, 52)
-                            infoRow(icon: "apple.logo", label: "Platform", value: "iOS \(UIDevice.current.systemVersion)")
+                            infoRow(icon: "apple.logo", label: DL.appInfoPlatform, value: "iOS \(UIDevice.current.systemVersion)")
                             Divider().padding(.leading, 52)
-                            infoRow(icon: "building.2", label: "Geliştirici", value: "Arveya Teknoloji")
+                            infoRow(icon: "building.2", label: DL.appInfoDeveloper, value: "Arveya Teknoloji")
                         }
 
                         // ── YASAL ──
-                        sectionCard(title: "YASAL") {
+                        sectionCard(title: DL.legalTitle.uppercased()) {
                             rowContent(icon: "doc.text", iconColor: AppTheme.indigo,
-                                       title: "Kullanım Koşulları", subtitle: nil, showChevron: true)
+                                       title: DL.termsOfUse, subtitle: nil, showChevron: true)
                             Divider().padding(.leading, 52)
                             rowContent(icon: "hand.raised.fill", iconColor: AppTheme.indigo,
-                                       title: "Gizlilik Politikası", subtitle: nil, showChevron: true)
+                                       title: DL.privacyPolicy, subtitle: nil, showChevron: true)
                         }
 
                         // Footer
@@ -96,7 +96,7 @@ struct SettingsView: View {
                             Text("© 2026 Arveya Teknoloji A.Ş.")
                                 .font(.system(size: 11))
                                 .foregroundColor(AppTheme.textMuted)
-                            Text("Tüm hakları saklıdır.")
+                            Text(DL.allRightsReserved)
                                 .font(.system(size: 10))
                                 .foregroundColor(AppTheme.textMuted.opacity(0.6))
                         }

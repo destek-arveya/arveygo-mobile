@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.arveya.arveygo.LocalAuthViewModel
 import com.arveya.arveygo.ui.navigation.AppPage
 import com.arveya.arveygo.ui.theme.AppColors
+import com.arveya.arveygo.utils.DashboardStrings
 
 @Composable
 fun SideMenu(
@@ -37,6 +38,8 @@ fun SideMenu(
     val authVM = LocalAuthViewModel.current
     val user by authVM.currentUser.collectAsState()
     val menuWidth = 300.dp
+    val DL = DashboardStrings
+    val dlLang by DashboardStrings.currentLang.collectAsState()
 
     AnimatedVisibility(
         visible = isShowing,
@@ -153,7 +156,7 @@ fun SideMenu(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                "Arveya Teknoloji",
+                                DL.menuCompany,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = Color.White.copy(alpha = 0.6f)
@@ -169,26 +172,26 @@ fun SideMenu(
                         .verticalScroll(rememberScrollState())
                         .padding(vertical = 12.dp)
                 ) {
-                    MenuSection("ANA MENÜ") {
-                        MenuItem(Icons.Default.Dashboard, "Dashboard", AppPage.DASHBOARD, selectedPage, onPageSelected)
-                        MenuItem(Icons.Default.Map, "Canlı Harita", AppPage.LIVE_MAP, selectedPage, onPageSelected)
-                        MenuItem(Icons.Default.History, "Rota Geçmişi", AppPage.ROUTE_HISTORY, selectedPage, onPageSelected)
+                    MenuSection(DL.menuSectionMain) {
+                        MenuItem(Icons.Default.Dashboard, DL.menuDashboard, AppPage.DASHBOARD, selectedPage, onPageSelected)
+                        MenuItem(Icons.Default.Map, DL.menuLiveMap, AppPage.LIVE_MAP, selectedPage, onPageSelected)
+                        MenuItem(Icons.Default.History, DL.menuRouteHistory, AppPage.ROUTE_HISTORY, selectedPage, onPageSelected)
                     }
-                    MenuSection("FİLO YÖNETİMİ") {
-                        MenuItem(Icons.Default.DirectionsCar, "Araçlar", AppPage.VEHICLES, selectedPage, onPageSelected)
-                        MenuItem(Icons.Default.People, "Sürücüler", AppPage.DRIVERS, selectedPage, onPageSelected)
-                        MenuItem(Icons.Default.Build, "Bakım / Belgeler / Masraflar", AppPage.FLEET_MANAGEMENT, selectedPage, onPageSelected)
+                    MenuSection(DL.menuSectionFleet) {
+                        MenuItem(Icons.Default.DirectionsCar, DL.menuVehicles, AppPage.VEHICLES, selectedPage, onPageSelected)
+                        MenuItem(Icons.Default.People, DL.menuDrivers, AppPage.DRIVERS, selectedPage, onPageSelected)
+                        MenuItem(Icons.Default.Build, DL.menuMaintenance, AppPage.FLEET_MANAGEMENT, selectedPage, onPageSelected)
                     }
-                    MenuSection("İZLEME") {
-                        MenuItem(Icons.Default.Notifications, "Alarmlar", AppPage.ALARMS, selectedPage, onPageSelected)
-                        MenuItem(Icons.Default.Hexagon, "Geofence", AppPage.GEOFENCES, selectedPage, onPageSelected)
-                        MenuItem(Icons.Default.BarChart, "Raporlar", AppPage.REPORTS, selectedPage, onPageSelected)
+                    MenuSection(DL.menuSectionMonitor) {
+                        MenuItem(Icons.Default.Notifications, DL.menuAlarms, AppPage.ALARMS, selectedPage, onPageSelected)
+                        MenuItem(Icons.Default.Hexagon, DL.menuGeofence, AppPage.GEOFENCES, selectedPage, onPageSelected)
+                        MenuItem(Icons.Default.BarChart, DL.menuReports, AppPage.REPORTS, selectedPage, onPageSelected)
                     }
-                    MenuSection("AYARLAR") {
-                        MenuItem(Icons.Default.Settings, "Ayarlar", AppPage.SETTINGS, selectedPage, onPageSelected)
+                    MenuSection(DL.menuSectionSettings) {
+                        MenuItem(Icons.Default.Settings, DL.menuSettings, AppPage.SETTINGS, selectedPage, onPageSelected)
                     }
-                    MenuSection("DESTEK") {
-                        MenuItem(Icons.Default.HelpOutline, "Destek Talebi", AppPage.SUPPORT, selectedPage, onPageSelected)
+                    MenuSection(DL.menuSectionSupport) {
+                        MenuItem(Icons.Default.HelpOutline, DL.menuSupport, AppPage.SUPPORT, selectedPage, onPageSelected)
                     }
 
                     Spacer(Modifier.height(8.dp))
@@ -225,7 +228,7 @@ fun SideMenu(
                         }
                         Spacer(Modifier.width(12.dp))
                         Text(
-                            "Çıkış Yap",
+                            DL.menuLogout,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             color = Color.Red.copy(alpha = 0.8f)

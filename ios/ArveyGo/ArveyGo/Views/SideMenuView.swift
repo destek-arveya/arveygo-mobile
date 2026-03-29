@@ -4,6 +4,7 @@ struct SideMenuView: View {
     @Binding var isShowing: Bool
     @Binding var selectedPage: AppPage
     @EnvironmentObject var authVM: AuthViewModel
+    @ObservedObject private var DL = DashboardStrings.shared
 
     private let menuWidth: CGFloat = 300
 
@@ -61,7 +62,7 @@ struct SideMenuView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "building.2")
                             .font(.system(size: 12))
-                        Text("Arveya Teknoloji")
+                        Text(DL.menuCompany)
                             .font(.system(size: 12, weight: .medium))
                     }
                     .foregroundColor(.white.opacity(0.6))
@@ -90,30 +91,30 @@ struct SideMenuView: View {
                 // ── Menu items ──
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 2) {
-                        menuSection(title: "ANA MENÜ") {
-                            menuItem(icon: "square.grid.2x2", label: "Dashboard", page: .dashboard)
-                            menuItem(icon: "map.fill", label: "Canlı Harita", page: .liveMap)
-                            menuItem(icon: "clock.arrow.circlepath", label: "Rota Geçmişi", page: .routeHistory)
+                        menuSection(title: DL.menuSectionMain) {
+                            menuItem(icon: "square.grid.2x2", label: DL.menuDashboard, page: .dashboard)
+                            menuItem(icon: "map.fill", label: DL.menuLiveMap, page: .liveMap)
+                            menuItem(icon: "clock.arrow.circlepath", label: DL.menuRouteHistory, page: .routeHistory)
                         }
 
-                        menuSection(title: "FİLO YÖNETİMİ") {
-                            menuItem(icon: "car.2.fill", label: "Araçlar", page: .vehicles)
-                            menuItem(icon: "person.2.fill", label: "Sürücüler", page: .drivers)
-                            menuItem(icon: "wrench.and.screwdriver.fill", label: "Bakım / Belgeler / Masraflar", page: .fleetManagement)
+                        menuSection(title: DL.menuSectionFleet) {
+                            menuItem(icon: "car.2.fill", label: DL.menuVehicles, page: .vehicles)
+                            menuItem(icon: "person.2.fill", label: DL.menuDrivers, page: .drivers)
+                            menuItem(icon: "wrench.and.screwdriver.fill", label: DL.menuMaintenance, page: .fleetManagement)
                         }
 
-                        menuSection(title: "İZLEME") {
-                            menuItem(icon: "bell.fill", label: "Alarmlar", page: .alarms)
-                            menuItem(icon: "hexagon.fill", label: "Geofence", page: .geofences)
-                            menuItem(icon: "chart.bar.fill", label: "Raporlar", page: .reports)
+                        menuSection(title: DL.menuSectionMonitor) {
+                            menuItem(icon: "bell.fill", label: DL.menuAlarms, page: .alarms)
+                            menuItem(icon: "hexagon.fill", label: DL.menuGeofence, page: .geofences)
+                            menuItem(icon: "chart.bar.fill", label: DL.menuReports, page: .reports)
                         }
 
-                        menuSection(title: "AYARLAR") {
-                            menuItem(icon: "gearshape.fill", label: "Ayarlar", page: .settings)
+                        menuSection(title: DL.menuSectionSettings) {
+                            menuItem(icon: "gearshape.fill", label: DL.menuSettings, page: .settings)
                         }
 
-                        menuSection(title: "DESTEK") {
-                            menuItem(icon: "questionmark.circle.fill", label: "Destek Talebi", page: .support)
+                        menuSection(title: DL.menuSectionSupport) {
+                            menuItem(icon: "questionmark.circle.fill", label: DL.menuSupport, page: .support)
                         }
 
                         Spacer().frame(height: 8)
@@ -143,7 +144,7 @@ struct SideMenuView: View {
                                             .foregroundColor(.red.opacity(0.8))
                                     )
 
-                                Text("Çıkış Yap")
+                                Text(DL.menuLogout)
                                     .font(.system(size: 14, weight: .medium))
                                     .foregroundColor(.red.opacity(0.8))
 

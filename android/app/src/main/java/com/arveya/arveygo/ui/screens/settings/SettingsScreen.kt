@@ -122,8 +122,8 @@ fun SettingsScreen(onMenuClick: () -> Unit) {
                     Icon(Icons.Default.NotificationsActive, null, tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Bildirim Ayarları", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
-                        Text("Push, kategoriler, sessiz saatler", fontSize = 11.sp, color = AppColors.TextMuted)
+                        Text(DL.notificationSettings, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
+                        Text(DL.notificationSettingsSubtitle, fontSize = 11.sp, color = AppColors.TextMuted)
                     }
                     Icon(Icons.Default.ChevronRight, null, tint = AppColors.TextMuted.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                 }
@@ -131,15 +131,15 @@ fun SettingsScreen(onMenuClick: () -> Unit) {
 
             // ── UYGULAMA BİLGİSİ ──
             SectionCard(title = DL.appInfoTitle.uppercase()) {
-                InfoRow(Icons.Default.Apps, "Uygulama", "ArveyGo v1.0.0")
+                InfoRow(Icons.Default.Apps, DL.appInfoApp, "ArveyGo v1.0.0")
                 HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
-                InfoRow(Icons.Default.PhoneAndroid, "Platform", "Android ${android.os.Build.VERSION.RELEASE}")
+                InfoRow(Icons.Default.PhoneAndroid, DL.appInfoPlatform, "Android ${android.os.Build.VERSION.RELEASE}")
                 HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
-                InfoRow(Icons.Default.Business, "Geliştirici", "Arveya Teknoloji")
+                InfoRow(Icons.Default.Business, DL.appInfoDeveloper, "Arveya Teknoloji")
             }
 
             // ── YASAL ──
-            SectionCard(title = "YASAL") {
+            SectionCard(title = DL.legalTitle.uppercase()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -149,7 +149,7 @@ fun SettingsScreen(onMenuClick: () -> Unit) {
                 ) {
                     Icon(Icons.Default.Description, null, tint = AppColors.Indigo, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(10.dp))
-                    Text("Kullanım Koşulları", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy, modifier = Modifier.weight(1f))
+                    Text(DL.termsOfUse, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy, modifier = Modifier.weight(1f))
                     Icon(Icons.Default.ChevronRight, null, tint = AppColors.TextMuted.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                 }
                 HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
@@ -162,7 +162,7 @@ fun SettingsScreen(onMenuClick: () -> Unit) {
                 ) {
                     Icon(Icons.Default.PrivacyTip, null, tint = AppColors.Indigo, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(10.dp))
-                    Text("Gizlilik Politikası", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy, modifier = Modifier.weight(1f))
+                    Text(DL.privacyPolicy, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy, modifier = Modifier.weight(1f))
                     Icon(Icons.Default.ChevronRight, null, tint = AppColors.TextMuted.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                 }
             }
@@ -174,7 +174,7 @@ fun SettingsScreen(onMenuClick: () -> Unit) {
             ) {
                 Text("© 2026 Arveya Teknoloji A.Ş.", fontSize = 11.sp, color = AppColors.TextMuted)
                 Spacer(Modifier.height(4.dp))
-                Text("Tüm hakları saklıdır.", fontSize = 10.sp, color = AppColors.TextMuted.copy(alpha = 0.6f))
+                Text(DL.allRightsReserved, fontSize = 10.sp, color = AppColors.TextMuted.copy(alpha = 0.6f))
             }
         }
     }
