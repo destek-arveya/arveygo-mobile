@@ -4,9 +4,16 @@ struct ContentView: View {
     @EnvironmentObject var beacon: BeaconManager
     @State private var copiedToClipboard = false
 
-    /// Teltonika'nın beklediği format: UUID:Major:Minor
+    /// Teltonika'nın beklediği format: uuid(tire yok, küçük harf):Major(4 hane):Minor(4 hane)
+    /// Örnek: 89627cfc1a114be49b29a668aa394835:0001:0001
     private var teltonikaFormat: String {
-        "\(beacon.uuidString.uppercased()):\(beacon.majorValue):\(beacon.minorValue)"
+        let rawUUID = beacon.uuidString
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "")
+        let major = String(format: "%04d", beacon.majorValue)
+        let minor = String(format: "%04d", beacon.minorValue)
+        return "\(rawUUID):\(major):\(minor)"
     }
 
     var body: some View {

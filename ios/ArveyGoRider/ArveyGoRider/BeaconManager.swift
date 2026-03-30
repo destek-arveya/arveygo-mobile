@@ -48,7 +48,7 @@ class BeaconManager: NSObject, ObservableObject {
     // MARK: - Init
     override init() {
         let ud = UserDefaults.standard
-        uuidString      = ud.string(forKey: StorageKey.uuid)       ?? "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0"
+        uuidString      = ud.string(forKey: StorageKey.uuid)       ?? "89627cfc-1a11-4be4-9b29-a668aa394835"
         let savedMajor  = ud.object(forKey: StorageKey.major) as? Int
         let savedMinor  = ud.object(forKey: StorageKey.minor) as? Int
         majorValue      = savedMajor.map { UInt16($0) } ?? 1
