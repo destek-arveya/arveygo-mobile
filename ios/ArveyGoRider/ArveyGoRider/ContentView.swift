@@ -2,6 +2,12 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var beacon: BeaconManager
+    @State private var copiedToClipboard = false
+
+    /// Teltonika'nın beklediği format: UUID:Major:Minor
+    private var teltonikaFormat: String {
+        "\(beacon.uuidString.uppercased()):\(beacon.majorValue):\(beacon.minorValue)"
+    }
 
     var body: some View {
         NavigationStack {
@@ -60,6 +66,61 @@ struct ContentView: View {
                                 .font(.caption)
                                 .autocorrectionDisabled()
                         }
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Cihaz Adı (localName)").font(.caption).foregroundStyle(.secondary)
+                            TextField("Cihaz adı", text: $beacon.deviceName)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.caption)
+                                .autocorrectionDisabled()
+                            Text("Scanner'larda görünecek isim")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+
+                        // Teltonika Format
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "doc.on.doc")
+                                    .foregroundStyle(.orange)
+                                Text("Teltonika Beacon ID")
+                                    .font(.caption).bold()
+                                    .foregroundStyle(.orange)
+                            }
+                            HStack(spacing: 8) {
+                                Text(teltonikaFormat)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundStyle(.primary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 8)
+                                    .background(Color(.secondarySystemBackground))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.6)
+
+                                Button {
+                                    UIPasteboard.general.string = teltonikaFormat
+                                    copiedToClipboard = true
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                        copiedToClipboard = false
+                                    }
+                                } label: {
+                                    Image(systemName: copiedToClipboard ? "checkmark" : "doc.on.clipboard")
+                                        .foregroundStyle(copiedToClipboard ? .green : .orange)
+                                        .frame(width: 36, height: 36)
+                                        .background(Color(.secondarySystemBackground))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                            }
+                            Text("Bu değeri Teltonika Web Arayüzü → Bluetooth → Beacon List'e yapıştırın.")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(12)
+                        .background(Color.orange.opacity(0.07))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.orange.opacity(0.25), lineWidth: 1))
                     }
                     .padding(20)
                     .background(Color(.systemBackground))
@@ -86,12 +147,32 @@ struct ContentView: View {
                     .tint(beacon.isAdvertising ? .red : .blue)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
 
+                    // Persistence info
+                    if beacon.isAdvertising {
+                        HStack(spacing: 10) {
+                            Image(systemName: "checkmark.shield.fill")
+                                .foregroundStyle(.green)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Arka planda devam ediyor")
+                                    .font(.caption).bold()
+                                Text("Uygulamayı kapatsan bile yayın aktif kalır. Durdurmak için uygulamayı tekrar aç.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.green.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.green.opacity(0.25), lineWidth: 1))
+                    }
+
                     // Info
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Bilgilendirme", systemImage: "info.circle")
                             .font(.caption).bold()
                             .foregroundStyle(.secondary)
-                        Text("Bu uygulama telefonunuzu iBeacon olarak kullanır. Arka planda da yayın yapmaya devam eder. Bluetooth'un açık olduğundan emin olun.")
+                        Text("Ayarları bir kez girin, yayına başlayın. Uygulama arka plana alınsa bile Bluetooth yayını devam eder. Telefon yeniden başlatılırsa uygulamayı tekrar açmanız gerekir.")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }

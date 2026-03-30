@@ -21,11 +21,13 @@ targets:
     settings:
       base:
         INFOPLIST_FILE: ArveyGoRider/Info.plist
+        GENERATE_INFOPLIST_FILE: "NO"
         PRODUCT_BUNDLE_IDENTIFIER: com.arveya.arveygorider
         DEVELOPMENT_TEAM: DMGAP95S6R
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_STRICT_CONCURRENCY: complete
+        CODE_SIGN_STYLE: Automatic
     dependencies:
       - framework: CoreBluetooth.framework
         embed: false

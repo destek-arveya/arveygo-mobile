@@ -110,6 +110,7 @@
 				TargetAttributes = {
 					B5B96301AF883F52F0640893 = {
 						DevelopmentTeam = DMGAP95S6R;
+						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -221,11 +222,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = DMGAP95S6R;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\".\"",
 				);
+				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ArveyGoRider/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -243,11 +246,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = DMGAP95S6R;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\".\"",
 				);
+				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ArveyGoRider/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
