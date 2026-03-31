@@ -145,6 +145,11 @@ struct VehicleDetailView: View {
     @State private var selectedTab: DetailTab = .overview
     @State private var mapCameraPosition: MapCameraPosition = .automatic
     @State private var showDriverAssign = false
+    @State private var showEditSheet = false
+    @State private var showBlockageModal = false
+    @State private var blockageLoading = false
+    @State private var blockageError: String?
+    @State private var blockageSuccess: String?
 
     // Fleet data states
     @State private var fleetMaintenances: [FleetMaintenance] = []
@@ -418,19 +423,32 @@ struct VehicleDetailView: View {
                         onNavigateToRouteHistory?(vehicle)
                     }
                 }
-                quickActionButton(icon: "bell.badge.fill", label: "Alarm Ekle", color: .orange) {
-                    dismiss()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                        onNavigateToAddAlarm?(vehicle.plate)
-                    }
+                quickActionButton(icon: "pencil.circle.fill", label: "Düzenle", color: Color(hex: "#8B5CF6")) {
+                    showEditSheet = true
                 }
-                quickActionButton(icon: "square.and.arrow.up", label: "Paylaş", color: AppTheme.textMuted) {
-                    shareVehicleLocation(vehicle: vehicle)
+                quickActionButton(icon: "lock.shield.fill", label: "Blokaj", color: .red) {
+                    blockageError = nil
+                    blockageSuccess = nil
+                    showBlockageModal = true
                 }
             }
             .padding(14)
             .background(AppTheme.surface)
             .cornerRadius(14)
+            .sheet(isPresented: $showEditSheet) {
+                VehicleEditSheet(vehicle: vehicle) { updatedVehicle in
+                    observer.vehicle.plate = updatedVehicle.plate
+                    if !updatedVehicle.name.isEmpty { observer.vehicle.name = updatedVehicle.name }
+                }
+            }
+            .sheet(isPresented: $showBlockageModal) {
+                BlockageSheet(
+                    vehicle: vehicle,
+                    isLoading: $blockageLoading,
+                    errorMessage: $blockageError,
+                    successMessage: $blockageSuccess
+                )
+            }
 
             // ── Vehicle Info ──
             cleanListCard {

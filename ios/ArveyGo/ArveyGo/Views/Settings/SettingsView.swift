@@ -4,6 +4,7 @@ struct SettingsView: View {
     @Binding var showSideMenu: Bool
     @ObservedObject private var DL = DashboardStrings.shared
     @ObservedObject private var LS = LoginStrings.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
 
     private let languages: [(code: String, flag: String)] = [
         ("TR", "🇹🇷"),
@@ -63,6 +64,46 @@ struct SettingsView: View {
 
                             Divider().padding(.leading, 52)
 
+                            // ── Tema Seçimi ──
+                            VStack(spacing: 0) {
+                                HStack(spacing: 10) {
+                                    sectionIcon("circle.lefthalf.filled", color: AppTheme.indigo)
+                                    Text(themeLabel)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(AppTheme.navy)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.top, 13)
+                                .padding(.bottom, 10)
+
+                                HStack(spacing: 8) {
+                                    ForEach(ThemeManager.ThemeMode.allCases, id: \.rawValue) { mode in
+                                        Button {
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                themeManager.mode = mode
+                                            }
+                                        } label: {
+                                            HStack(spacing: 5) {
+                                                Text(mode.label).font(.system(size: 14))
+                                                Text(mode.title)
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .foregroundColor(themeManager.mode == mode ? .white : AppTheme.navy)
+                                            }
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 7)
+                                            .background(themeManager.mode == mode ? AppTheme.indigo : AppTheme.bg)
+                                            .cornerRadius(8)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 13)
+                            }
+
+                            Divider().padding(.leading, 52)
+
                             // Bildirim Ayarları
                             NavigationLink(destination: NotificationSettingsView()) {
                                 rowContent(icon: "bell.badge.fill", iconColor: Color(hex: "#EF4444"),
@@ -101,7 +142,7 @@ struct SettingsView: View {
                                 .foregroundColor(AppTheme.textMuted.opacity(0.6))
                         }
                         .padding(.top, 8)
-                        .padding(.bottom, 20)
+                        .padding(.bottom, 16)
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 6)
@@ -110,19 +151,17 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { withAnimation(.spring(response: 0.3)) { showSideMenu.toggle() } }) {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(AppTheme.navy)
-                    }
-                }
-                ToolbarItem(placement: .principal) {
                     Text(DL.settingsTitle)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundColor(AppTheme.navy)
                 }
             }
         }
+    }
+
+    // MARK: - Theme label
+    private var themeLabel: String {
+        DL.currentLang == "EN" ? "Theme" : "Tema"
     }
 
     // MARK: - Components

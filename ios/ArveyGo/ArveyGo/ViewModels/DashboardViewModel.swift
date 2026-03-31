@@ -237,7 +237,7 @@ class DashboardViewModel: ObservableObject {
                         let createdAt = a["created_at"] as? String ?? ""
                         let timeAgo = self.formatTimeAgo(createdAt)
                         let id = "\(a["id"] ?? 0)"
-                        return FleetAlert(id: id, title: typeLabel, description: desc, time: timeAgo, severity: severity)
+                        return FleetAlert(id: id, title: typeLabel, description: desc, time: timeAgo, severity: severity, createdAt: createdAt)
                     }
                     await MainActor.run {
                         self.alerts = alertList
@@ -282,12 +282,12 @@ class DashboardViewModel: ObservableObject {
     /// Load dummy alerts (alerts API not yet available)
     func loadDummyAlerts() {
         alerts = [
-            FleetAlert(id: "1", title: "Hız İhlali", description: "34 ABC 123 — 142 km/h, E-5 Karayolu", time: "3 dk", severity: .red),
-            FleetAlert(id: "2", title: "Geofence Çıkış", description: "35 DEF 456 — İzmir bölge dışına çıktı", time: "18 dk", severity: .amber),
-            FleetAlert(id: "3", title: "Bakım Hatırlatma", description: "07 MNO 987 — Yağ değişim zamanı", time: "1 sa", severity: .blue),
-            FleetAlert(id: "4", title: "Seyahat Tamamlandı", description: "41 JKL 654 — Kocaeli → İstanbul", time: "2 sa", severity: .green),
-            FleetAlert(id: "5", title: "Ani Fren", description: "34 PRS 111 — Kadıköy civarı", time: "35 dk", severity: .amber),
-            FleetAlert(id: "6", title: "Motor Arızası", description: "06 TUV 222 — Check Engine uyarısı", time: "4 sa", severity: .red),
+            FleetAlert(id: "1", title: "Hız İhlali", description: "34 ABC 123 — 142 km/h, E-5 Karayolu", time: "3 dk", severity: .red, createdAt: "2026-03-29 21:45:00"),
+            FleetAlert(id: "2", title: "Geofence Çıkış", description: "35 DEF 456 — İzmir bölge dışına çıktı", time: "18 dk", severity: .amber, createdAt: "2026-03-29 21:30:00"),
+            FleetAlert(id: "3", title: "Bakım Hatırlatma", description: "07 MNO 987 — Yağ değişim zamanı", time: "1 sa", severity: .blue, createdAt: "2026-03-29 20:48:00"),
+            FleetAlert(id: "4", title: "Seyahat Tamamlandı", description: "41 JKL 654 — Kocaeli → İstanbul", time: "2 sa", severity: .green, createdAt: "2026-03-29 19:30:00"),
+            FleetAlert(id: "5", title: "Ani Fren", description: "34 PRS 111 — Kadıköy civarı", time: "35 dk", severity: .amber, createdAt: "2026-03-29 21:13:00"),
+            FleetAlert(id: "6", title: "Motor Arızası", description: "06 TUV 222 — Check Engine uyarısı", time: "4 sa", severity: .red, createdAt: "2026-03-29 17:48:00"),
         ]
     }
 

@@ -631,6 +631,22 @@ final class APIService {
         return json["data"] as? [String: Any] ?? json
     }
 
+    /// PUT /api/mobile/vehicles/{id} — update plate, name, brand, model, year, type, odometer
+    func updateVehicle(deviceId: Int, data: [String: Any]) async throws {
+        _ = try await put("/api/mobile/vehicles/\(deviceId)", body: data)
+    }
+
+    /// POST /api/mobile/vehicles/{id}/blockage — action: "block" | "unblock"
+    func sendBlockage(deviceId: Int, action: String) async throws -> [String: Any] {
+        let json = try await post("/api/mobile/vehicles/\(deviceId)/blockage", body: ["action": action])
+        return json["data"] as? [String: Any] ?? json
+    }
+
+    /// POST /api/mobile/vehicles/{id}/cancel-blockage — cancel pending blockage command
+    func cancelBlockage(deviceId: Int) async throws {
+        _ = try await post("/api/mobile/vehicles/\(deviceId)/cancel-blockage")
+    }
+
     /// POST /api/mobile/vehicles/{id}/assign-driver
     func assignDriverToVehicle(vehicleId: Int, driverProfileId: Int?, driverCode: String?) async throws {
         var body: [String: Any] = [:]

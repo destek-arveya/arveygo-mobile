@@ -34,13 +34,7 @@ struct VehiclesListView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { withAnimation(.spring(response: 0.3)) { showSideMenu.toggle() } }) {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(AppTheme.navy)
-                    }
-                }
+
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 1) {
                         Text("Araçlarım")

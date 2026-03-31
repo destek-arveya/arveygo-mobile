@@ -108,15 +108,7 @@ struct FleetManagementView: View {
             .background(AppTheme.bg)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3)) { showSideMenu.toggle() }
-                    }) {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(AppTheme.navy)
-                    }
-                }
+
                 ToolbarItem(placement: .principal) {
                     Text("Filo Yönetimi")
                         .font(.system(size: 15, weight: .semibold))

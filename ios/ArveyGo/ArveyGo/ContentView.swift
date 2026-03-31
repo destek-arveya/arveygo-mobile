@@ -30,6 +30,7 @@ enum AppPage: String, CaseIterable {
 // ═══════════════════════════════════════════════════════════════════════════
 struct ContentView: View {
     @EnvironmentObject var authVM: AuthViewModel
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedTab: AppTab = .dashboard
     @State private var showSupportRequest = false
 
@@ -42,6 +43,8 @@ struct ContentView: View {
 
     // Alarm glow effect
     @State private var alarmGlowing = false
+
+    private var isDark: Bool { colorScheme == .dark }
 
     var body: some View {
         Group {
@@ -62,8 +65,8 @@ struct ContentView: View {
     // MARK: — Main Tab View
     // ═══════════════════════════════════════════════════════════════════════
     var mainTabView: some View {
-        ZStack(alignment: .bottom) {
-            // ── Active Page Content ──
+        VStack(spacing: 0) {
+            // ── Active Page Content (fills remaining space) ──
             Group {
                 switch selectedTab {
                 case .dashboard:
@@ -97,12 +100,11 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // ── Custom Bottom Tab Bar ──
-            customTabBar
+            // ── Bottom Tab Bar — flush to bottom edge ──
+            bottomTabBar
         }
         .ignoresSafeArea(.keyboard)
         .onChange(of: selectedTab) { oldTab, newTab in
-            // Clear alarm params when leaving alarms
             if oldTab == .alarms {
                 alarmsSearchText = ""
                 alarmsAutoOpenCreate = false
@@ -110,7 +112,6 @@ struct ContentView: View {
             }
         }
         .onChange(of: selectedPage) { _, newPage in
-            // Sync legacy page changes to tabs
             switch newPage {
             case .dashboard: selectedTab = .dashboard
             case .alarms: selectedTab = .alarms
@@ -133,141 +134,113 @@ struct ContentView: View {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // MARK: — Custom Tab Bar
+    // MARK: — Bottom Tab Bar (flush, edge-to-edge)
     // ═══════════════════════════════════════════════════════════════════════
-    private var customTabBar: some View {
-        HStack(spacing: 0) {
-            tabBarItem(tab: .dashboard,  icon: "square.grid.2x2.fill",  label: "Özet")
-            tabBarItem(tab: .alarms,     icon: "bell.fill",             label: "Alarmlar")
-            liveMapCenterButton
-            tabBarItem(tab: .fleet,      icon: "wrench.and.screwdriver.fill", label: "Filo")
-            tabBarItem(tab: .hub,        icon: "circle.grid.2x2.fill",  label: "Hub")
-        }
-        .padding(.top, 10)
-        .padding(.bottom, bottomSafeArea > 0 ? 20 : 10)
-        .padding(.horizontal, 4)
-        .background(
-            ZStack {
-                // Frosted glass background
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(.ultraThinMaterial)
+    private var bottomTabBar: some View {
+        VStack(spacing: 0) {
+            // Top separator
+            Rectangle()
+                .fill(isDark
+                      ? Color.white.opacity(0.06)
+                      : Color(red: 228/255, green: 231/255, blue: 240/255).opacity(0.8))
+                .frame(height: 0.5)
 
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(Color.white.opacity(0.85))
-
-                // Top border line
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .stroke(Color(red: 228/255, green: 231/255, blue: 240/255).opacity(0.6), lineWidth: 0.5)
+            // Tab items
+            HStack(spacing: 0) {
+                tabItem(tab: .dashboard,  icon: "square.grid.2x2.fill",       label: "Özet")
+                tabItem(tab: .alarms,     icon: "bell.fill",                   label: "Alarmlar")
+                mapCenterTab
+                tabItem(tab: .fleet,      icon: "wrench.and.screwdriver.fill", label: "Filo")
+                tabItem(tab: .hub,        icon: "circle.grid.2x2.fill",       label: "Hub")
             }
-            .shadow(color: Color(red: 9/255, green: 15/255, blue: 65/255).opacity(0.08), radius: 20, x: 0, y: -6)
+            .padding(.top, 6)
+            .padding(.bottom, 2)
+        }
+        .background(
+            (isDark
+             ? Color(red: 16/255, green: 19/255, blue: 42/255)
+             : Color(red: 252/255, green: 252/255, blue: 254/255))
+            .shadow(.drop(color: isDark ? .black.opacity(0.4) : .black.opacity(0.06),
+                          radius: 8, x: 0, y: -2))
         )
-        .padding(.horizontal, 8)
     }
 
-    // ── Regular Tab Item ──
-    private func tabBarItem(tab: AppTab, icon: String, label: String) -> some View {
+    // ── Standard Tab Item ──
+    private func tabItem(tab: AppTab, icon: String, label: String) -> some View {
         let isActive = selectedTab == tab
         let isAlarm = tab == .alarms
 
-        return Button(action: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        let activeColor = isDark
+            ? Color(red: 139/255, green: 149/255, blue: 224/255)
+            : Color(red: 9/255, green: 15/255, blue: 65/255)
+        let inactiveColor = isDark
+            ? Color(red: 80/255, green: 84/255, blue: 110/255)
+            : Color(red: 155/255, green: 160/255, blue: 178/255)
+
+        return Button {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
                 selectedTab = tab
             }
-        }) {
-            VStack(spacing: 4) {
+        } label: {
+            VStack(spacing: 3) {
                 ZStack {
                     Image(systemName: icon)
-                        .font(.system(size: 20, weight: isActive ? .bold : .regular))
-                        .foregroundStyle(
-                            isActive
-                            ? Color(red: 9/255, green: 15/255, blue: 65/255)
-                            : Color(red: 160/255, green: 160/255, blue: 175/255)
-                        )
-                        .symbolEffect(.bounce, value: isActive)
+                        .font(.system(size: 19, weight: isActive ? .semibold : .regular))
+                        .foregroundStyle(isActive ? activeColor : inactiveColor)
 
-                    // Alarm glow effect
+                    // Alarm glow
                     if isAlarm && alarmGlowing {
                         Circle()
-                            .fill(Color(red: 239/255, green: 68/255, blue: 68/255).opacity(0.35))
-                            .frame(width: 36, height: 36)
+                            .fill(Color.red.opacity(0.3))
+                            .frame(width: 32, height: 32)
                             .blur(radius: 8)
                     }
                 }
-                .frame(width: 28, height: 28)
+                .frame(height: 24)
 
                 Text(label)
-                    .font(.system(size: 10, weight: isActive ? .bold : .medium))
-                    .foregroundStyle(
-                        isActive
-                        ? Color(red: 9/255, green: 15/255, blue: 65/255)
-                        : Color(red: 160/255, green: 160/255, blue: 175/255)
-                    )
+                    .font(.system(size: 10, weight: isActive ? .semibold : .regular))
+                    .foregroundStyle(isActive ? activeColor : inactiveColor)
             }
             .frame(maxWidth: .infinity)
-            .frame(minHeight: 44)
+            .frame(height: 48)
             .contentShape(Rectangle())
         }
     }
 
-    // ── Center Live Map Button — bigger, different style ──
-    private var liveMapCenterButton: some View {
+    // ── Center Map Tab — elevated circle ──
+    private var mapCenterTab: some View {
         let isActive = selectedTab == .liveMap
 
-        return Button(action: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        return Button {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
                 selectedTab = .liveMap
             }
-        }) {
+        } label: {
             ZStack {
-                // Glow ring when active
-                if isActive {
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    Color(red: 9/255, green: 15/255, blue: 65/255).opacity(0.15),
-                                    Color.clear
-                                ],
-                                center: .center,
-                                startRadius: 20,
-                                endRadius: 36
-                            )
-                        )
-                        .frame(width: 72, height: 72)
-                }
-
                 Circle()
                     .fill(
                         LinearGradient(
                             colors: [
                                 Color(red: 9/255, green: 15/255, blue: 65/255),
-                                Color(red: 74/255, green: 83/255, blue: 160/255)
+                                Color(red: 55/255, green: 65/255, blue: 140/255)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 56, height: 56)
-                    .shadow(color: Color(red: 9/255, green: 15/255, blue: 65/255).opacity(0.3), radius: 12, x: 0, y: 4)
+                    .frame(width: 50, height: 50)
+                    .shadow(color: Color(red: 9/255, green: 15/255, blue: 65/255).opacity(isActive ? 0.4 : 0.2),
+                            radius: isActive ? 10 : 6, x: 0, y: 3)
 
-                Image(systemName: "map.fill")
-                    .font(.system(size: 22, weight: .bold))
+                Image(systemName: "location.fill")
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(.white)
-                    .symbolEffect(.bounce, value: isActive)
             }
-            .offset(y: -12)
+            .offset(y: -10)
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
         }
-    }
-
-    // ── Bottom safe area helper ──
-    private var bottomSafeArea: CGFloat {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap { $0.windows }
-            .first { $0.isKeyWindow }?
-            .safeAreaInsets.bottom ?? 0
     }
 }
 

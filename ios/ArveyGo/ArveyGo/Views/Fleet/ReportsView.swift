@@ -1419,13 +1419,6 @@ private struct ReportsTopBar: View {
                         .foregroundColor(.white)
                         .frame(width: 36, height: 36)
                 }
-            } else if let binding = showSideMenu {
-                Button(action: { withAnimation(.spring(response: 0.3)) { binding.wrappedValue = true } }) {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 36, height: 36)
-                }
             }
 
             Text(title)

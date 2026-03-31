@@ -617,6 +617,40 @@ struct FleetAlert: Identifiable {
     let description: String
     let time: String
     let severity: AlertSeverity
+    let createdAt: String  // raw "yyyy-MM-dd HH:mm:ss"
+
+    init(id: String, title: String, description: String, time: String, severity: AlertSeverity, createdAt: String = "") {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.time = time
+        self.severity = severity
+        self.createdAt = createdAt
+    }
+
+    /// "2025.03.29" format
+    var dateString: String {
+        guard createdAt.count >= 10 else { return time }
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        f.locale = Locale(identifier: "tr_TR")
+        guard let date = f.date(from: createdAt) else { return time }
+        let out = DateFormatter()
+        out.dateFormat = "yyyy.MM.dd"
+        return out.string(from: date)
+    }
+
+    /// "14:32" format
+    var timeString: String {
+        guard createdAt.count >= 16 else { return "" }
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        f.locale = Locale(identifier: "tr_TR")
+        guard let date = f.date(from: createdAt) else { return "" }
+        let out = DateFormatter()
+        out.dateFormat = "HH:mm"
+        return out.string(from: date)
+    }
 }
 
 enum AlertSeverity: String {

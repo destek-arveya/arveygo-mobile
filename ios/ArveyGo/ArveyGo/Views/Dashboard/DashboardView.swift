@@ -2,31 +2,39 @@ import SwiftUI
 import MapKit
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MARK: - Design System
+// MARK: - Design System (Dark Mode aware)
 // ═══════════════════════════════════════════════════════════════════════════
-private enum DS {
-    // Primary — #090F41 "sistemi patlatacak renk"
-    static let primary      = Color(red: 9/255, green: 15/255, blue: 65/255)       // #090F41
-    static let primaryLight = Color(red: 74/255, green: 83/255, blue: 160/255)     // #4A53A0
-    static let primarySoft  = Color(red: 9/255, green: 15/255, blue: 65/255).opacity(0.07)
+struct DS {
+    let isDark: Bool
 
-    // Backgrounds — temiz, hafif soğuk beyaz
-    static let pageBg  = Color(red: 245/255, green: 246/255, blue: 250/255) // #F5F6FA
-    static let cardBg  = Color.white
+    // Primary
+    var primary: Color      { isDark ? Color(red: 139/255, green: 149/255, blue: 224/255) : Color(red: 9/255, green: 15/255, blue: 65/255) }
+    var primaryLight: Color  { Color(red: 74/255, green: 83/255, blue: 160/255) }
+    var primarySoft: Color   { primary.opacity(isDark ? 0.15 : 0.07) }
+
+    // Backgrounds
+    var pageBg: Color  { isDark ? Color(red: 13/255, green: 16/255, blue: 36/255) : Color(red: 245/255, green: 246/255, blue: 250/255) }
+    var cardBg: Color  { isDark ? Color(red: 22/255, green: 26/255, blue: 55/255) : Color.white }
 
     // Status
-    static let green  = Color(red: 34/255, green: 197/255, blue: 94/255)   // #22C55E
-    static let red    = Color(red: 239/255, green: 68/255, blue: 68/255)   // #EF4444
-    static let amber  = Color(red: 245/255, green: 158/255, blue: 11/255)  // #F59E0B
-    static let sky    = Color(red: 56/255, green: 147/255, blue: 241/255)
+    static let green = Color(red: 34/255, green: 197/255, blue: 94/255)
+    static let red   = Color(red: 239/255, green: 68/255, blue: 68/255)
+    static let amber = Color(red: 245/255, green: 158/255, blue: 11/255)
+    static let sky   = Color(red: 56/255, green: 147/255, blue: 241/255)
 
-    // Text — no pure black
-    static let text1 = Color(red: 26/255, green: 26/255, blue: 26/255)     // #1A1A1A
-    static let text2 = Color(red: 100/255, green: 100/255, blue: 112/255)
-    static let text3 = Color(red: 160/255, green: 160/255, blue: 175/255)
+    // Text
+    var text1: Color { isDark ? Color(red: 240/255, green: 241/255, blue: 250/255) : Color(red: 26/255, green: 26/255, blue: 26/255) }
+    var text2: Color { isDark ? Color(red: 170/255, green: 175/255, blue: 200/255) : Color(red: 100/255, green: 100/255, blue: 112/255) }
+    var text3: Color { isDark ? Color(red: 110/255, green: 115/255, blue: 145/255) : Color(red: 160/255, green: 160/255, blue: 175/255) }
 
-    // Squircle radius (20-30px per UI rules)
-    static let r: CGFloat = 22
+    // Divider
+    var divider: Color { isDark ? Color.white.opacity(0.08) : Color.black.opacity(0.06) }
+
+    // Shadow
+    var cardShadow: Color { isDark ? Color.clear : Color.black.opacity(0.04) }
+
+    // Squircle radius
+    static let r: CGFloat = 16
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -34,6 +42,7 @@ private enum DS {
 // ═══════════════════════════════════════════════════════════════════════════
 struct DashboardView: View {
     @EnvironmentObject var authVM: AuthViewModel
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var dashVM = DashboardViewModel()
     @ObservedObject private var DL = DashboardStrings.shared
 
@@ -46,6 +55,9 @@ struct DashboardView: View {
     @State private var selectedVehicle: Vehicle?
     @State private var showFullScreenMap = false
 
+    private var ds: DS { DS(isDark: colorScheme == .dark) }
+    private var isDark: Bool { colorScheme == .dark }
+
     // En hızlı 3 araç
     private var fastestVehicles: [Vehicle] {
         Array(dashVM.vehicles.sorted { $0.speed > $1.speed }.prefix(3))
@@ -54,62 +66,68 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 20) {
-
-                    // ── 1. Greeting ──
-                    greetingSection
+                VStack(spacing: 16) {
+                    // ── 1. Header ──
+                    headerSection
                         .padding(.horizontal, 20)
-                        .padding(.top, 8)
+                        .padding(.top, 4)
 
-                    // ── 2. Araç Durumu — Bento Grid ──
-                    fleetStatusGrid
+                    // ── 2. Fleet Status ──
+                    fleetStatusCard
                         .padding(.horizontal, 20)
 
-                    // ── 3. En Hızlı 3 Araç ──
+                    // ── 4. En Hızlı 3 Araç ──
                     fastestVehiclesCard
                         .padding(.horizontal, 20)
 
-                    // ── 4. Sürücü Ortalama Skoru ──
-                    driverScoreCard
-                        .padding(.horizontal, 20)
+                    // ── 4. Sürücü Skoru & Bugün KM (side-by-side) ──
+                    HStack(spacing: 12) {
+                        driverScoreCard
+                        dailyKmCard
+                    }
+                    .padding(.horizontal, 20)
 
-                    // ── 5. Son 5 Alarm ──
+                    // ── 6. Son 5 Alarm ──
                     recentAlarmsCard
                         .padding(.horizontal, 20)
-                        .padding(.bottom, 100) // Extra space for bottom tab bar
+                        .padding(.bottom, 16)
                 }
-                .padding(.top, 4)
+                .padding(.top, 2)
             }
             .refreshable {
                 dashVM.refreshData()
                 try? await Task.sleep(nanoseconds: 1_200_000_000)
             }
-            .background(DS.pageBg.ignoresSafeArea())
+            .background(ds.pageBg.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Text(DL.title)
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundStyle(DS.primary)
+                    Text("ArveyGo")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(ds.text1)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { selectedPage = .alarms } label: {
                         ZStack(alignment: .topTrailing) {
-                            Image(systemName: "bell.fill")
-                                .font(.system(size: 18))
-                                .foregroundStyle(DS.primary.opacity(0.7))
-                                .frame(width: 44, height: 44)
+                            Image(systemName: "bell")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(ds.text2)
+                                .frame(width: 36, height: 36)
+                                .background(ds.cardBg)
+                                .clipShape(Circle())
+                                .shadow(color: ds.cardShadow, radius: 4, x: 0, y: 2)
                             if dashVM.alerts.contains(where: { $0.severity == .red }) {
                                 Circle()
                                     .fill(DS.red)
-                                    .frame(width: 9, height: 9)
-                                    .offset(x: -10, y: 12)
+                                    .frame(width: 8, height: 8)
+                                    .offset(x: -2, y: 2)
                             }
                         }
                         .contentShape(Rectangle())
                     }
                 }
             }
+            .toolbarBackground(ds.pageBg, for: .navigationBar)
         }
         .sheet(item: $selectedVehicle) { vehicle in
             VehicleDetailView(
@@ -147,25 +165,29 @@ struct DashboardView: View {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // MARK: — 1. Greeting
+    // MARK: — 1. Header
     // ═══════════════════════════════════════════════════════════════════════
-    private var greetingSection: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(greetingText) 👋")
-                    .font(.system(size: 15, weight: .medium, design: .rounded))
-                    .foregroundStyle(DS.text2)
+    private var headerSection: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(greetingIcon)
+                        .font(.system(size: 13))
+                    Text(greetingText)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(ds.text3)
+                }
                 Text(authVM.currentUser?.name ?? "Admin")
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
-                    .foregroundStyle(DS.primary)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(ds.text1)
             }
             Spacer()
             Text(shortDateString)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(DS.primary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(DS.primarySoft)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(ds.text3)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(ds.primarySoft)
                 .clipShape(Capsule())
         }
     }
@@ -177,332 +199,354 @@ struct DashboardView: View {
         return DL.goodEvening
     }
 
+    private var greetingIcon: String {
+        let h = Calendar.current.component(.hour, from: Date())
+        if h < 6 { return "🌙" }
+        if h < 12 { return "☀️" }
+        if h < 18 { return "🌤️" }
+        return "🌙"
+    }
+
     private var shortDateString: String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "tr_TR")
-        f.dateFormat = "d MMM, EEEE"
+        f.dateFormat = "d MMM, EEE"
         return f.string(from: Date())
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // MARK: — 2. Fleet Status Bento Grid
+    // MARK: — 3. Fleet Status Card
     // ═══════════════════════════════════════════════════════════════════════
-    private var fleetStatusGrid: some View {
-        VStack(spacing: 12) {
-            // Row 1: Büyük "Toplam Araç" + iki küçük stacked
-            HStack(spacing: 12) {
-                // HERO — Toplam Araç
-                heroStatCard(
-                    icon: "car.2.fill",
-                    value: "\(dashVM.totalVehicles)",
-                    label: DL.vehiclesTitle,
-                    color: DS.primary
-                )
-                .frame(maxWidth: .infinity)
-                .frame(height: 140)
-
-                // Kontak Açık + Kontak Kapalı
-                VStack(spacing: 12) {
-                    miniStatCard(
-                        icon: "power",
-                        value: "\(dashVM.kontakOnCount)",
-                        label: DL.kontakOnChip(dashVM.kontakOnCount)
-                            .replacingOccurrences(of: "\(dashVM.kontakOnCount) ", with: ""),
-                        color: DS.green
-                    )
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 64)
-
-                    miniStatCard(
-                        icon: "poweroff",
-                        value: "\(dashVM.kontakOffCount)",
-                        label: DL.kontakOffChip(dashVM.kontakOffCount)
-                            .replacingOccurrences(of: "\(dashVM.kontakOffCount) ", with: ""),
-                        color: DS.red
-                    )
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 64)
-                }
-                .frame(maxWidth: .infinity)
-            }
-
-            // Row 2: Bilgi Yok — full width
-            miniStatCard(
-                icon: "wifi.slash",
-                value: "\(dashVM.bilgiYokCount)",
-                label: DL.bilgiYokChip(dashVM.bilgiYokCount)
-                    .replacingOccurrences(of: "\(dashVM.bilgiYokCount) ", with: ""),
-                color: DS.text3
-            )
-            .frame(height: 64)
-        }
-    }
-
-    // Hero stat — big number card with gradient accent
-    private func heroStatCard(icon: String, value: String, label: String, color: Color) -> some View {
-        ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: DS.r, style: .continuous)
-                .fill(DS.cardBg)
-
-            // Gradient accent bar at top
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(LinearGradient(
-                    colors: [color, color.opacity(0.5)],
-                    startPoint: .leading, endPoint: .trailing
-                ))
-                .frame(width: 44, height: 4)
-                .padding(.top, 14)
-                .padding(.leading, 18)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(color)
-                    .padding(.top, 28)
-
+    private var fleetStatusCard: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Filo Durumu")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(ds.text1)
                 Spacer()
-
-                Text(value)
-                    .font(.system(size: 38, weight: .bold, design: .rounded))
-                    .foregroundStyle(DS.text1)
-                Text(label)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(DS.text2)
-                    .padding(.bottom, 16)
+                Text("\(dashVM.totalVehicles) araç")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(ds.text3)
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+
+            // Status bar
+            if dashVM.totalVehicles > 0 {
+                GeometryReader { geo in
+                    let total = max(CGFloat(dashVM.totalVehicles), 1)
+                    let onW = geo.size.width * CGFloat(dashVM.kontakOnCount) / total
+                    let offW = geo.size.width * CGFloat(dashVM.kontakOffCount) / total
+                    let noW = geo.size.width * CGFloat(dashVM.bilgiYokCount) / total
+
+                    HStack(spacing: 2) {
+                        RoundedRectangle(cornerRadius: 3).fill(DS.green)
+                            .frame(width: max(onW, 4))
+                        RoundedRectangle(cornerRadius: 3).fill(DS.red)
+                            .frame(width: max(offW, 4))
+                        RoundedRectangle(cornerRadius: 3).fill(ds.text3.opacity(0.4))
+                            .frame(width: max(noW, 4))
+                    }
+                }
+                .frame(height: 6)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
+            }
+
+            // Legend rows
+            Divider().overlay(ds.divider).padding(.horizontal, 16)
+
+            HStack(spacing: 0) {
+                statusLegend(
+                    color: DS.green,
+                    value: "\(dashVM.kontakOnCount)",
+                    label: "Kontak Açık"
+                )
+                dividerVert
+                statusLegend(
+                    color: DS.red,
+                    value: "\(dashVM.kontakOffCount)",
+                    label: "Kontak Kapalı"
+                )
+                dividerVert
+                statusLegend(
+                    color: ds.text3.opacity(0.6),
+                    value: "\(dashVM.bilgiYokCount)",
+                    label: "Bilgi Yok"
+                )
+            }
+            .padding(.vertical, 12)
         }
-        .shadow(color: color.opacity(0.08), radius: 12, x: 0, y: 4)
-        .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
+        .background(ds.cardBg)
+        .clipShape(RoundedRectangle(cornerRadius: DS.r, style: .continuous))
+        .shadow(color: ds.cardShadow, radius: 8, x: 0, y: 3)
     }
 
-    // Mini stat — compact horizontal card
-    private func miniStatCard(icon: String, value: String, label: String, color: Color) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(color)
-                .frame(width: 34, height: 34)
-                .background(color.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 1) {
+    private func statusLegend(color: Color, value: String, label: String) -> some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 5) {
+                Circle().fill(color).frame(width: 7, height: 7)
                 Text(value)
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundStyle(DS.text1)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Text(label)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(DS.text3)
-                    .lineLimit(1)
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundStyle(ds.text1)
             }
-            Spacer(minLength: 0)
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(ds.text3)
         }
-        .padding(.horizontal, 16)
-        .background(DS.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 3)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var dividerVert: some View {
+        Rectangle()
+            .fill(ds.divider)
+            .frame(width: 1, height: 36)
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // MARK: — 3. En Hızlı 3 Araç
+    // MARK: — 4. En Hızlı 3 Araç
     // ═══════════════════════════════════════════════════════════════════════
     private var fastestVehiclesCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
             HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: "gauge.open.with.lines.needle.84percent.exclamation")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(DS.primary)
-                    Text("En Hızlı Araçlar")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundStyle(DS.text1)
-                }
+                Text("En Hızlı Araçlar")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(ds.text1)
                 Spacer()
                 Button { selectedPage = .vehicles } label: {
-                    HStack(spacing: 4) {
-                        Text(DL.viewAll)
-                            .font(.system(size: 13, weight: .semibold))
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .bold))
-                    }
-                    .foregroundStyle(DS.primary)
-                    .frame(minWidth: 44, minHeight: 44)
+                    Text(DL.viewAll)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(ds.primary)
                 }
+                .frame(minHeight: 36)
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 18)
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
             .padding(.bottom, 8)
 
             if fastestVehicles.isEmpty {
-                // Friendly empty state
                 HStack {
                     Spacer()
-                    VStack(spacing: 8) {
-                        Image(systemName: "car.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(DS.text3.opacity(0.5))
+                    VStack(spacing: 6) {
+                        Image(systemName: "gauge.with.dots.needle.0percent")
+                            .font(.system(size: 24))
+                            .foregroundStyle(ds.text3.opacity(0.4))
                         Text("Henüz araç verisi yok")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(DS.text2)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(ds.text3)
                     }
-                    .padding(.vertical, 24)
+                    .padding(.vertical, 20)
                     Spacer()
                 }
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(fastestVehicles.enumerated()), id: \.element.id) { index, vehicle in
                         Button { selectedVehicle = vehicle } label: {
-                            fastVehicleRow(vehicle: vehicle, rank: index + 1)
+                            fastRow(vehicle: vehicle, rank: index + 1)
                         }
                         .buttonStyle(BounceButtonStyle())
 
                         if index < fastestVehicles.count - 1 {
                             Divider()
-                                .padding(.leading, 62)
-                                .padding(.trailing, 18)
+                                .overlay(ds.divider)
+                                .padding(.leading, 52)
+                                .padding(.trailing, 16)
                         }
                     }
                 }
-                .padding(.bottom, 12)
+                .padding(.bottom, 10)
             }
         }
-        .background(DS.cardBg)
+        .background(ds.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: DS.r, style: .continuous))
-        .shadow(color: .black.opacity(0.05), radius: 12, x: 0, y: 4)
+        .shadow(color: ds.cardShadow, radius: 8, x: 0, y: 3)
     }
 
-    private func fastVehicleRow(vehicle: Vehicle, rank: Int) -> some View {
-        HStack(spacing: 14) {
-            // Rank badge
-            ZStack {
-                Circle()
-                    .fill(rank == 1 ? DS.primary : DS.primary.opacity(0.12))
-                    .frame(width: 36, height: 36)
-                Text("\(rank)")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(rank == 1 ? .white : DS.primary)
-            }
+    private func fastRow(vehicle: Vehicle, rank: Int) -> some View {
+        HStack(spacing: 12) {
+            // Rank
+            Text("#\(rank)")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(rank == 1 ? .white : ds.primary)
+                .frame(width: 32, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(rank == 1 ? ds.primary : ds.primarySoft)
+                )
 
-            // Vehicle info
-            VStack(alignment: .leading, spacing: 2) {
+            // Info
+            VStack(alignment: .leading, spacing: 1) {
                 Text(vehicle.plate)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(DS.text1)
-                Text("\(vehicle.model) · \(vehicle.city)")
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(DS.text2)
-                    .lineLimit(1)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(ds.text1)
+                Text(vehicle.model)
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(ds.text3)
             }
 
             Spacer()
 
-            // Speed — prominent
-            HStack(spacing: 4) {
-                Image(systemName: "speedometer")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(vehicle.speed > 120 ? DS.red : DS.primary)
-                Text("\(Int(vehicle.speed))")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundStyle(vehicle.speed > 120 ? DS.red : DS.text1)
-                Text("km/h")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(DS.text3)
-            }
+            // Speed
+            Text("\(Int(vehicle.speed)) km/h")
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(vehicle.speed > 120 ? DS.red : ds.text1)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .frame(minHeight: 60)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
         .contentShape(Rectangle())
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // MARK: — 4. Sürücü Ortalama Skoru
+    // MARK: — 4a. Sürücü Skoru (compact, half-width)
     // ═══════════════════════════════════════════════════════════════════════
     private var driverScoreCard: some View {
         let score = dashVM.avgScore
-        let grade = score >= 85 ? "A" : score >= 70 ? "B" : score >= 50 ? "C" : "D"
         let ringColor = score >= 85 ? DS.green : score >= 70 ? DS.amber : DS.red
 
-        return HStack(spacing: 20) {
+        return VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text(DL.driverScores)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(ds.text1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
+
             // Ring
             ZStack {
                 Circle()
-                    .stroke(DS.pageBg, lineWidth: 8)
-                    .frame(width: 100, height: 100)
+                    .stroke(ds.pageBg, lineWidth: 5)
+                    .frame(width: 64, height: 64)
                 Circle()
                     .trim(from: 0, to: CGFloat(score) / 100.0)
-                    .stroke(
-                        ringColor,
-                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                    )
-                    .frame(width: 100, height: 100)
+                    .stroke(ringColor, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                    .frame(width: 64, height: 64)
                     .rotationEffect(.degrees(-90))
 
-                VStack(spacing: -2) {
-                    Text("\(score)")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundStyle(DS.text1)
-                    Text(grade)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(ringColor)
-                }
+                Text("\(score)")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundStyle(ds.text1)
             }
+            .padding(.bottom, 8)
 
-            // Info
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    Image(systemName: "shield.checkered")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(DS.primary)
-                    Text(DL.driverScores)
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundStyle(DS.text1)
-                }
-
-                Text(DL.driverPerformance)
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(DS.text2)
-                    .lineSpacing(2)
-
-                HStack(spacing: 6) {
-                    Image(systemName: "person.2.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(DS.text3)
-                    Text("\(dashVM.drivers.count) sürücü")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(DS.text3)
-                }
-
-                Button { selectedPage = .drivers } label: {
-                    Text(DL.detailLabel)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 10)
-                        .background(
-                            LinearGradient(
-                                colors: [DS.primary, DS.primaryLight],
-                                startPoint: .leading, endPoint: .trailing
-                            )
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-                .frame(minHeight: 44)
+            // Footer
+            HStack(spacing: 8) {
+                miniStat(label: "Sürücü", value: "\(dashVM.drivers.count)")
+                miniStat(label: "Araç", value: "\(dashVM.totalVehicles)")
             }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 10)
 
-            Spacer(minLength: 0)
+            // Detail button
+            Button { selectedPage = .drivers } label: {
+                Text(DL.detailLabel)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(ds.primary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .background(ds.primarySoft)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 14)
         }
-        .padding(20)
-        .background(DS.cardBg)
+        .background(ds.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: DS.r, style: .continuous))
-        .shadow(color: .black.opacity(0.05), radius: 12, x: 0, y: 4)
+        .shadow(color: ds.cardShadow, radius: 8, x: 0, y: 3)
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // MARK: — 5. Son 5 Alarm
+    // MARK: — 4b. Bugün Toplam KM (compact, half-width)
+    // ═══════════════════════════════════════════════════════════════════════
+    private var dailyKmCard: some View {
+        let totalDailyKm = dashVM.vehicles.reduce(0.0) { $0 + $1.dailyKm }
+        let formattedKm = dashVM.formatKm(Int(totalDailyKm))
+
+        return VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Bugün Mesafe")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(ds.text1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
+
+            // Big KM value
+            ZStack {
+                Circle()
+                    .stroke(ds.pageBg, lineWidth: 5)
+                    .frame(width: 64, height: 64)
+                Circle()
+                    .trim(from: 0, to: min(CGFloat(totalDailyKm) / max(CGFloat(dashVM.totalVehicles * 100), 1), 1.0))
+                    .stroke(DS.sky, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                    .frame(width: 64, height: 64)
+                    .rotationEffect(.degrees(-90))
+
+                VStack(spacing: 0) {
+                    Text(formattedKm)
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(ds.text1)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    Text("km")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(ds.text3)
+                }
+            }
+            .padding(.bottom, 8)
+
+            // Footer stats
+            HStack(spacing: 8) {
+                miniStat(label: "Araç", value: "\(dashVM.totalVehicles)")
+                miniStat(label: "Aktif", value: "\(dashVM.kontakOnCount)")
+            }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 10)
+
+            // View all button
+            Button { selectedPage = .vehicles } label: {
+                Text(DL.viewAll)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(DS.sky)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .background(DS.sky.opacity(isDark ? 0.15 : 0.07))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 14)
+        }
+        .background(ds.cardBg)
+        .clipShape(RoundedRectangle(cornerRadius: DS.r, style: .continuous))
+        .shadow(color: ds.cardShadow, radius: 8, x: 0, y: 3)
+    }
+
+    private func miniStat(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(value)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(ds.text1)
+            Text(label)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(ds.text3)
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MARK: — 6. Son 5 Alarm
     // ═══════════════════════════════════════════════════════════════════════
     private var recentAlarmsCard: some View {
         let criticalCount = dashVM.alerts.filter { $0.severity == .red }.count
@@ -510,93 +554,125 @@ struct DashboardView: View {
         return VStack(alignment: .leading, spacing: 0) {
             // Header
             HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 15))
-                        .foregroundStyle(DS.red)
-                    Text(DL.recentAlarms)
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundStyle(DS.text1)
+                Text(DL.recentAlarms)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(ds.text1)
+
+                if criticalCount > 0 {
+                    Text("\(criticalCount)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 20, height: 20)
+                        .background(DS.red)
+                        .clipShape(Circle())
                 }
 
                 Spacer()
 
-                if criticalCount > 0 {
-                    Text("\(criticalCount) kritik")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(DS.red)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(DS.red.opacity(0.1))
-                        .clipShape(Capsule())
-                }
-
                 Button { selectedPage = .alarms } label: {
-                    HStack(spacing: 4) {
-                        Text(DL.allLabel)
-                            .font(.system(size: 13, weight: .semibold))
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .bold))
-                    }
-                    .foregroundStyle(DS.primary)
-                    .frame(minWidth: 44, minHeight: 44)
+                    Text(DL.allLabel)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(ds.primary)
                 }
+                .frame(minHeight: 36)
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 18)
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
             .padding(.bottom, 6)
 
-            // Content
             if dashVM.isLoadingAlerts && dashVM.alerts.isEmpty {
-                HStack { Spacer(); ProgressView().padding(28); Spacer() }
+                HStack { Spacer(); ProgressView().padding(24); Spacer() }
             } else if dashVM.alerts.isEmpty {
-                // Friendly empty state
                 HStack {
                     Spacer()
-                    VStack(spacing: 10) {
-                        Image(systemName: "checkmark.shield.fill")
-                            .font(.system(size: 32))
-                            .foregroundStyle(DS.green.opacity(0.6))
-                        Text("Her şey yolunda, alarm yok! 🎉")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(DS.text2)
+                    VStack(spacing: 8) {
+                        Image(systemName: "checkmark.shield")
+                            .font(.system(size: 24))
+                            .foregroundStyle(DS.green.opacity(0.5))
+                        Text("Alarm yok")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(ds.text3)
                     }
-                    .padding(.vertical, 28)
+                    .padding(.vertical, 20)
                     Spacer()
                 }
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(dashVM.alerts.prefix(5).enumerated()), id: \.element.id) { i, alert in
-                        AlertRow(alert: alert)
+                        alarmRow(alert: alert)
                         if i < min(dashVM.alerts.count, 5) - 1 {
                             Divider()
-                                .padding(.leading, 62)
-                                .padding(.trailing, 18)
+                                .overlay(ds.divider)
+                                .padding(.leading, 52)
+                                .padding(.trailing, 16)
                         }
                     }
                 }
-                .padding(.bottom, 12)
+                .padding(.bottom, 10)
             }
         }
-        .background(DS.cardBg)
+        .background(ds.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: DS.r, style: .continuous))
-        .shadow(color: .black.opacity(0.05), radius: 12, x: 0, y: 4)
+        .shadow(color: ds.cardShadow, radius: 8, x: 0, y: 3)
+    }
+
+    private func alarmRow(alert: FleetAlert) -> some View {
+        let iconName: String = {
+            switch alert.severity {
+            case .red:   return "exclamationmark.octagon.fill"
+            case .amber: return "exclamationmark.triangle.fill"
+            case .green: return "checkmark.circle.fill"
+            case .blue:  return "info.circle.fill"
+            }
+        }()
+
+        return HStack(spacing: 10) {
+            Image(systemName: iconName)
+                .font(.system(size: 15))
+                .foregroundStyle(alert.severity.color)
+                .frame(width: 32, height: 32)
+                .background(alert.severity.color.opacity(isDark ? 0.18 : 0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(alert.title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(ds.text1)
+                Text(alert.description)
+                    .font(.system(size: 11))
+                    .foregroundStyle(ds.text3)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(alert.dateString)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(ds.text3)
+                Text(alert.timeString)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(ds.text3)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MARK: - Bounce Button Style (micro-interaction)
+// MARK: - Bounce Button Style
 // ═══════════════════════════════════════════════════════════════════════════
 struct BounceButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MARK: - Alert Row
+// MARK: - Alert Row (standalone — kept for other views)
 // ═══════════════════════════════════════════════════════════════════════════
 struct AlertRow: View {
     let alert: FleetAlert
@@ -611,6 +687,7 @@ struct AlertRow: View {
     }
 
     var body: some View {
+        let dsLight = DS(isDark: false)
         HStack(spacing: 12) {
             Image(systemName: iconName)
                 .font(.system(size: 18))
@@ -622,18 +699,23 @@ struct AlertRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(alert.title)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(DS.text1)
+                    .foregroundStyle(dsLight.text1)
                 Text(alert.description)
                     .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(DS.text2)
+                    .foregroundStyle(dsLight.text2)
                     .lineLimit(1)
             }
 
             Spacer()
 
-            Text(alert.time)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(DS.text3)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(alert.dateString)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(dsLight.text3)
+                Text(alert.timeString)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(dsLight.text3)
+            }
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
@@ -642,11 +724,12 @@ struct AlertRow: View {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MARK: - Vehicle Row (kept for compatibility — VehicleDetailView etc.)
+// MARK: - Vehicle Row (kept for compatibility)
 // ═══════════════════════════════════════════════════════════════════════════
 struct VehicleRow: View {
     let vehicle: Vehicle
     var body: some View {
+        let dsLight = DS(isDark: false)
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -659,22 +742,22 @@ struct VehicleRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(vehicle.plate)
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(DS.text1)
+                    .foregroundStyle(dsLight.text1)
                 Text("\(vehicle.model) · \(vehicle.city)")
                     .font(.system(size: 12))
-                    .foregroundStyle(DS.text2)
+                    .foregroundStyle(dsLight.text2)
                     .lineLimit(1)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 Text(vehicle.formattedTodayKm)
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(DS.text1)
+                    .foregroundStyle(dsLight.text1)
                 HStack(spacing: 3) {
                     Image(systemName: "speedometer").font(.system(size: 9))
                     Text("\(Int(vehicle.speed)) km/h").font(.system(size: 11))
                 }
-                .foregroundStyle(DS.text3)
+                .foregroundStyle(dsLight.text3)
             }
             Text(vehicle.status.label)
                 .font(.system(size: 10, weight: .semibold))
@@ -773,11 +856,12 @@ struct MiniLineChart: View {
 struct InsightBubble: View {
     let text: String; let dotColor: Color; let tag: (String, Color)?
     var body: some View {
+        let dsLight = DS(isDark: false)
         HStack(alignment: .top, spacing: 10) {
             Circle().fill(dotColor).frame(width: 7, height: 7).padding(.top, 6)
             Text(text)
                 .font(.system(size: 13))
-                .foregroundStyle(DS.text2)
+                .foregroundStyle(dsLight.text2)
                 .lineSpacing(3)
             if let tag = tag {
                 Spacer()
@@ -791,7 +875,7 @@ struct InsightBubble: View {
             }
         }
         .padding(12)
-        .background(DS.pageBg)
+        .background(dsLight.pageBg)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
