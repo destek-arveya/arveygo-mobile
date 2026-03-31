@@ -491,6 +491,9 @@ private fun OverviewTab(
     driverName: String = "",
     onDriverAssigned: (() -> Unit)? = null
 ) {
+    var showEditDialog by remember { mutableStateOf(false) }
+    var showBlockageDialog by remember { mutableStateOf(false) }
+
     fun formatVoltage(value: Double?): String {
         if (value == null) return "—"
         return String.format("%.2f V", value)
@@ -503,9 +506,24 @@ private fun OverviewTab(
 
     val vehicleBatteryDisplay = vehicle.batteryVoltage ?: vehicle.externalVoltage
 
+    // ── Dialogs ──
+    if (showEditDialog) {
+        VehicleEditDialog(
+            vehicle = vehicle,
+            onDismiss = { showEditDialog = false },
+            onSaved = { showEditDialog = false }
+        )
+    }
+    if (showBlockageDialog) {
+        BlockageDialog(
+            vehicle = vehicle,
+            onDismiss = { showBlockageDialog = false }
+        )
+    }
+
     // ── Quick Actions Row (top, prominent) ──
     Row(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
             .background(AppColors.Surface, RoundedCornerShape(14.dp))
@@ -520,9 +538,11 @@ private fun OverviewTab(
                 onBack()
                 onNavigateToRouteHistory?.invoke(vehicle)
             },
-            QuickAction(Icons.Default.AddAlert, "Alarm Ekle", Color(0xFFFF9800)) {
-                onBack()
-                onNavigateToAddAlarm?.invoke(vehicle.plate)
+            QuickAction(Icons.Default.Edit, "Düzenle", Color(0xFF8B5CF6)) {
+                showEditDialog = true
+            },
+            QuickAction(Icons.Default.Lock, "Blokaj", Color(0xFFEF4444)) {
+                showBlockageDialog = true
             },
             QuickAction(Icons.Default.Share, "Paylaş", AppColors.TextMuted) {
                 shareVehicleLocation(context, vehicle)
@@ -536,13 +556,13 @@ private fun OverviewTab(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(40.dp)
                         .background(action.color.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
                 ) {
-                    Icon(action.icon, null, tint = action.color, modifier = Modifier.size(18.dp))
+                    Icon(action.icon, null, tint = action.color, modifier = Modifier.size(17.dp))
                 }
                 Spacer(Modifier.height(6.dp))
-                Text(action.label, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted, textAlign = TextAlign.Center, maxLines = 1)
+                Text(action.label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted, textAlign = TextAlign.Center, maxLines = 1)
             }
         }
     }

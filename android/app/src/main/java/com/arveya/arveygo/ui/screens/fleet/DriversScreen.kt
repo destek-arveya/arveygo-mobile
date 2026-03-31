@@ -36,7 +36,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DriversScreen(onMenuClick: () -> Unit) {
+fun DriversScreen() {
     val authVM = LocalAuthViewModel.current
     val user by authVM.currentUser.collectAsState()
     val scope = rememberCoroutineScope()
@@ -88,11 +88,6 @@ fun DriversScreen(onMenuClick: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Default.Menu, null, tint = AppColors.Navy, modifier = Modifier.size(22.dp))
-                    }
-                },
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                         Text("Sürücüler", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)

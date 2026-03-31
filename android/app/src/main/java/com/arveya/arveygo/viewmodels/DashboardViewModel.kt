@@ -167,7 +167,7 @@ class DashboardViewModel : ViewModel() {
                         val desc = if (plate.isNotEmpty()) "$plate — $descText" else if (vehicleName.isNotEmpty()) "$vehicleName — $descText" else descText
                         val createdAt = a.optString("created_at", "")
                         val timeAgo = formatTimeAgo(createdAt)
-                        alertList.add(FleetAlert("${a.optInt("id", i)}", typeLabel, desc, timeAgo, severity))
+                        alertList.add(FleetAlert("${a.optInt("id", i)}", typeLabel, desc, timeAgo, severity, createdAt = createdAt))
                     }
                     _alerts.value = alertList
                 } else {
@@ -208,12 +208,12 @@ class DashboardViewModel : ViewModel() {
 
     private fun loadDummyAlerts() {
         _alerts.value = listOf(
-            FleetAlert("1","Hız İhlali","34 ABC 123 — 142 km/h, E-5 Karayolu","3 dk",AlertSeverity.RED),
-            FleetAlert("2","Geofence Çıkış","35 DEF 456 — İzmir bölge dışına çıktı","18 dk",AlertSeverity.AMBER),
-            FleetAlert("3","Bakım Hatırlatma","07 MNO 987 — Yağ değişim zamanı","1 sa",AlertSeverity.BLUE),
-            FleetAlert("4","Seyahat Tamamlandı","41 JKL 654 — Kocaeli → İstanbul","2 sa",AlertSeverity.GREEN),
-            FleetAlert("5","Ani Fren","34 PRS 111 — Kadıköy civarı","35 dk",AlertSeverity.AMBER),
-            FleetAlert("6","Motor Arızası","06 TUV 222 — Check Engine uyarısı","4 sa",AlertSeverity.RED),
+            FleetAlert("1","Hız İhlali","34 ABC 123 — 142 km/h, E-5 Karayolu","3 dk",AlertSeverity.RED, createdAt = "2026-03-29 21:45:00"),
+            FleetAlert("2","Geofence Çıkış","35 DEF 456 — İzmir bölge dışına çıktı","18 dk",AlertSeverity.AMBER, createdAt = "2026-03-29 21:30:00"),
+            FleetAlert("3","Bakım Hatırlatma","07 MNO 987 — Yağ değişim zamanı","1 sa",AlertSeverity.BLUE, createdAt = "2026-03-29 20:00:00"),
+            FleetAlert("4","Seyahat Tamamlandı","41 JKL 654 — Kocaeli → İstanbul","2 sa",AlertSeverity.GREEN, createdAt = "2026-03-29 19:00:00"),
+            FleetAlert("5","Ani Fren","34 PRS 111 — Kadıköy civarı","35 dk",AlertSeverity.AMBER, createdAt = "2026-03-29 21:10:00"),
+            FleetAlert("6","Motor Arızası","06 TUV 222 — Check Engine uyarısı","4 sa",AlertSeverity.RED, createdAt = "2026-03-29 17:00:00"),
         )
     }
 

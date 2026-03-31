@@ -54,7 +54,7 @@ import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RouteHistoryScreen(onMenuClick: () -> Unit) {
+fun RouteHistoryScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var vehicles by remember { mutableStateOf<List<Vehicle>>(emptyList()) }
@@ -442,11 +442,6 @@ fun RouteHistoryScreen(onMenuClick: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Default.Menu, null, tint = AppColors.Navy)
-                    }
-                },
                 title = {
                     Text("Rota Ge\u00e7mi\u015fi", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
                 },

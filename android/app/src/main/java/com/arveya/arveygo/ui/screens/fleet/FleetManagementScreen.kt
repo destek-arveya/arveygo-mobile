@@ -49,7 +49,7 @@ enum class FleetTab(val label: String, val icon: ImageVector) {
 // ============================================================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FleetManagementScreen(onMenuClick: () -> Unit) {
+fun FleetManagementScreen() {
     var selectedTab by remember { mutableStateOf(FleetTab.MAINTENANCE) }
     var showAddSheet by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
@@ -139,11 +139,6 @@ fun FleetManagementScreen(onMenuClick: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text("Filo Yönetimi", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy) },
-                navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Default.Menu, null, tint = AppColors.Navy)
-                    }
-                },
                 actions = {
                     IconButton(onClick = {
                         editingMaintenance = null; editingCost = null; editingDocument = null; editingTire = null

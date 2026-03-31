@@ -896,8 +896,28 @@ data class FleetAlert(
     val title: String,
     val description: String,
     val time: String,
-    val severity: AlertSeverity
-)
+    val severity: AlertSeverity,
+    val createdAt: String = ""
+) {
+    /** e.g. "2025.03.29" */
+    val dateString: String
+        get() {
+            if (createdAt.length < 10) return time
+            return try {
+                val parts = createdAt.substring(0, 10).split("-")
+                "${parts[0]}.${parts[1]}.${parts[2]}"
+            } catch (_: Exception) { time }
+        }
+
+    /** e.g. "21:45" */
+    val timeString: String
+        get() {
+            if (createdAt.length < 16) return ""
+            return try {
+                createdAt.substring(11, 16)
+            } catch (_: Exception) { "" }
+        }
+}
 
 enum class AlertSeverity(val color: Color) {
     RED(Color.Red),

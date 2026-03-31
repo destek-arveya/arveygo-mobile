@@ -2,11 +2,9 @@ package com.arveya.arveygo.ui.screens.dashboard
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -16,13 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,7 +38,6 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
-    onMenuClick: () -> Unit,
     onNavigateToMap: () -> Unit = {},
     onNavigateToVehicles: () -> Unit = {},
     onNavigateToDrivers: () -> Unit = {},
@@ -73,25 +66,13 @@ fun DashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Default.Menu, null, tint = MaterialTheme.colorScheme.onSurface)
-                    }
-                },
                 title = {
-                    Column {
-                        Text(
-                            DL.title,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            DL.subtitle,
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                    }
+                    Text(
+                        "ArveyGo",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 },
                 actions = {
                     IconButton(onClick = { onNavigateToAlarms("") }) {
@@ -129,9 +110,6 @@ fun DashboardScreen(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
                 )
 
-                // ─── 2. Summary Metrics Bar (horizontal scroll) ───
-                SummaryBar(vm = vm, DL = DL)
-
                 Spacer(Modifier.height(16.dp))
 
                 // ─── 3. Live Fleet Map Card ───
@@ -156,22 +134,26 @@ fun DashboardScreen(
 
                 Spacer(Modifier.height(16.dp))
 
-                // ─── 5. Weekly Distance + Driver Safety (side by side) ───
+                // ─── 5. Driver Score + Daily KM (side by side, matches iOS) ───
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                     modifier = Modifier
                         .padding(horizontal = 20.dp)
                         .fillMaxWidth()
                 ) {
-                    WeeklyDistanceCard(
-                        todayKm = vm.formatKm(vm.todayKm),
-                        vehicles = vehicles,
-                        modifier = Modifier.weight(1f)
-                    )
-                    DriverSafetyCard(
+                    DriverScoreCard(
                         score = vm.avgScore,
                         driverCount = drivers.size,
+                        vehicleCount = vm.totalVehicles,
                         onNavigateToDrivers = onNavigateToDrivers,
+                        modifier = Modifier.weight(1f)
+                    )
+                    DailyKmCard(
+                        totalDailyKm = vehicles.sumOf { it.dailyKm },
+                        formattedKm = vm.formatKm(vehicles.sumOf { it.dailyKm }.toInt()),
+                        vehicleCount = vm.totalVehicles,
+                        activeCount = vm.kontakOnCount,
+                        onNavigateToVehicles = onNavigateToVehicles,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -235,6 +217,11 @@ private fun GreetingHeader(userName: String, fleetDesc: String, modifier: Modifi
         hour < 18 -> "İyi Günler"
         else -> "İyi Akşamlar"
     }
+    val greetingEmoji = when {
+        hour < 12 -> "☀️"
+        hour < 18 -> "🌤️"
+        else -> "🌙"
+    }
     val dateStr = remember {
         val sdf = SimpleDateFormat("d MMM, EEE", Locale("tr", "TR"))
         sdf.format(java.util.Date())
@@ -246,7 +233,7 @@ private fun GreetingHeader(userName: String, fleetDesc: String, modifier: Modifi
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                "$greeting, $userName 👋",
+                "$greetingEmoji $greeting, $userName",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -271,158 +258,6 @@ private fun GreetingHeader(userName: String, fleetDesc: String, modifier: Modifi
                 )
                 .padding(horizontal = 10.dp, vertical = 6.dp)
         )
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// MARK: 2 — Summary Metrics Bar
-// ═══════════════════════════════════════════════════════════════════════════
-@Composable
-private fun SummaryBar(vm: DashboardViewModel, DL: DashboardStrings) {
-    val vehicles by vm.vehicles.collectAsState()
-    val alerts by vm.alerts.collectAsState()
-    val criticalCount = alerts.count { it.severity == AlertSeverity.RED }
-
-    // Average fuel
-    val avgFuel = remember(vehicles) {
-        val rates = vehicles.mapNotNull { v ->
-            val r = if (v.dailyFuelPer100km > 0) v.dailyFuelPer100km else v.fuelPer100km
-            if (r > 0) r else null
-        }
-        if (rates.isEmpty()) "—" else String.format("%.1f", rates.average())
-    }
-
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(horizontal = 20.dp),
-        modifier = Modifier.padding(top = 8.dp)
-    ) {
-        item {
-            SummaryPill(
-                icon = Icons.Default.DirectionsCar,
-                iconColor = Color(0xFF3B82F6),
-                title = "Araçlar",
-                value = "${vm.totalVehicles}",
-                badge = "${vm.kontakOnCount} aktif",
-                badgeColor = AppColors.Online
-            )
-        }
-        item {
-            SummaryPill(
-                icon = Icons.Default.VpnKey,
-                iconColor = AppColors.Online,
-                title = "Kontak Açık",
-                value = "${vm.kontakOnCount}",
-                badge = null,
-                badgeColor = AppColors.Online
-            )
-        }
-        item {
-            SummaryPill(
-                icon = Icons.Default.VpnKeyOff,
-                iconColor = AppColors.Idle,
-                title = "Kontak Kapalı",
-                value = "${vm.kontakOffCount}",
-                badge = null,
-                badgeColor = AppColors.Idle
-            )
-        }
-        item {
-            SummaryPill(
-                icon = Icons.Default.SignalWifiOff,
-                iconColor = Color(0xFF94A3B8),
-                title = "Bilgi Yok",
-                value = "${vm.bilgiYokCount}",
-                badge = null,
-                badgeColor = Color.Gray
-            )
-        }
-        item {
-            SummaryPill(
-                icon = Icons.Default.LocalGasStation,
-                iconColor = Color(0xFF8B5CF6),
-                title = "Ort. Yakıt",
-                value = avgFuel,
-                badge = "L/100km",
-                badgeColor = Color(0xFF8B5CF6)
-            )
-        }
-        item {
-            SummaryPill(
-                icon = Icons.Default.Warning,
-                iconColor = Color(0xFFEF4444),
-                title = "Kritik Alarm",
-                value = "$criticalCount",
-                badge = if (criticalCount > 0) "acil" else null,
-                badgeColor = Color(0xFFEF4444)
-            )
-        }
-        item {
-            SummaryPill(
-                icon = Icons.Default.Route,
-                iconColor = AppColors.Indigo,
-                title = "Bugün KM",
-                value = vm.formatKm(vm.todayKm),
-                badge = null,
-                badgeColor = Color.Blue
-            )
-        }
-    }
-}
-
-@Composable
-private fun SummaryPill(
-    icon: ImageVector,
-    iconColor: Color,
-    title: String,
-    value: String,
-    badge: String?,
-    badgeColor: Color
-) {
-    Column(
-        modifier = Modifier
-            .width(100.dp)
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-            .padding(12.dp)
-    ) {
-        // Simple icon
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = iconColor,
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(Modifier.height(6.dp))
-
-        // Value — clean and readable
-        Text(
-            value,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1
-        )
-        Spacer(Modifier.height(2.dp))
-
-        // Title
-        Text(
-            title,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-            maxLines = 1
-        )
-
-        // Optional badge
-        if (badge != null) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                badge,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = badgeColor
-            )
-        }
     }
 }
 
@@ -848,164 +683,16 @@ private fun DashboardVehicleRow(vehicle: Vehicle, onClick: () -> Unit = {}) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MARK: 5a — Weekly Distance Card (Mini Line Chart)
+// MARK: 5a — Driver Score Card (compact, half-width — matches iOS)
 // ═══════════════════════════════════════════════════════════════════════════
 @Composable
-private fun WeeklyDistanceCard(
-    todayKm: String,
-    vehicles: List<Vehicle>,
-    modifier: Modifier = Modifier
-) {
-    val todayTotal = vehicles.sumOf { it.todayKm }.toFloat()
-    val base = maxOf(todayTotal * 0.6f, 50f)
-    val weeklyData = listOf(
-        base * 0.7f, base * 1.1f, base * 0.9f, base * 1.3f,
-        base * 0.8f, base * 1.05f, todayTotal
-    )
-
-    val dayLabels = remember {
-        val sdf = SimpleDateFormat("EEE", Locale("tr", "TR"))
-        val cal = Calendar.getInstance()
-        (6 downTo 0).map { offset ->
-            cal.time = java.util.Date()
-            cal.add(Calendar.DAY_OF_YEAR, -offset)
-            sdf.format(cal.time).take(2)
-        }
-    }
-
-    Column(
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
-            .padding(14.dp)
-    ) {
-        // Header
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.AutoMirrored.Filled.ShowChart,
-                contentDescription = null,
-                tint = AppColors.Indigo,
-                modifier = Modifier.size(14.dp)
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                "Haftalık Mesafe",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            "$todayKm km",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            "bugün",
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
-        )
-        Spacer(Modifier.height(8.dp))
-
-        // Mini line chart
-        MiniLineChart(
-            values = weeklyData,
-            lineColor = AppColors.Indigo,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp)
-        )
-
-        Spacer(Modifier.height(4.dp))
-
-        // Day labels
-        Row(modifier = Modifier.fillMaxWidth()) {
-            dayLabels.forEach { day ->
-                Text(
-                    day,
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MiniLineChart(
-    values: List<Float>,
-    lineColor: Color,
-    modifier: Modifier = Modifier
-) {
-    Canvas(modifier = modifier) {
-        if (values.isEmpty()) return@Canvas
-        val maxVal = values.max().coerceAtLeast(1f)
-        val w = size.width
-        val h = size.height
-        val step = w / (values.size - 1).coerceAtLeast(1)
-
-        val points = values.mapIndexed { i, v ->
-            Offset(step * i, h - (v / maxVal) * h)
-        }
-
-        // Gradient fill
-        val fillPath = Path().apply {
-            points.forEachIndexed { i, p ->
-                if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
-            }
-            lineTo(w, h)
-            lineTo(0f, h)
-            close()
-        }
-        drawPath(
-            fillPath,
-            brush = Brush.verticalGradient(
-                colors = listOf(lineColor.copy(alpha = 0.2f), lineColor.copy(alpha = 0.02f))
-            )
-        )
-
-        // Line
-        val linePath = Path().apply {
-            points.forEachIndexed { i, p ->
-                if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
-            }
-        }
-        drawPath(
-            linePath,
-            color = lineColor,
-            style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        )
-
-        // End dot
-        val last = points.lastOrNull()
-        if (last != null) {
-            drawCircle(color = lineColor, radius = 3f, center = last)
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// MARK: 5b — Driver Safety Score Card (Circular)
-// ═══════════════════════════════════════════════════════════════════════════
-@Composable
-private fun DriverSafetyCard(
+private fun DriverScoreCard(
     score: Int,
     driverCount: Int,
+    vehicleCount: Int,
     onNavigateToDrivers: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val grade = when {
-        score >= 85 -> "A"
-        score >= 70 -> "B"
-        score >= 50 -> "C"
-        else -> "D"
-    }
     val scoreColor = when {
         score >= 85 -> AppColors.Online
         score >= 70 -> AppColors.Idle
@@ -1015,120 +702,180 @@ private fun DriverSafetyCard(
     Column(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
-            .padding(14.dp)
     ) {
         // Header
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Default.Shield,
-                contentDescription = null,
-                tint = AppColors.Online,
-                modifier = Modifier.size(14.dp)
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                "Güvenlik Skoru",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
+        Text(
+            "Sürücü Skoru",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 10.dp)
+        )
 
-        Spacer(Modifier.height(8.dp))
-
-        // Circular progress
+        // Ring
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .padding(horizontal = 12.dp)
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Canvas(modifier = Modifier.size(72.dp)) {
-                val strokeW = 6.dp.toPx()
+            Canvas(modifier = Modifier.size(64.dp)) {
+                val strokeW = 5.dp.toPx()
                 val radius = (size.minDimension - strokeW) / 2
                 val topLeft = Offset(
                     (size.width - radius * 2) / 2,
                     (size.height - radius * 2) / 2
                 )
                 val arcSize = Size(radius * 2, radius * 2)
-
-                // Background circle
-                drawArc(
-                    color = Color(0xFFF1F5F9),
-                    startAngle = 0f,
-                    sweepAngle = 360f,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeW, cap = StrokeCap.Round)
-                )
-
-                // Score arc
-                drawArc(
-                    color = scoreColor,
-                    startAngle = -90f,
-                    sweepAngle = 360f * score / 100f,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeW, cap = StrokeCap.Round)
-                )
+                drawArc(Color(0xFFF1F5F9), 0f, 360f, false, topLeft, arcSize, style = Stroke(width = strokeW, cap = StrokeCap.Round))
+                drawArc(scoreColor, -90f, 360f * score / 100f, false, topLeft, arcSize, style = Stroke(width = strokeW, cap = StrokeCap.Round))
             }
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    "$score",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    grade,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
-            }
-        }
-
-        Spacer(Modifier.height(4.dp))
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Default.People,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-                modifier = Modifier.size(12.dp)
-            )
-            Spacer(Modifier.width(3.dp))
             Text(
-                "$driverCount sürücü",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                "$score",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
 
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
+
+        // Mini stats
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 14.dp)
+        ) {
+            MiniStatLabel("Sürücü", "$driverCount")
+            MiniStatLabel("Araç", "$vehicleCount")
+        }
+
+        Spacer(Modifier.height(10.dp))
 
         // Detail button
         Button(
             onClick = onNavigateToDrivers,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = AppColors.Indigo.copy(alpha = 0.06f)
-            ),
+            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Indigo.copy(alpha = 0.06f)),
             shape = RoundedCornerShape(8.dp),
-            contentPadding = PaddingValues(vertical = 6.dp),
+            contentPadding = PaddingValues(vertical = 7.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp)
+                .padding(bottom = 14.dp)
+        ) {
+            Text("Detaylar", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Indigo)
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MARK: 5b — Daily KM Card (compact, half-width — matches iOS)
+// ═══════════════════════════════════════════════════════════════════════════
+@Composable
+private fun DailyKmCard(
+    totalDailyKm: Double,
+    formattedKm: String,
+    vehicleCount: Int,
+    activeCount: Int,
+    onNavigateToVehicles: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val skyBlue = Color(0xFF3893F1)
+    val progress = if (vehicleCount > 0) (totalDailyKm / maxOf(vehicleCount * 100.0, 1.0)).coerceAtMost(1.0).toFloat() else 0f
+
+    Column(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+    ) {
+        // Header
+        Text(
+            "Bugün Mesafe",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 10.dp)
+        )
+
+        // Ring
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(
-                "Detaylar",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = AppColors.Indigo
-            )
+            Canvas(modifier = Modifier.size(64.dp)) {
+                val strokeW = 5.dp.toPx()
+                val radius = (size.minDimension - strokeW) / 2
+                val topLeft = Offset(
+                    (size.width - radius * 2) / 2,
+                    (size.height - radius * 2) / 2
+                )
+                val arcSize = Size(radius * 2, radius * 2)
+                drawArc(Color(0xFFF1F5F9), 0f, 360f, false, topLeft, arcSize, style = Stroke(width = strokeW, cap = StrokeCap.Round))
+                drawArc(skyBlue, -90f, 360f * progress, false, topLeft, arcSize, style = Stroke(width = strokeW, cap = StrokeCap.Round))
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    formattedKm,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+                Text(
+                    "km",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                )
+            }
         }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Mini stats
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 14.dp)
+        ) {
+            MiniStatLabel("Araç", "$vehicleCount")
+            MiniStatLabel("Aktif", "$activeCount")
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        // View all button
+        Button(
+            onClick = onNavigateToVehicles,
+            colors = ButtonDefaults.buttonColors(containerColor = skyBlue.copy(alpha = 0.07f)),
+            shape = RoundedCornerShape(8.dp),
+            contentPadding = PaddingValues(vertical = 7.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp)
+                .padding(bottom = 14.dp)
+        ) {
+            Text("Tümünü Gör", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = skyBlue)
+        }
+    }
+}
+
+@Composable
+private fun MiniStatLabel(label: String, value: String) {
+    Column {
+        Text(
+            value,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1
+        )
+        Text(
+            label,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+            maxLines = 1
+        )
     }
 }
 
@@ -1274,7 +1021,9 @@ private fun DashboardAlertRow(alert: FleetAlert) {
                 alert.title,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 alert.description,
@@ -1284,12 +1033,24 @@ private fun DashboardAlertRow(alert: FleetAlert) {
                 overflow = TextOverflow.Ellipsis
             )
         }
-        Text(
-            alert.time,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
-        )
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                alert.dateString,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                maxLines = 1
+            )
+            if (alert.timeString.isNotEmpty()) {
+                Text(
+                    alert.timeString,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    maxLines = 1
+                )
+            }
+        }
     }
 }
 

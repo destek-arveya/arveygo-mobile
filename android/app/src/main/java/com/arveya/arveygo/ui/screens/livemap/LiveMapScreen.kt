@@ -224,7 +224,6 @@ private fun createVehiclePinBitmap(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveMapScreen(
-    onMenuClick: () -> Unit,
     onNavigateToRouteHistory: ((Vehicle) -> Unit)? = null,
     onNavigateToAlarms: (() -> Unit)? = null,
     onNavigateToAddAlarm: ((String) -> Unit)? = null
@@ -471,14 +470,6 @@ fun LiveMapScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                navigationIcon = {
-                    IconButton(onClick = {
-                        selectedVehicle = null
-                        onMenuClick()
-                    }) {
-                        Icon(Icons.Default.Menu, null, tint = AppColors.Navy)
-                    }
-                },
                 title = {
                     Column {
                         Text("Canl\u0131 Harita", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)

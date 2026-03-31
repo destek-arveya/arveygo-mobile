@@ -337,6 +337,22 @@ object APIService {
         json.optJSONObject("data") ?: json
     }
 
+    /** PUT /api/mobile/vehicles/{id} — update vehicle info */
+    suspend fun updateVehicle(deviceId: Int, body: Map<String, Any>): Unit = withContext(Dispatchers.IO) {
+        put("/api/mobile/vehicles/$deviceId", org.json.JSONObject(body))
+    }
+
+    /** POST /api/mobile/vehicles/{id}/blockage — action: "block" | "unblock" */
+    suspend fun sendBlockage(deviceId: Int, action: String): org.json.JSONObject = withContext(Dispatchers.IO) {
+        val body = org.json.JSONObject().put("action", action)
+        post("/api/mobile/vehicles/$deviceId/blockage", body)
+    }
+
+    /** POST /api/mobile/vehicles/{id}/cancel-blockage */
+    suspend fun cancelBlockage(deviceId: Int): Unit = withContext(Dispatchers.IO) {
+        post("/api/mobile/vehicles/$deviceId/cancel-blockage", null)
+    }
+
     suspend fun assignDriverToVehicle(vehicleId: Int, driverProfileId: Int?, driverCode: String?): Unit = withContext(Dispatchers.IO) {
         val body = org.json.JSONObject()
         if (driverProfileId != null) body.put("driver_profile_id", driverProfileId)

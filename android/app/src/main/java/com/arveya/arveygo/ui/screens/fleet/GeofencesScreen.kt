@@ -37,9 +37,7 @@ import org.osmdroid.views.overlay.Polygon
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GeofencesScreen(
-    onMenuClick: () -> Unit
-) {
+fun GeofencesScreen() {
     val context = LocalContext.current
     val authVM = LocalAuthViewModel.current
     val user by authVM.currentUser.collectAsState()
@@ -78,15 +76,6 @@ fun GeofencesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(
-                            Icons.Default.Menu, null,
-                            tint = AppColors.Navy,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                },
                 title = {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,

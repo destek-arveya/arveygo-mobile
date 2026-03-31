@@ -23,7 +23,7 @@ private data class LangChip(val code: String, val flag: String)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onMenuClick: () -> Unit) {
+fun SettingsScreen() {
     var showNotifSettings by remember { mutableStateOf(false) }
 
     if (showNotifSettings) {
@@ -45,11 +45,6 @@ fun SettingsScreen(onMenuClick: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Default.Menu, null, tint = AppColors.Navy)
-                    }
-                },
                 title = {
                     Text(DL.settingsTitle, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
                 },

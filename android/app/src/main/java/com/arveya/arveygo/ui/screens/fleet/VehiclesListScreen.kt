@@ -83,7 +83,6 @@ class VehiclesListViewModel {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VehiclesListScreen(
-    onMenuClick: () -> Unit,
     onNavigateToRouteHistory: ((Vehicle) -> Unit)? = null,
     onNavigateToAlarms: (() -> Unit)? = null,
     onNavigateToAddAlarm: ((String) -> Unit)? = null
@@ -145,11 +144,6 @@ fun VehiclesListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Default.Menu, null, tint = AppColors.Navy)
-                    }
-                },
                 title = {
                     Column {
                         Text("Araçlarım", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)

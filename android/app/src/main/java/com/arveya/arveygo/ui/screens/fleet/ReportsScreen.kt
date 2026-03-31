@@ -38,7 +38,7 @@ import java.time.format.DateTimeFormatter
 // ═══════════════════════════════════════════════════════════════
 
 @Composable
-fun ReportsScreen(onMenuClick: () -> Unit) {
+fun ReportsScreen() {
     var selectedReportType by remember { mutableStateOf<String?>(null) }
 
     AnimatedContent(
@@ -53,7 +53,7 @@ fun ReportsScreen(onMenuClick: () -> Unit) {
         label = "reports_nav"
     ) { reportType ->
         if (reportType == null) {
-            ReportsCatalogPage(onMenuClick = onMenuClick, onSelectReport = { selectedReportType = it })
+            ReportsCatalogPage(onSelectReport = { selectedReportType = it })
         } else {
             ReportDetailPage(reportType = reportType, onBack = { selectedReportType = null })
         }
@@ -65,7 +65,7 @@ fun ReportsScreen(onMenuClick: () -> Unit) {
 // ═══════════════════════════════════════════════════════════════
 
 @Composable
-private fun ReportsCatalogPage(onMenuClick: () -> Unit, onSelectReport: (String) -> Unit) {
+private fun ReportsCatalogPage(onSelectReport: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     var catalogItems by remember { mutableStateOf<List<ReportCatalogItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -96,7 +96,7 @@ private fun ReportsCatalogPage(onMenuClick: () -> Unit, onSelectReport: (String)
             .background(AppColors.Bg)
     ) {
         // ── Top Bar ──
-        ReportsTopBar(title = "Raporlar", onMenuClick = onMenuClick)
+        ReportsTopBar(title = "Raporlar")
 
         if (isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1637,11 +1637,6 @@ private fun ReportsTopBar(
             if (showBack) {
                 IconButton(onClick = { onBack?.invoke() }, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
-                }
-                Spacer(Modifier.width(8.dp))
-            } else if (onMenuClick != null) {
-                IconButton(onClick = onMenuClick, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Menu, null, tint = Color.White)
                 }
                 Spacer(Modifier.width(8.dp))
             }

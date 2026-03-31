@@ -337,7 +337,7 @@ private val ALARM_TYPES = listOf(
 // MARK: - Alarms Screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AlarmsScreen(onMenuClick: () -> Unit, initialSearchText: String = "", autoOpenCreate: Boolean = false, preSelectedPlate: String = "") {
+fun AlarmsScreen(initialSearchText: String = "", autoOpenCreate: Boolean = false, preSelectedPlate: String = "") {
     val authVM = LocalAuthViewModel.current
     val user by authVM.currentUser.collectAsState()
     val scope = rememberCoroutineScope()
@@ -480,11 +480,6 @@ fun AlarmsScreen(onMenuClick: () -> Unit, initialSearchText: String = "", autoOp
                     Column {
                         Text("Alarmlar", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
                         Text("İzleme / Alarmlar", fontSize = 10.sp, color = AppColors.TextMuted)
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Default.Menu, null, tint = AppColors.Navy)
                     }
                 },
                 actions = {
