@@ -774,7 +774,7 @@ private fun VehiclePopupCard(
         containerColor = Color.Transparent,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         dragHandle = null,
-        windowInsets = WindowInsets(0),
+        contentWindowInsets = { WindowInsets(0) },
         scrimColor = Color.Black.copy(alpha = 0.15f)
     ) {
     Column(
