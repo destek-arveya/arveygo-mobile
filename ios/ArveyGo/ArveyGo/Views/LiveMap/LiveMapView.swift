@@ -356,7 +356,7 @@ struct LiveMapView: View {
                     HStack(spacing: 10) {
                         Text(vehicle.plate)
                             .font(.system(size: 20, weight: .heavy))
-                            .foregroundColor(AppTheme.navy)
+                            .foregroundColor(AppTheme.darkText)
                             .tracking(0.5)
                         StatusBadge(status: vehicle.status)
                     }
@@ -385,7 +385,7 @@ struct LiveMapView: View {
                         icon: "gauge.open.with.lines.needle.33percent",
                         label: "Hız",
                         value: vehicle.formattedSpeed,
-                        iconColor: AppTheme.indigo
+                        iconColor: AppTheme.lavender
                     )
                 }
 
@@ -397,14 +397,14 @@ struct LiveMapView: View {
                         icon: "road.lanes",
                         label: "Bugün",
                         value: vehicle.formattedTodayKm,
-                        iconColor: AppTheme.indigo
+                        iconColor: AppTheme.lavender
                     )
                     Divider().frame(height: 36)
                     compactInfoTile(
                         icon: "speedometer",
                         label: "Toplam",
                         value: vehicle.formattedTotalKm + " km",
-                        iconColor: AppTheme.navy
+                        iconColor: AppTheme.darkTextSub
                     )
                 }
 
@@ -438,16 +438,16 @@ struct LiveMapView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "clock.fill")
                             .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textMuted.opacity(0.6))
+                            .foregroundColor(AppTheme.darkTextMuted.opacity(0.6))
                         Text("Son Güncelleme: \(vehicle.formattedDeviceTime)")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(AppTheme.darkTextMuted)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
                 }
             }
-            .background(AppTheme.surface)
+            .background(AppTheme.darkSurface)
             .cornerRadius(16)
             .padding(.horizontal, 16)
 
@@ -456,7 +456,7 @@ struct LiveMapView: View {
                 popupActionBtn(icon: "location.fill", label: "Yol Tarifi", color: Color(hex: "#3B82F6")) {
                     openMapsDirections(lat: vehicle.lat, lng: vehicle.lng, label: vehicle.plate)
                 }
-                popupActionBtn(icon: "clock.arrow.circlepath", label: "Rota Geçmişi", color: AppTheme.indigo) {
+                popupActionBtn(icon: "clock.arrow.circlepath", label: "Rota Geçmişi", color: AppTheme.lavender) {
                     selectedVehicle = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                         selectedPage = .routeHistory
@@ -476,7 +476,7 @@ struct LiveMapView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 14)
-            .background(AppTheme.surface)
+            .background(AppTheme.darkSurface)
             .cornerRadius(16)
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -522,7 +522,7 @@ struct LiveMapView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 46)
-                    .background(AppTheme.buttonGradient)
+                    .background(AppTheme.darkCard)
                     .cornerRadius(14)
                 }
             }
@@ -534,11 +534,11 @@ struct LiveMapView: View {
     }
 
     // MARK: - Compact Info Tile
-    func compactInfoTile(icon: String, label: String, value: String, valueColor: Color? = nil, iconColor: Color = AppTheme.indigo) -> some View {
+    func compactInfoTile(icon: String, label: String, value: String, valueColor: Color? = nil, iconColor: Color = AppTheme.lavender) -> some View {
         HStack(spacing: 8) {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(iconColor.opacity(0.1))
+                    .fill(iconColor.opacity(0.15))
                     .frame(width: 30, height: 30)
                 Image(systemName: icon)
                     .font(.system(size: 12))
@@ -547,10 +547,10 @@ struct LiveMapView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(label)
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(AppTheme.darkTextMuted)
                 Text(value)
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(valueColor ?? AppTheme.navy)
+                    .foregroundColor(valueColor ?? AppTheme.darkText)
                     .lineLimit(1)
             }
         }
@@ -563,15 +563,15 @@ struct LiveMapView: View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.system(size: 14))
-                .foregroundColor(AppTheme.indigo.opacity(0.7))
+                .foregroundColor(AppTheme.lavender.opacity(0.7))
                 .frame(width: 18)
             Text(label)
                 .font(.system(size: 13))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(AppTheme.darkTextSub)
             Spacer()
             Text(value)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(valueColor ?? AppTheme.navy)
+                .foregroundColor(valueColor ?? AppTheme.darkText)
                 .lineLimit(1)
                 .frame(maxWidth: 170, alignment: .trailing)
         }
@@ -592,11 +592,11 @@ struct LiveMapView: View {
                     .font(.system(size: 16))
                     .foregroundColor(color)
                     .frame(width: 40, height: 40)
-                    .background(color.opacity(0.1))
+                    .background(color.opacity(0.15))
                     .cornerRadius(11)
                 Text(label)
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(AppTheme.darkTextMuted)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }

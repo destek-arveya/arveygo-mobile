@@ -182,7 +182,7 @@ struct VehicleDetailView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                AppTheme.bg.ignoresSafeArea()
+                AppTheme.darkBg.ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
@@ -228,17 +228,17 @@ struct VehicleDetailView: View {
                             Text("Geri")
                                 .font(.system(size: 14, weight: .medium))
                         }
-                        .foregroundColor(AppTheme.navy)
+                        .foregroundColor(AppTheme.darkText)
                     }
                 }
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 1) {
                         Text(vehicle.plate)
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(AppTheme.navy)
+                            .foregroundColor(AppTheme.darkText)
                         Text("Araç Detayı")
                             .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(AppTheme.darkTextMuted)
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -309,7 +309,7 @@ struct VehicleDetailView: View {
                     HStack(spacing: 8) {
                         Text(vehicle.plate)
                             .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(AppTheme.navy)
+                            .foregroundColor(AppTheme.darkText)
                         StatusBadge(status: vehicle.status)
                     }
                     // name fieldı yorum satırına alındı
@@ -343,7 +343,7 @@ struct VehicleDetailView: View {
             }
             .padding(.vertical, 12)
         }
-        .background(AppTheme.surface)
+        .background(AppTheme.darkSurface)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: 4)
     }
@@ -369,12 +369,12 @@ struct VehicleDetailView: View {
                 .foregroundColor(color)
             Text(value)
                 .font(.system(size: 12, weight: .bold))
-                .foregroundColor(AppTheme.navy)
+                .foregroundColor(AppTheme.darkText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(label)
                 .font(.system(size: 9))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(AppTheme.darkTextMuted)
         }
         .frame(maxWidth: .infinity)
     }
@@ -389,10 +389,10 @@ struct VehicleDetailView: View {
                     VStack(spacing: 6) {
                         Text(tab.rawValue)
                             .font(.system(size: 13, weight: selectedTab == tab ? .semibold : .medium))
-                            .foregroundColor(selectedTab == tab ? AppTheme.navy : AppTheme.textMuted)
+                            .foregroundColor(selectedTab == tab ? AppTheme.darkText : AppTheme.darkTextMuted)
 
                         Rectangle()
-                            .fill(selectedTab == tab ? AppTheme.indigo : Color.clear)
+                            .fill(selectedTab == tab ? AppTheme.lavender : Color.clear)
                             .frame(height: 2.5)
                             .cornerRadius(2)
                     }
@@ -401,11 +401,11 @@ struct VehicleDetailView: View {
             }
         }
         .padding(.top, 8)
-        .background(AppTheme.surface)
+        .background(AppTheme.darkSurface)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
+                .stroke(AppTheme.darkBorder, lineWidth: 1)
         )
     }
 
@@ -417,7 +417,7 @@ struct VehicleDetailView: View {
                 quickActionButton(icon: "location.fill", label: "Yol Tarifi", color: Color(hex: "#3B82F6")) {
                     openMapsDirections(lat: vehicle.lat, lng: vehicle.lng, label: vehicle.plate)
                 }
-                quickActionButton(icon: "clock.arrow.circlepath", label: "Rota Geçmişi", color: AppTheme.indigo) {
+                quickActionButton(icon: "clock.arrow.circlepath", label: "Rota Geçmişi", color: AppTheme.lavender) {
                     dismiss()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                         onNavigateToRouteHistory?(vehicle)
@@ -433,7 +433,7 @@ struct VehicleDetailView: View {
                 }
             }
             .padding(14)
-            .background(AppTheme.surface)
+            .background(AppTheme.darkSurface)
             .cornerRadius(14)
             .sheet(isPresented: $showEditSheet) {
                 VehicleEditSheet(vehicle: vehicle) { updatedVehicle in
@@ -529,20 +529,20 @@ struct VehicleDetailView: View {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(AppTheme.indigo.opacity(0.08))
+                        .fill(AppTheme.lavender.opacity(0.12))
                         .frame(width: 40, height: 40)
                     Text(displayName.isEmpty ? "?" : String(displayName.prefix(1)))
                         .font(.system(size: 17, weight: .bold))
-                        .foregroundColor(AppTheme.indigo)
+                        .foregroundColor(AppTheme.lavender)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(displayName.isEmpty ? "Sürücü Atanmamış" : displayName)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(AppTheme.navy)
+                        .foregroundColor(AppTheme.darkText)
                     Text("Sürücü")
                         .font(.system(size: 11))
-                        .foregroundColor(AppTheme.textMuted)
+                        .foregroundColor(AppTheme.darkTextMuted)
                 }
 
                 Spacer()
@@ -554,11 +554,11 @@ struct VehicleDetailView: View {
                         Text("Değiştir")
                             .font(.system(size: 11, weight: .medium))
                     }
-                    .foregroundColor(AppTheme.indigo)
+                    .foregroundColor(AppTheme.lavender)
                 }
             }
             .padding(16)
-            .background(AppTheme.surface)
+            .background(AppTheme.darkSurface)
             .cornerRadius(14)
             .sheet(isPresented: $showDriverAssign) {
                 VehicleDriverAssignSheet(
@@ -577,7 +577,7 @@ struct VehicleDetailView: View {
         VStack(spacing: 0) {
             content()
         }
-        .background(AppTheme.surface)
+        .background(AppTheme.darkSurface)
         .cornerRadius(14)
     }
 
@@ -591,15 +591,15 @@ struct VehicleDetailView: View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.system(size: 14))
-                .foregroundColor(AppTheme.indigo.opacity(0.7))
+                .foregroundColor(AppTheme.lavender.opacity(0.8))
                 .frame(width: 18)
             Text(label)
                 .font(.system(size: 13))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(AppTheme.darkTextSub)
             Spacer()
             Text(value)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(valueColor ?? AppTheme.navy)
+                .foregroundColor(valueColor ?? AppTheme.darkText)
                 .lineLimit(1)
                 .frame(maxWidth: 180, alignment: .trailing)
         }
@@ -618,7 +618,7 @@ struct VehicleDetailView: View {
                     .cornerRadius(12)
                 Text(label)
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(AppTheme.darkTextMuted)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
@@ -638,10 +638,10 @@ struct VehicleDetailView: View {
                     if fleetMaintenances.isEmpty {
                         HStack {
                             Image(systemName: "wrench.and.screwdriver")
-                                .foregroundColor(AppTheme.textMuted)
+                                .foregroundColor(AppTheme.darkTextMuted)
                             Text("Bu araç için bakım kaydı bulunmuyor")
                                 .font(.system(size: 13))
-                                .foregroundColor(AppTheme.textMuted)
+                                .foregroundColor(AppTheme.darkTextMuted)
                         }
                         .padding(.vertical, 20)
                         .frame(maxWidth: .infinity)
@@ -669,10 +669,10 @@ struct VehicleDetailView: View {
                     if fleetDocuments.isEmpty {
                         HStack {
                             Image(systemName: "doc.text")
-                                .foregroundColor(AppTheme.textMuted)
+                                .foregroundColor(AppTheme.darkTextMuted)
                             Text("Bu araç için belge kaydı bulunmuyor")
                                 .font(.system(size: 13))
-                                .foregroundColor(AppTheme.textMuted)
+                                .foregroundColor(AppTheme.darkTextMuted)
                         }
                         .padding(.vertical, 20)
                         .frame(maxWidth: .infinity)
@@ -716,10 +716,10 @@ struct VehicleDetailView: View {
                 sectionCard(title: "MASRAFLAR", icon: "chart.bar.fill") {
                     HStack {
                         Image(systemName: "banknote")
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(AppTheme.darkTextMuted)
                         Text("Bu araç için masraf kaydı bulunmuyor")
                             .font(.system(size: 13))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(AppTheme.darkTextMuted)
                     }
                     .padding(.vertical, 20)
                     .frame(maxWidth: .infinity)
@@ -749,14 +749,14 @@ struct VehicleDetailView: View {
                     HStack {
                         Text("TOPLAM")
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(AppTheme.darkTextMuted)
                         Spacer()
                         Text(FleetCost.formatAmount(totalAmount, currency: currency))
                             .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(AppTheme.navy)
+                            .foregroundColor(AppTheme.darkText)
                     }
                     .padding(14)
-                    .background(AppTheme.navy.opacity(0.04))
+                    .background(AppTheme.darkCard)
                     .cornerRadius(10)
                 }
 
@@ -776,17 +776,17 @@ struct VehicleDetailView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(cost.category.capitalized)
                                         .font(.system(size: 13, weight: .semibold))
-                                        .foregroundColor(AppTheme.navy)
+                                        .foregroundColor(AppTheme.darkText)
                                     Text(cost.costDate)
                                         .font(.system(size: 11))
-                                        .foregroundColor(AppTheme.textMuted)
+                                        .foregroundColor(AppTheme.darkTextSub)
                                 }
 
                                 Spacer()
 
                                 Text(cost.formattedAmount)
                                     .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(AppTheme.navy)
+                                    .foregroundColor(AppTheme.darkText)
                             }
                             .padding(.vertical, 10)
                             .padding(.horizontal, 14)
@@ -834,21 +834,21 @@ struct VehicleDetailView: View {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.indigo)
+                    .foregroundColor(AppTheme.lavender)
                 Text(title)
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(AppTheme.darkTextMuted)
                     .tracking(0.5)
                 Spacer()
             }
             content()
         }
         .padding(16)
-        .background(AppTheme.surface)
+        .background(AppTheme.darkSurface)
         .cornerRadius(14)
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
+                .stroke(AppTheme.darkBorder, lineWidth: 1)
         )
     }
 
@@ -856,26 +856,26 @@ struct VehicleDetailView: View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 12))
-                .foregroundColor(AppTheme.indigo)
+                .foregroundColor(AppTheme.lavender)
                 .frame(width: 26, height: 26)
-                .background(AppTheme.indigo.opacity(0.08))
+                .background(AppTheme.lavender.opacity(0.12))
                 .cornerRadius(7)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
                     .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(AppTheme.textFaint)
+                    .foregroundColor(AppTheme.darkTextMuted)
                     .tracking(0.3)
                 Text(value)
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(valueColor ?? AppTheme.navy)
+                    .foregroundColor(valueColor ?? AppTheme.darkText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
             Spacer()
         }
         .padding(10)
-        .background(AppTheme.bg)
+        .background(AppTheme.darkCard)
         .cornerRadius(10)
     }
 
@@ -890,7 +890,7 @@ struct VehicleDetailView: View {
                     .cornerRadius(12)
                 Text(label)
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(AppTheme.darkTextMuted)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -935,17 +935,17 @@ struct VehicleDetailView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppTheme.navy)
+                    .foregroundColor(AppTheme.darkText)
                 HStack(spacing: 8) {
                     Text(date)
                         .font(.system(size: 11))
-                        .foregroundColor(AppTheme.textMuted)
+                        .foregroundColor(AppTheme.darkTextSub)
                     Text("•")
                         .font(.system(size: 8))
-                        .foregroundColor(AppTheme.textFaint)
+                        .foregroundColor(AppTheme.darkTextMuted)
                     Text(km)
                         .font(.system(size: 11))
-                        .foregroundColor(AppTheme.textMuted)
+                        .foregroundColor(AppTheme.darkTextSub)
                 }
             }
 
@@ -980,10 +980,10 @@ struct VehicleDetailView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppTheme.navy)
+                    .foregroundColor(AppTheme.darkText)
                 Text("Bitiş: \(date)")
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(AppTheme.darkTextSub)
             }
 
             Spacer()
@@ -994,7 +994,7 @@ struct VehicleDetailView: View {
                     .foregroundColor(status.color)
                 Text("kalan")
                     .font(.system(size: 9))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(AppTheme.darkTextMuted)
             }
 
             Circle()
@@ -1017,10 +1017,10 @@ struct VehicleDetailView: View {
             }
             Text(amount)
                 .font(.system(size: 10, weight: .bold))
-                .foregroundColor(AppTheme.navy)
+                .foregroundColor(AppTheme.darkText)
             Text(label)
                 .font(.system(size: 9))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(AppTheme.darkTextMuted)
         }
         .frame(maxWidth: .infinity)
     }
@@ -1085,17 +1085,17 @@ struct VehicleDetailView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppTheme.navy)
+                    .foregroundColor(AppTheme.darkText)
                 Text(subtitle)
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(AppTheme.darkTextSub)
             }
 
             Spacer()
 
             Text(time)
                 .font(.system(size: 10))
-                .foregroundColor(AppTheme.textFaint)
+                .foregroundColor(AppTheme.darkTextMuted)
                 .multilineTextAlignment(.trailing)
         }
         .padding(.vertical, 10)
@@ -1152,10 +1152,10 @@ struct EventsTabContent: View {
                     VStack(spacing: 8) {
                         Image(systemName: "bell.slash")
                             .font(.system(size: 28))
-                            .foregroundColor(AppTheme.textFaint)
+                            .foregroundColor(AppTheme.darkTextMuted)
                         Text("Bu araç için alarm bulunamadı")
                             .font(.system(size: 13))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(AppTheme.darkTextMuted)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(24)
@@ -1186,10 +1186,10 @@ struct EventsTabContent: View {
                                 Image(systemName: "arrow.right")
                                     .font(.system(size: 11))
                             }
-                            .foregroundColor(AppTheme.indigo)
+                            .foregroundColor(AppTheme.lavender)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
-                            .background(AppTheme.indigo.opacity(0.06))
+                            .background(AppTheme.lavender.opacity(0.1))
                             .cornerRadius(10)
                         }
                         .padding(.top, 4)
@@ -1231,21 +1231,21 @@ struct EventsTabContent: View {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.indigo)
+                    .foregroundColor(AppTheme.lavender)
                 Text(title)
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(AppTheme.darkTextMuted)
                     .tracking(0.5)
                 Spacer()
             }
             content()
         }
         .padding(16)
-        .background(AppTheme.surface)
+        .background(AppTheme.darkSurface)
         .cornerRadius(14)
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
+                .stroke(AppTheme.darkBorder, lineWidth: 1)
         )
     }
 
@@ -1262,15 +1262,15 @@ struct EventsTabContent: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppTheme.navy)
+                    .foregroundColor(AppTheme.darkText)
                 Text(subtitle)
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(AppTheme.darkTextSub)
             }
             Spacer()
             Text(time)
                 .font(.system(size: 10))
-                .foregroundColor(AppTheme.textFaint)
+                .foregroundColor(AppTheme.darkTextMuted)
                 .multilineTextAlignment(.trailing)
         }
         .padding(.vertical, 10)

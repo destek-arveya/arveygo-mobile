@@ -14,7 +14,7 @@ struct VehiclesListView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                AppTheme.bg.ignoresSafeArea()
+                AppTheme.darkBg.ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 12) {
@@ -39,10 +39,10 @@ struct VehiclesListView: View {
                     VStack(spacing: 1) {
                         Text("Araçlarım")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(AppTheme.navy)
+                            .foregroundColor(AppTheme.darkText)
                         Text("Filo Yönetimi / Araçlar")
                             .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(AppTheme.darkTextMuted)
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -126,26 +126,26 @@ struct VehiclesListView: View {
                     .frame(width: 8, height: 8)
                 Text(label)
                     .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
-                    .foregroundColor(isSelected ? color : AppTheme.textSecondary)
+                    .foregroundColor(isSelected ? color : AppTheme.darkTextSub)
                 Text("\(count)")
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(isSelected ? color : AppTheme.textMuted)
+                    .foregroundColor(isSelected ? color : AppTheme.darkTextMuted)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 1)
                     .background(
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(isSelected ? color.opacity(0.15) : AppTheme.bg)
+                            .fill(isSelected ? color.opacity(0.15) : AppTheme.darkCard)
                     )
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(isSelected ? color.opacity(0.12) : AppTheme.surface)
+                    .fill(isSelected ? color.opacity(0.12) : AppTheme.darkSurface)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(isSelected ? color.opacity(0.3) : AppTheme.borderSoft, lineWidth: 1)
+                    .stroke(isSelected ? color.opacity(0.3) : AppTheme.darkBorder, lineWidth: 1)
             )
         }
     }
@@ -157,24 +157,24 @@ struct VehiclesListView: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 16))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(AppTheme.darkTextMuted)
                 TextField("Plaka, araç veya sürücü ara...", text: $vm.searchText)
                     .font(.system(size: 14))
                 if !vm.searchText.isEmpty {
                     Button(action: { vm.searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 16))
-                            .foregroundColor(AppTheme.textFaint)
+                            .foregroundColor(AppTheme.darkTextMuted)
                     }
                 }
             }
             .padding(.horizontal, 14)
             .frame(height: 44)
-            .background(AppTheme.surface)
+            .background(AppTheme.darkSurface)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(AppTheme.borderSoft, lineWidth: 1)
+                    .stroke(AppTheme.darkBorder, lineWidth: 1)
             )
 
             // Group filter + count
@@ -188,20 +188,20 @@ struct VehiclesListView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "folder")
                             .font(.system(size: 12))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(AppTheme.darkTextMuted)
                         Text(vm.groupFilter ?? "Tüm Gruplar")
                             .font(.system(size: 12, weight: .medium))
                         Image(systemName: "chevron.down")
                             .font(.system(size: 9, weight: .semibold))
                     }
-                    .foregroundColor(AppTheme.navy)
+                    .foregroundColor(AppTheme.darkText)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(AppTheme.surface)
+                    .background(AppTheme.darkSurface)
                     .cornerRadius(8)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(AppTheme.borderSoft, lineWidth: 1)
+                            .stroke(AppTheme.darkBorder, lineWidth: 1)
                     )
                 }
 
@@ -209,7 +209,7 @@ struct VehiclesListView: View {
 
                 Text("\(vm.filteredVehicles.count) araç listeleniyor")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(AppTheme.darkTextMuted)
             }
         }
     }
@@ -228,13 +228,13 @@ struct VehiclesListView: View {
                 VStack(spacing: 16) {
                     Image(systemName: "car.2.fill")
                         .font(.system(size: 48))
-                        .foregroundColor(AppTheme.textFaint.opacity(0.4))
+                        .foregroundColor(AppTheme.darkTextMuted.opacity(0.4))
                     Text("Araç bulunamadı")
                         .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(AppTheme.textMuted)
+                        .foregroundColor(AppTheme.darkTextMuted)
                     Text("Filtre veya arama kriterlerinizi değiştirin")
                         .font(.system(size: 12))
-                        .foregroundColor(AppTheme.textFaint)
+                        .foregroundColor(AppTheme.darkTextMuted)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 60)
@@ -260,12 +260,12 @@ struct VehiclesListView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(vehicle.plate)
                         .font(.system(size: 17, weight: .bold))
-                        .foregroundColor(AppTheme.navy)
+                        .foregroundColor(AppTheme.darkText)
 
                     if !vehicle.vehicleType.isEmpty && vehicle.vehicleType != "Ticari" {
                         Text(vehicle.vehicleType)
                             .font(.system(size: 11))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(AppTheme.darkTextMuted)
                             .lineLimit(1)
                     }
                 }
@@ -311,7 +311,7 @@ struct VehiclesListView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(AppTheme.bg.opacity(0.7))
+            .background(AppTheme.darkBg.opacity(0.7))
             .cornerRadius(12)
             .padding(.horizontal, 12)
 
@@ -322,10 +322,10 @@ struct VehiclesListView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "location.fill")
                         .font(.system(size: 11))
-                        .foregroundColor(AppTheme.indigo.opacity(0.6))
+                        .foregroundColor(AppTheme.lavender.opacity(0.6))
                     Text(vehicle.locationDisplay)
                         .font(.system(size: 11))
-                        .foregroundColor(AppTheme.textSecondary)
+                        .foregroundColor(AppTheme.darkTextSub)
                         .lineLimit(1)
                 }
                 .padding(.horizontal, 16)
@@ -339,10 +339,10 @@ struct VehiclesListView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "clock")
                             .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textFaint)
+                            .foregroundColor(AppTheme.darkTextMuted)
                         Text(vehicle.formattedDeviceTime)
                             .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textFaint)
+                            .foregroundColor(AppTheme.darkTextMuted)
                     }
                 }
 
@@ -352,7 +352,7 @@ struct VehiclesListView: View {
                         HStack(spacing: 0) {
                             Spacer().frame(width: 8)
                             Circle()
-                                .fill(AppTheme.borderSoft)
+                                .fill(AppTheme.darkBorder)
                                 .frame(width: 3, height: 3)
                             Spacer().frame(width: 8)
                         }
@@ -367,7 +367,7 @@ struct VehiclesListView: View {
                     Spacer().frame(width: 6)
                     Text(String(format: "💧%.0f%%", hum))
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(AppTheme.indigo)
+                        .foregroundColor(AppTheme.lavender)
                 }
 
                 Spacer()
@@ -378,10 +378,10 @@ struct VehiclesListView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "person.fill")
                             .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textFaint)
+                            .foregroundColor(AppTheme.darkTextMuted)
                         Text(driverText)
                             .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(AppTheme.darkTextMuted)
                             .lineLimit(1)
                     }
                     .frame(maxWidth: 120, alignment: .trailing)
@@ -389,13 +389,13 @@ struct VehiclesListView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(AppTheme.bg.opacity(0.4))
+            .background(AppTheme.darkCard.opacity(0.4))
         }
-        .background(AppTheme.surface)
+        .background(AppTheme.darkSurface)
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
+                .stroke(AppTheme.darkBorder, lineWidth: 1)
         )
     }
 
@@ -419,7 +419,7 @@ struct VehiclesListView: View {
 
             Text(label)
                 .font(.system(size: 9))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(AppTheme.darkTextMuted)
         }
         .frame(maxWidth: .infinity)
     }

@@ -26,6 +26,15 @@ struct AppTheme {
     // Border
     static let borderSoft = Color(red: 228/255, green: 231/255, blue: 240/255)
 
+    // ── Dark Mode Palette ──
+    static let darkBg      = Color(red: 10/255,  green: 14/255,  blue: 31/255)   // #0A0E1F
+    static let darkSurface = Color(red: 17/255,  green: 22/255,  blue: 41/255)   // #111629
+    static let darkCard    = Color(red: 26/255,  green: 32/255,  blue: 64/255)   // #1A2040
+    static let darkBorder  = Color(red: 37/255,  green: 45/255,  blue: 74/255)   // #252D4A
+    static let darkText    = Color(red: 232/255, green: 234/255, blue: 246/255)  // #E8EAF6
+    static let darkTextSub = Color(red: 176/255, green: 186/255, blue: 216/255)  // #B0BAD8
+    static let darkTextMuted = Color(red: 107/255, green: 118/255, blue: 153/255) // #6B7699
+
     // Gradient for side panel / login background
     static let panelGradient = LinearGradient(
         colors: [
