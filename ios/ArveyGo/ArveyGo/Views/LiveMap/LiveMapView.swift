@@ -49,16 +49,18 @@ struct LiveMapView: View {
                     // (filter bar moved to top overlay)
                 }
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(AppTheme.darkBg, for: .navigationBar)
+                .toolbarColorScheme(.dark, for: .navigationBar)
                 .toolbar {
 
                     ToolbarItem(placement: .principal) {
                         VStack(spacing: 1) {
                             Text("Canlı Harita")
                                 .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(AppTheme.navy)
+                                .foregroundColor(AppTheme.darkText)
                             Text("Araç Takip / Canlı Harita")
                                 .font(.system(size: 10))
-                                .foregroundColor(AppTheme.textMuted)
+                                .foregroundColor(AppTheme.darkTextMuted)
                         }
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -76,8 +78,10 @@ struct LiveMapView: View {
                     }
                         .presentationDetents([.fraction(0.50), .large])
                         .presentationDragIndicator(.visible)
+                        .presentationBackground(AppTheme.darkBg)
                         .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.50)))
                         .presentationCornerRadius(20)
+                        .colorScheme(.dark)
                 }
                 .fullScreenCover(item: $detailVehicle) { vehicle in
                     VehicleDetailView(

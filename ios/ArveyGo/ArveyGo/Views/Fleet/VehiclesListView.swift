@@ -33,6 +33,8 @@ struct VehiclesListView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(AppTheme.darkBg, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
 
                 ToolbarItem(placement: .principal) {
