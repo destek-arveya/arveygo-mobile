@@ -781,7 +781,7 @@ private fun VehiclePopupCard(
             .fillMaxWidth()
             .background(
                 brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                    colors = listOf(AppColors.Surface, AppColors.Bg)
+                    colors = listOf(AppColors.DarkSurface, AppColors.DarkBg)
                 ),
                 shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
             )
@@ -797,7 +797,7 @@ private fun VehiclePopupCard(
                     .width(40.dp)
                     .height(4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(AppColors.BorderSoft)
+                    .background(AppColors.DarkBorder)
             )
         }
 
@@ -832,7 +832,7 @@ private fun VehiclePopupCard(
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(vehicle.plate, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = AppColors.Navy, letterSpacing = 0.5.sp)
+                    Text(vehicle.plate, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = AppColors.DarkText, letterSpacing = 0.5.sp)
                     Spacer(Modifier.width(10.dp))
                     StatusBadge(vehicle.status)
                 }
@@ -848,7 +848,7 @@ private fun VehiclePopupCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .background(AppColors.Surface, RoundedCornerShape(16.dp))
+                .background(AppColors.DarkSurface, RoundedCornerShape(16.dp))
                 .padding(vertical = 8.dp, horizontal = 4.dp)
         ) {
             // Row 1: Kontak - Hız
@@ -861,17 +861,17 @@ private fun VehiclePopupCard(
                     iconTint = if (vehicle.kontakOn) AppColors.Online else AppColors.Offline,
                     modifier = Modifier.weight(1f)
                 )
-                Box(Modifier.width(1.dp).height(36.dp).background(AppColors.BorderSoft.copy(alpha = 0.5f)).align(Alignment.CenterVertically))
+                Box(Modifier.width(1.dp).height(36.dp).background(AppColors.DarkBorder.copy(alpha = 0.5f)).align(Alignment.CenterVertically))
                 CompactInfoTile(
                     icon = Icons.Default.Speed,
                     label = "Hız",
                     value = vehicle.formattedSpeed,
-                    iconTint = AppColors.Indigo,
+                    iconTint = AppColors.Lavender,
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            HorizontalDivider(color = AppColors.BorderSoft.copy(alpha = 0.4f), modifier = Modifier.padding(horizontal = 12.dp))
+            HorizontalDivider(color = AppColors.DarkBorder.copy(alpha = 0.4f), modifier = Modifier.padding(horizontal = 12.dp))
 
             // Row 2: Bugünkü KM - Toplam KM
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -879,15 +879,15 @@ private fun VehiclePopupCard(
                     icon = Icons.Default.Route,
                     label = "Bugün",
                     value = vehicle.formattedTodayKm,
-                    iconTint = AppColors.Indigo,
+                    iconTint = AppColors.Lavender,
                     modifier = Modifier.weight(1f)
                 )
-                Box(Modifier.width(1.dp).height(36.dp).background(AppColors.BorderSoft.copy(alpha = 0.5f)).align(Alignment.CenterVertically))
+                Box(Modifier.width(1.dp).height(36.dp).background(AppColors.DarkBorder.copy(alpha = 0.5f)).align(Alignment.CenterVertically))
                 CompactInfoTile(
                     icon = Icons.Default.Speed,
                     label = "Toplam",
                     value = vehicle.formattedTotalKm + " km",
-                    iconTint = AppColors.Navy,
+                    iconTint = AppColors.DarkTextSub,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -921,18 +921,18 @@ private fun VehiclePopupCard(
 
             // Son Güncelleme - ortalanmış
             if (vehicle.deviceTime != null) {
-                HorizontalDivider(color = AppColors.BorderSoft.copy(alpha = 0.4f), modifier = Modifier.padding(horizontal = 12.dp))
+                HorizontalDivider(color = AppColors.DarkBorder.copy(alpha = 0.4f), modifier = Modifier.padding(horizontal = 12.dp))
                 Row(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp, horizontal = 12.dp)
                 ) {
-                    Icon(Icons.Default.Schedule, null, tint = AppColors.TextMuted.copy(alpha = 0.6f), modifier = Modifier.size(12.dp))
+                    Icon(Icons.Default.Schedule, null, tint = AppColors.DarkTextMuted.copy(alpha = 0.6f), modifier = Modifier.size(12.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(
                         "Son Güncelleme: ${vehicle.formattedDeviceTime}",
                         fontSize = 11.sp,
-                        color = AppColors.TextMuted,
+                        color = AppColors.DarkTextMuted,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -947,13 +947,13 @@ private fun VehiclePopupCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .background(AppColors.Surface, RoundedCornerShape(16.dp))
+                .background(AppColors.DarkSurface, RoundedCornerShape(16.dp))
                 .padding(horizontal = 12.dp, vertical = 14.dp)
         ) {
             PopupActionBtn(Icons.Default.Navigation, "Yol Tarifi", Color(0xFF3B82F6), Modifier.weight(1f)) {
                 openMapsDirectionsLiveMap(context, vehicle.lat, vehicle.lng, vehicle.plate)
             }
-            PopupActionBtn(Icons.Default.History, "Rota Geçmişi", AppColors.Indigo, Modifier.weight(1f)) {
+            PopupActionBtn(Icons.Default.History, "Rota Geçmişi", AppColors.Lavender, Modifier.weight(1f)) {
                 onClose()
                 onNavigateToRouteHistory?.invoke(vehicle)
             }
@@ -984,7 +984,7 @@ private fun VehiclePopupCard(
             Button(
                 onClick = onDetail,
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AppColors.Navy),
+                colors = ButtonDefaults.buttonColors(containerColor = AppColors.DarkCard),
                 modifier = Modifier.weight(1f).height(46.dp)
             ) {
                 Icon(Icons.Default.OpenInFull, null, modifier = Modifier.size(14.dp))
@@ -1011,12 +1011,12 @@ private fun PopupRow(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Icon(icon, null, tint = AppColors.Indigo.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+        Icon(icon, null, tint = AppColors.Lavender.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(14.dp))
-        Text(label, fontSize = 13.sp, color = AppColors.TextMuted, modifier = Modifier.weight(1f))
+        Text(label, fontSize = 13.sp, color = AppColors.DarkTextSub, modifier = Modifier.weight(1f))
         Text(
             value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-            color = valueColor ?: AppColors.Navy,
+            color = valueColor ?: AppColors.DarkText,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.End,
             modifier = Modifier.widthIn(max = 170.dp)
@@ -1026,7 +1026,7 @@ private fun PopupRow(
 
 @Composable
 private fun PopupDivider() {
-    HorizontalDivider(color = AppColors.BorderSoft, modifier = Modifier.padding(start = 48.dp, end = 16.dp))
+    HorizontalDivider(color = AppColors.DarkBorder, modifier = Modifier.padding(start = 48.dp, end = 16.dp))
 }
 
 @Composable
@@ -1047,16 +1047,16 @@ private fun CompactInfoTile(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(30.dp)
-                .background(iconTint.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                .background(iconTint.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
         ) {
             Icon(icon, null, tint = iconTint, modifier = Modifier.size(14.dp))
         }
         Spacer(Modifier.width(8.dp))
         Column {
-            Text(label, fontSize = 10.sp, color = AppColors.TextMuted, fontWeight = FontWeight.Medium)
+            Text(label, fontSize = 10.sp, color = AppColors.DarkTextMuted, fontWeight = FontWeight.Medium)
             Text(
                 value, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                color = valueColor ?: AppColors.Navy,
+                color = valueColor ?: AppColors.DarkText,
                 maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
@@ -1084,7 +1084,7 @@ private fun PopupActionBtn(
             Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
         }
         Spacer(Modifier.height(4.dp))
-        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted, textAlign = TextAlign.Center, maxLines = 1)
+        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.DarkTextMuted, textAlign = TextAlign.Center, maxLines = 1)
     }
 }
 

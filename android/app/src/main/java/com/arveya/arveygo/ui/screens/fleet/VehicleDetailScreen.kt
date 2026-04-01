@@ -207,15 +207,15 @@ fun VehicleDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.ChevronLeft, null, tint = AppColors.Navy, modifier = Modifier.size(18.dp))
-                            Text("Geri", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
+                            Icon(Icons.Default.ChevronLeft, null, tint = AppColors.DarkText, modifier = Modifier.size(18.dp))
+                            Text("Geri", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.DarkText)
                         }
                     }
                 },
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        Text(currentVehicle.plate, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-                        Text("Araç Detayı", fontSize = 10.sp, color = AppColors.TextMuted)
+                        Text(currentVehicle.plate, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.DarkText)
+                        Text("Araç Detayı", fontSize = 10.sp, color = AppColors.DarkTextMuted)
                     }
                 },
                 actions = {
@@ -225,7 +225,7 @@ fun VehicleDetailScreen(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.Surface)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.DarkSurface)
             )
         }
     ) { padding ->
@@ -233,7 +233,7 @@ fun VehicleDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(AppColors.Bg)
+                .background(AppColors.DarkBg)
                 .verticalScroll(rememberScrollState())
         ) {
             // Map Header
@@ -360,7 +360,7 @@ private fun VehicleIdentityCard(vehicle: Vehicle) {
             .padding(horizontal = 16.dp)
             .offset(y = (-30).dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(AppColors.Surface)
+            .background(AppColors.DarkSurface)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -370,7 +370,7 @@ private fun VehicleIdentityCard(vehicle: Vehicle) {
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .size(56.dp)
-                    .background(vehicle.status.color.copy(alpha = 0.1f), RoundedCornerShape(14.dp))
+                    .background(vehicle.status.color.copy(alpha = 0.15f), RoundedCornerShape(14.dp))
             ) {
                 Icon(
                     if (vehicle.isMotorcycle) Icons.Default.TwoWheeler else Icons.Default.DirectionsCar,
@@ -380,12 +380,10 @@ private fun VehicleIdentityCard(vehicle: Vehicle) {
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(vehicle.plate, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                    Text(vehicle.plate, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.DarkText)
                     Spacer(Modifier.width(8.dp))
                     StatusBadge(vehicle.status)
                 }
-                // name fieldı yorum satırına alındı
-                // Text(vehicle.model, fontSize = 13.sp, color = AppColors.TextMuted)
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     VehicleTag(vehicle.group, Icons.Default.Folder, Color.Blue)
@@ -396,22 +394,20 @@ private fun VehicleIdentityCard(vehicle: Vehicle) {
                     )
                 }
             }
-
-
         }
 
-        HorizontalDivider(color = AppColors.BorderSoft)
+        HorizontalDivider(color = AppColors.DarkBorder)
 
         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-            QuickStatItem("Toplam Km", vehicle.formattedTotalKm, Icons.Default.Speed, AppColors.Navy, Modifier.weight(1f))
-            Box(Modifier.width(1.dp).height(40.dp).background(AppColors.BorderSoft))
+            QuickStatItem("Toplam Km", vehicle.formattedTotalKm, Icons.Default.Speed, AppColors.Lavender, Modifier.weight(1f))
+            Box(Modifier.width(1.dp).height(40.dp).background(AppColors.DarkBorder))
             QuickStatItem("Bugün", vehicle.formattedTodayKm, Icons.Default.Route, AppColors.Indigo, Modifier.weight(1f))
-            Box(Modifier.width(1.dp).height(40.dp).background(AppColors.BorderSoft))
-            QuickStatItem("Sürücü", run {
+            Box(Modifier.width(1.dp).height(40.dp).background(AppColors.DarkBorder))
+            QuickStatItem("SürüCü", run {
                 val name = if (vehicle.driverName.isNotEmpty()) vehicle.driverName else vehicle.driver
                 if (name.isEmpty()) "—" else name.split(" ").firstOrNull() ?: "—"
             }, Icons.Default.Person, AppColors.Online, Modifier.weight(1f))
-            Box(Modifier.width(1.dp).height(40.dp).background(AppColors.BorderSoft))
+            Box(Modifier.width(1.dp).height(40.dp).background(AppColors.DarkBorder))
             QuickStatItem("Konum", vehicle.locationDisplay, Icons.Default.LocationOn, Color(0xFFFF9800), Modifier.weight(1f))
         }
     }
@@ -436,8 +432,8 @@ private fun QuickStatItem(label: String, value: String, icon: ImageVector, color
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
         Icon(icon, null, tint = color, modifier = Modifier.size(12.dp))
         Spacer(Modifier.height(4.dp))
-        Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(label, fontSize = 9.sp, color = AppColors.TextMuted)
+        Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppColors.DarkText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, fontSize = 9.sp, color = AppColors.DarkTextMuted)
     }
 }
 
@@ -449,8 +445,8 @@ private fun TabSelector(selectedTab: DetailTab, onSelect: (DetailTab) -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .offset(y = (-14).dp)
-            .background(AppColors.Surface, RoundedCornerShape(12.dp))
-            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
+            .background(AppColors.DarkSurface, RoundedCornerShape(12.dp))
+            .border(1.dp, AppColors.DarkBorder, RoundedCornerShape(12.dp))
             .padding(top = 8.dp)
     ) {
         DetailTab.entries.forEach { tab ->
@@ -464,7 +460,7 @@ private fun TabSelector(selectedTab: DetailTab, onSelect: (DetailTab) -> Unit) {
                     tab.label,
                     fontSize = 13.sp,
                     fontWeight = if (selectedTab == tab) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (selectedTab == tab) AppColors.Navy else AppColors.TextMuted
+                    color = if (selectedTab == tab) AppColors.DarkText else AppColors.DarkTextMuted
                 )
                 Spacer(Modifier.height(6.dp))
                 Box(
@@ -472,7 +468,7 @@ private fun TabSelector(selectedTab: DetailTab, onSelect: (DetailTab) -> Unit) {
                         .fillMaxWidth(0.7f)
                         .height(2.5.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(if (selectedTab == tab) AppColors.Indigo else Color.Transparent)
+                        .background(if (selectedTab == tab) AppColors.Lavender else Color.Transparent)
                 )
             }
         }
@@ -526,7 +522,7 @@ private fun OverviewTab(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .background(AppColors.Surface, RoundedCornerShape(14.dp))
+            .background(AppColors.DarkSurface, RoundedCornerShape(14.dp))
             .padding(14.dp)
     ) {
         data class QuickAction(val icon: ImageVector, val label: String, val color: Color, val onClick: () -> Unit)
@@ -534,7 +530,7 @@ private fun OverviewTab(
             QuickAction(Icons.Default.Navigation, "Yol Tarifi", Color(0xFF3B82F6)) {
                 openMapsDirections(context, vehicle.lat, vehicle.lng, vehicle.plate)
             },
-            QuickAction(Icons.Default.History, "Rota Geçmişi", AppColors.Indigo) {
+            QuickAction(Icons.Default.History, "Rota Geçmişi", AppColors.Lavender) {
                 onBack()
                 onNavigateToRouteHistory?.invoke(vehicle)
             },
@@ -544,7 +540,7 @@ private fun OverviewTab(
             QuickAction(Icons.Default.Lock, "Blokaj", Color(0xFFEF4444)) {
                 showBlockageDialog = true
             },
-            QuickAction(Icons.Default.Share, "Paylaş", AppColors.TextMuted) {
+            QuickAction(Icons.Default.Share, "Paylaş", AppColors.DarkTextMuted) {
                 shareVehicleLocation(context, vehicle)
             },
         )
@@ -557,12 +553,12 @@ private fun OverviewTab(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(40.dp)
-                        .background(action.color.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                        .background(action.color.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                 ) {
                     Icon(action.icon, null, tint = action.color, modifier = Modifier.size(17.dp))
                 }
                 Spacer(Modifier.height(6.dp))
-                Text(action.label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted, textAlign = TextAlign.Center, maxLines = 1)
+                Text(action.label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.DarkTextMuted, textAlign = TextAlign.Center, maxLines = 1)
             }
         }
     }
@@ -645,31 +641,31 @@ private fun OverviewTab(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AppColors.Surface, RoundedCornerShape(14.dp))
+            .background(AppColors.DarkSurface, RoundedCornerShape(14.dp))
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(AppColors.Indigo.copy(alpha = 0.08f))
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(AppColors.Indigo.copy(alpha = 0.15f))
             ) {
                 Text(
                     if (displayName.isEmpty()) "?" else displayName.take(1),
-                    fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AppColors.Indigo
+                    fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AppColors.Lavender
                 )
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     if (displayName.isEmpty()) "Sürücü Atanmamış" else displayName,
-                    fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy
+                    fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.DarkText
                 )
-                Text("Sürücü", fontSize = 11.sp, color = AppColors.TextMuted)
+                Text("Sürücü", fontSize = 11.sp, color = AppColors.DarkTextMuted)
             }
             TextButton(onClick = { showDriverAssign = true }) {
-                Icon(Icons.Default.Edit, null, modifier = Modifier.size(13.dp), tint = AppColors.Indigo)
+                Icon(Icons.Default.Edit, null, modifier = Modifier.size(13.dp), tint = AppColors.Lavender)
                 Spacer(Modifier.width(4.dp))
-                Text("Değiştir", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AppColors.Indigo)
+                Text("Değiştir", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AppColors.Lavender)
             }
         }
     }
@@ -690,7 +686,7 @@ private fun CleanListCard(content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AppColors.Surface, RoundedCornerShape(14.dp))
+            .background(AppColors.DarkSurface, RoundedCornerShape(14.dp))
             .padding(vertical = 4.dp),
         content = content
     )
@@ -699,7 +695,7 @@ private fun CleanListCard(content: @Composable ColumnScope.() -> Unit) {
 @Composable
 private fun ListDivider() {
     HorizontalDivider(
-        color = AppColors.BorderSoft,
+        color = AppColors.DarkBorder,
         modifier = Modifier.padding(start = 52.dp, end = 16.dp)
     )
 }
@@ -719,7 +715,7 @@ private fun DetailRow(
     ) {
         Icon(
             icon, null,
-            tint = AppColors.Indigo.copy(alpha = 0.7f),
+            tint = AppColors.Lavender.copy(alpha = 0.8f),
             modifier = Modifier.size(16.dp)
         )
         Spacer(Modifier.width(14.dp))
@@ -727,14 +723,14 @@ private fun DetailRow(
             label,
             fontSize = 13.sp,
             fontWeight = FontWeight.Normal,
-            color = AppColors.TextMuted,
+            color = AppColors.DarkTextSub,
             modifier = Modifier.weight(1f)
         )
         Text(
             value,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
-            color = valueColor ?: AppColors.Navy,
+            color = valueColor ?: AppColors.DarkText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.End,
@@ -1056,14 +1052,14 @@ private fun SectionCard(title: String, icon: ImageVector, content: @Composable (
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AppColors.Surface, RoundedCornerShape(14.dp))
-            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(14.dp))
+            .background(AppColors.DarkSurface, RoundedCornerShape(14.dp))
+            .border(1.dp, AppColors.DarkBorder, RoundedCornerShape(14.dp))
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = AppColors.Indigo, modifier = Modifier.size(11.dp))
+            Icon(icon, null, tint = AppColors.Lavender, modifier = Modifier.size(11.dp))
             Spacer(Modifier.width(8.dp))
-            Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppColors.TextMuted, letterSpacing = 0.5.sp)
+            Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppColors.DarkTextMuted, letterSpacing = 0.5.sp)
             Spacer(Modifier.weight(1f))
         }
         Spacer(Modifier.height(12.dp))
@@ -1075,18 +1071,18 @@ private fun SectionCard(title: String, icon: ImageVector, content: @Composable (
 private fun InfoCell(icon: ImageVector, label: String, value: String, modifier: Modifier = Modifier, valueColor: Color? = null) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.background(AppColors.Bg, RoundedCornerShape(10.dp)).padding(10.dp)
+        modifier = modifier.background(AppColors.DarkCard, RoundedCornerShape(10.dp)).padding(10.dp)
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.size(26.dp).background(AppColors.Indigo.copy(alpha = 0.08f), RoundedCornerShape(7.dp))
+            modifier = Modifier.size(26.dp).background(AppColors.Lavender.copy(alpha = 0.12f), RoundedCornerShape(7.dp))
         ) {
-            Icon(icon, null, tint = AppColors.Indigo, modifier = Modifier.size(12.dp))
+            Icon(icon, null, tint = AppColors.Lavender, modifier = Modifier.size(12.dp))
         }
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f, fill = false)) {
-            Text(label, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = AppColors.TextFaint, letterSpacing = 0.3.sp)
-            Text(value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = valueColor ?: AppColors.Navy, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = AppColors.DarkTextMuted, letterSpacing = 0.3.sp)
+            Text(value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = valueColor ?: AppColors.DarkText, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -1104,7 +1100,7 @@ private fun ActionButton(icon: ImageVector, label: String, color: Color, modifie
             Icon(icon, null, tint = color, modifier = Modifier.size(17.dp))
         }
         Spacer(Modifier.height(6.dp))
-        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted, textAlign = TextAlign.Center, maxLines = 2, lineHeight = 11.sp)
+        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.DarkTextMuted, textAlign = TextAlign.Center, maxLines = 2, lineHeight = 11.sp)
     }
 }
 
@@ -1129,11 +1125,11 @@ private fun MaintenanceRow(icon: ImageVector, title: String, date: String, km: S
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+            Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.DarkText)
             Row {
-                Text(date, fontSize = 11.sp, color = AppColors.TextMuted)
-                Text(" • ", fontSize = 8.sp, color = AppColors.TextFaint)
-                Text(km, fontSize = 11.sp, color = AppColors.TextMuted)
+                Text(date, fontSize = 11.sp, color = AppColors.DarkTextSub)
+                Text(" • ", fontSize = 8.sp, color = AppColors.DarkTextMuted)
+                Text(km, fontSize = 11.sp, color = AppColors.DarkTextSub)
             }
         }
         Text(
@@ -1156,12 +1152,12 @@ private fun DocumentRow(title: String, date: String, daysLeft: Int, status: DocS
         modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp, horizontal = 14.dp)
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-            Text("Bitiş: $date", fontSize = 11.sp, color = AppColors.TextMuted)
+            Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.DarkText)
+            Text("Bitiş: $date", fontSize = 11.sp, color = AppColors.DarkTextSub)
         }
         Column(horizontalAlignment = Alignment.End) {
             Text("$daysLeft gün", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = status.color)
-            Text("kalan", fontSize = 9.sp, color = AppColors.TextMuted)
+            Text("kalan", fontSize = 9.sp, color = AppColors.DarkTextMuted)
         }
         Spacer(Modifier.width(8.dp))
         Box(Modifier.size(8.dp).clip(CircleShape).background(status.color))
@@ -1178,8 +1174,8 @@ private fun CostSummaryItem(label: String, amount: String, color: Color, percent
             Box(modifier = Modifier.fillMaxWidth().height((percent / 100f * 60).dp).background(color, RoundedCornerShape(4.dp)))
         }
         Spacer(Modifier.height(6.dp))
-        Text(amount, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
-        Text(label, fontSize = 9.sp, color = AppColors.TextMuted)
+        Text(amount, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = AppColors.DarkText)
+        Text(label, fontSize = 9.sp, color = AppColors.DarkTextMuted)
     }
 }
 
@@ -1220,10 +1216,10 @@ private fun CostRow(cost: VehicleCost) {
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-            Text(cost.costDate.ifEmpty { "—" }, fontSize = 11.sp, color = AppColors.TextMuted)
+            Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.DarkText)
+            Text(cost.costDate.ifEmpty { "—" }, fontSize = 11.sp, color = AppColors.DarkTextSub)
         }
-        Text(cost.formattedAmount, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+        Text(cost.formattedAmount, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AppColors.DarkText)
     }
 }
 
@@ -1241,10 +1237,10 @@ private fun EventRow(icon: ImageVector, title: String, subtitle: String, time: S
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-            Text(subtitle, fontSize = 11.sp, color = AppColors.TextMuted)
+            Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.DarkText)
+            Text(subtitle, fontSize = 11.sp, color = AppColors.DarkTextSub)
         }
-        Text(time, fontSize = 10.sp, color = AppColors.TextFaint, textAlign = TextAlign.End)
+        Text(time, fontSize = 10.sp, color = AppColors.DarkTextMuted, textAlign = TextAlign.End)
     }
 }
 

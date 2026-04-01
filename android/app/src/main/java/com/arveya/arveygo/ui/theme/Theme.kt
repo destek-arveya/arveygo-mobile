@@ -36,6 +36,15 @@ object AppColors {
     // Border
     val BorderSoft = Color(0xFFE4E7F0)
 
+    // ── Dark Mode palette (used by VehicleDetailScreen & LiveMap popup) ──
+    val DarkBg     = Color(0xFF0A0E1F)   // Page background
+    val DarkSurface = Color(0xFF111629)  // Card / sheet background
+    val DarkCard   = Color(0xFF1A2040)   // Elevated card
+    val DarkBorder = Color(0xFF252D4A)   // Dividers / borders
+    val DarkText   = Color(0xFFE8EAF6)   // Primary text
+    val DarkTextSub = Color(0xFFB0BAD8)  // Secondary text
+    val DarkTextMuted = Color(0xFF6B7699) // Muted / labels
+
     // Gradients
     val PanelGradient = Brush.linearGradient(
         colors = listOf(
