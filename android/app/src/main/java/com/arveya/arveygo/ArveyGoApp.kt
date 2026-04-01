@@ -296,20 +296,23 @@ private fun HubCard(title: String, icon: ImageVector, color: Color, modifier: Mo
 // ═══════════════════════════════════════════════════════════════════════════
 @Composable
 fun BottomTabBar(selectedTab: AppTab, onTabSelected: (AppTab) -> Unit) {
-    val activeColor = AppColors.Navy
-    val inactiveColor = Color(0xFF9BA0B2)
+    // Uygulamanın dark-first tasarımına uygun sabit dark renk paleti
+    val activeColor   = Color(0xFF8B95E0)   // lavender
+    val inactiveColor = Color(0xFF50546E)
+    val bgColor       = Color(0xFF10132A)   // darkBg tonu
+    val dividerColor  = Color.White.copy(alpha = 0.06f)
 
     Column {
         // Top separator
         HorizontalDivider(
             thickness = 0.5.dp,
-            color = AppColors.BorderSoft.copy(alpha = 0.8f)
+            color = dividerColor
         )
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFFFCFCFE))
+                .background(bgColor)
                 .navigationBarsPadding()
                 .padding(top = 6.dp, bottom = 2.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,

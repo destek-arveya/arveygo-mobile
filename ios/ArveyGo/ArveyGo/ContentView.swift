@@ -157,11 +157,14 @@ struct ContentView: View {
             .padding(.bottom, 2)
         }
         .background(
-            (isDark
-             ? Color(red: 16/255, green: 19/255, blue: 42/255)
-             : Color(red: 252/255, green: 252/255, blue: 254/255))
-            .shadow(.drop(color: isDark ? .black.opacity(0.4) : .black.opacity(0.06),
-                          radius: 8, x: 0, y: -2))
+            ZStack {
+                (isDark
+                 ? Color(red: 16/255, green: 19/255, blue: 42/255)
+                 : Color(red: 252/255, green: 252/255, blue: 254/255))
+                .shadow(.drop(color: isDark ? .black.opacity(0.4) : .black.opacity(0.06),
+                              radius: 8, x: 0, y: -2))
+                .ignoresSafeArea(edges: .bottom)
+            }
         )
     }
 

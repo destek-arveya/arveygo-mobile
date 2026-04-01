@@ -54,13 +54,39 @@ struct LiveMapView: View {
                 .toolbar {
 
                     ToolbarItem(placement: .principal) {
-                        VStack(spacing: 1) {
-                            Text("Canlı Harita")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(AppTheme.darkText)
-                            Text("Araç Takip / Canlı Harita")
-                                .font(.system(size: 10))
-                                .foregroundColor(AppTheme.darkTextMuted)
+                        HStack(spacing: 8) {
+                            VStack(spacing: 1) {
+                                Text("Canlı Harita")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(AppTheme.darkText)
+                                Text("Araç Takip / Canlı Harita")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(AppTheme.darkTextMuted)
+                            }
+                            // WS canlı bağlantı durumu
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(wsStatusColor)
+                                    .frame(width: 6, height: 6)
+                                Text(vm.wsStatus.label)
+                                    .font(.system(size: 8, weight: .semibold))
+                                    .foregroundColor(wsStatusColor)
+                            }
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(wsStatusColor.opacity(0.15))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(wsStatusColor.opacity(0.35), lineWidth: 1)
+                            )
+                            .onTapGesture {
+                                if vm.wsStatus == .disconnected || vm.wsStatus == .idle {
+                                    authVM.connectWebSocket()
+                                }
+                            }
                         }
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -75,12 +101,13 @@ struct LiveMapView: View {
                     let liveVehicle = vm.vehicles.first(where: { $0.id == selected.id }) ?? selected
                     EnrichedPopupWrapper(initialVehicle: liveVehicle, liveVehicles: vm.vehicles) { enriched in
                         vehiclePopupSheet(enriched)
+                            .ignoresSafeArea(edges: .bottom)
                     }
                         .presentationDetents([.fraction(0.50), .large])
-                        .presentationDragIndicator(.visible)
+                        .presentationDragIndicator(.hidden)
                         .presentationBackground(AppTheme.darkBg)
                         .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.50)))
-                        .presentationCornerRadius(20)
+                        .presentationCornerRadius(24)
                         .colorScheme(.dark)
                 }
                 .fullScreenCover(item: $detailVehicle) { vehicle in
@@ -217,48 +244,16 @@ struct LiveMapView: View {
         .ignoresSafeArea(edges: .bottom)
     }
 
-    // MARK: - Top Overlay (filter chips + WS status)
+    // MARK: - Top Overlay (filter chips only — WS status taşındı toolbar'a)
     var topOverlay: some View {
-        VStack(spacing: 6) {
-            // Filter chips row (like Android)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    statusChip(label: "Tümü", count: vm.vehicles.count, filter: nil, color: AppTheme.navy)
-                    statusChip(label: "Kontak Açık", count: vm.onlineCount, filter: .ignitionOn, color: AppTheme.online)
-                    statusChip(label: "Kontak Kapalı", count: vm.offlineCount, filter: .ignitionOff, color: AppTheme.offline)
-                    statusChip(label: "Bilgi Yok", count: vm.idleCount, filter: .noData, color: Color(red: 148/255, green: 163/255, blue: 184/255))
-                    
-                    Spacer()
-                    
-                    // WebSocket status chip
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(wsStatusColor)
-                            .frame(width: 6, height: 6)
-                        Text(vm.wsStatus.label)
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundColor(wsStatusColor)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(wsStatusColor.opacity(0.1))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(wsStatusColor.opacity(0.3), lineWidth: 1)
-                    )
-                    .onTapGesture {
-                        if case .error = vm.wsStatus {
-                            authVM.connectWebSocket()
-                        } else if vm.wsStatus == .disconnected || vm.wsStatus == .idle {
-                            authVM.connectWebSocket()
-                        }
-                    }
-                }
-                .padding(.horizontal, 12)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                statusChip(label: "Tümü", count: vm.vehicles.count, filter: nil, color: AppTheme.navy)
+                statusChip(label: "Kontak Açık", count: vm.onlineCount, filter: .ignitionOn, color: AppTheme.online)
+                statusChip(label: "Kontak Kapalı", count: vm.offlineCount, filter: .ignitionOff, color: AppTheme.offline)
+                statusChip(label: "Bilgi Yok", count: vm.idleCount, filter: .noData, color: Color(red: 148/255, green: 163/255, blue: 184/255))
             }
+            .padding(.horizontal, 12)
         }
         .padding(.top, 4)
     }
@@ -311,18 +306,18 @@ struct LiveMapView: View {
         let isActive = vm.statusFilter == filter
         return Button(action: { vm.statusFilter = filter }) {
             Text("\(label) (\(count))")
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundColor(isActive ? color : AppTheme.textSecondary)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(isActive ? color : AppTheme.darkTextSub)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(isActive ? color.opacity(0.15) : Color.white.opacity(0.9))
+                .fill(isActive ? color.opacity(0.15) : AppTheme.darkSurface.opacity(0.92))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .stroke(isActive ? color : AppTheme.borderSoft, lineWidth: 1)
+                .stroke(isActive ? color : AppTheme.darkBorder, lineWidth: 1)
         )
     }
 
