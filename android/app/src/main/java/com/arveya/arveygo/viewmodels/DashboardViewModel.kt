@@ -30,6 +30,9 @@ class DashboardViewModel : ViewModel() {
     private val _isLoadingAlerts = MutableStateFlow(false)
     val isLoadingAlerts: StateFlow<Boolean> = _isLoadingAlerts
 
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading
+
     private val _selectedPeriod = MutableStateFlow("today")
     val selectedPeriod: StateFlow<String> = _selectedPeriod
 
@@ -85,6 +88,7 @@ class DashboardViewModel : ViewModel() {
             WebSocketManager.vehicleList.collectLatest { list ->
                 if (list.isNotEmpty()) {
                     _vehicles.value = list
+                    _isLoading.value = false
                 }
             }
         }
@@ -93,6 +97,7 @@ class DashboardViewModel : ViewModel() {
             delay(3000)
             if (_vehicles.value.isEmpty()) {
                 loadDummyVehicles()
+                _isLoading.value = false
             }
         }
     }

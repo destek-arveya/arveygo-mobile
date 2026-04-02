@@ -8,7 +8,7 @@ class DashboardViewModel: ObservableObject {
     @Published var drivers: [DriverScore] = []
     @Published var alerts: [FleetAlert] = []
     @Published var selectedPeriod: String = "today"
-    @Published var isLoading = false
+    @Published var isLoading = true
     @Published var isRefreshing = false
     @Published var isLoadingDrivers = false
     @Published var isLoadingAlerts = false
@@ -106,6 +106,7 @@ class DashboardViewModel: ObservableObject {
                         }
                         return newVehicle
                     }
+                    self.isLoading = false
                 }
             }
             .store(in: &cancellables)
@@ -125,6 +126,7 @@ class DashboardViewModel: ObservableObject {
                         }
                         return newVehicle
                     }
+                    self.isLoading = false
                 case .update(let vehicle, _):
                     if let idx = self.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
                         self.vehicles[idx].mergeUpdate(from: vehicle)
@@ -140,6 +142,7 @@ class DashboardViewModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
             guard let self = self, self.vehicles.isEmpty else { return }
             self.loadDummyData()
+            self.isLoading = false
         }
     }
 

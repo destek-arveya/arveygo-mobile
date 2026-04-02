@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -24,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.*
 import com.arveya.arveygo.LocalAuthViewModel
 import com.arveya.arveygo.models.CatalogVehicle
 import com.arveya.arveygo.models.Driver
@@ -109,7 +111,7 @@ fun DriversScreen() {
             modifier = Modifier.fillMaxSize().padding(padding).background(AppColors.Bg)
         ) {
             if (isLoading && drivers.isEmpty()) {
-                CircularProgressIndicator(color = AppColors.Indigo, modifier = Modifier.size(32.dp).align(Alignment.Center))
+                DriversSkeletonScreen()
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -946,4 +948,87 @@ fun VehicleDriverAssignDialog(vehicleId: Int, currentDriverName: String, onDismi
         confirmButton = {},
         dismissButton = { TextButton(onClick = onDismiss) { Text("Kapat", color = AppColors.TextMuted) } }
     )
+}
+
+// MARK: - Drivers Skeleton Screen
+@Composable
+private fun DriversSkeletonScreen() {
+    val infiniteTransition = rememberInfiniteTransition(label = "drivers_shimmer")
+    val shimmerX by infiniteTransition.animateFloat(
+        initialValue = -1f, targetValue = 2f,
+        animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart),
+        label = "shimmer_x"
+    )
+
+    fun shimmerBrush(): Brush {
+        val base = Color(0xFFE8E8E8)
+        val highlight = Color(0xFFF5F5F5)
+        return Brush.linearGradient(
+            colors = listOf(base, highlight, base),
+            start = androidx.compose.ui.geometry.Offset(shimmerX * 1000f, 0f),
+            end = androidx.compose.ui.geometry.Offset((shimmerX + 1f) * 1000f, 0f)
+        )
+    }
+
+    @Composable
+    fun SkeletonBox(modifier: Modifier = Modifier, radius: Float = 8f) {
+        Box(modifier = modifier.clip(RoundedCornerShape(radius.dp)).background(shimmerBrush()))
+    }
+
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Stats chips row
+        item {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(5) {
+                    SkeletonBox(Modifier.width(80.dp).height(34.dp), radius = 20f)
+                }
+            }
+        }
+        // Search bar
+        item { SkeletonBox(Modifier.fillMaxWidth().height(52.dp), radius = 10f) }
+        // Filter chips
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(50, 80, 70, 90).forEach { w ->
+                    SkeletonBox(Modifier.width(w.dp).height(30.dp), radius = 20f)
+                }
+            }
+        }
+        // Driver card skeletons
+        items(6) {
+            Column(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                    .background(AppColors.Surface).border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(14.dp)
+                ) {
+                    // Avatar
+                    Box(Modifier.size(44.dp).clip(CircleShape).background(shimmerBrush()))
+                    Spacer(Modifier.width(12.dp))
+                    // Name & info
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SkeletonBox(Modifier.width(130.dp).height(13.dp))
+                        SkeletonBox(Modifier.width(90.dp).height(11.dp))
+                        SkeletonBox(Modifier.width(70.dp).height(10.dp))
+                    }
+                    // Score circle
+                    Box(Modifier.size(44.dp).clip(CircleShape).background(shimmerBrush()))
+                }
+                // Mini stats row
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    repeat(4) {
+                        SkeletonBox(Modifier.weight(1f).height(10.dp))
+                    }
+                }
+            }
+        }
+    }
 }

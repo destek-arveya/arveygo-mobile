@@ -69,16 +69,7 @@ struct LoginView: View {
                         .frame(height: 64)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
 
-                        VStack(spacing: 2) {
-                            Text("ArveyGo")
-                                .font(.system(size: 22, weight: .bold))
-                                .foregroundColor(AppTheme.navy)
-
-                            Text(L.appSubtitle)
-                                .font(.system(size: 9, weight: .medium))
-                                .tracking(2)
-                                .foregroundColor(AppTheme.textMuted)
-                        }
+                        
                     }
                     .padding(.bottom, 24)
 

@@ -65,39 +65,16 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 16) {
-                    // ── 1. Header ──
-                    headerSection
-                        .padding(.horizontal, 20)
-                        .padding(.top, 4)
-
-                    // ── 2. Fleet Status ──
-                    fleetStatusCard
-                        .padding(.horizontal, 20)
-
-                    // ── 4. En Hızlı 3 Araç ──
-                    fastestVehiclesCard
-                        .padding(.horizontal, 20)
-
-                    // ── 4. Sürücü Skoru & Bugün KM (side-by-side) ──
-                    HStack(spacing: 12) {
-                        driverScoreCard
-                        dailyKmCard
-                    }
-                    .padding(.horizontal, 20)
-
-                    // ── 6. Son 5 Alarm ──
-                    recentAlarmsCard
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 16)
+            Group {
+                if dashVM.isLoading {
+                    DashboardSkeletonView()
+                        .transition(AnyTransition.opacity)
+                } else {
+                    mainContent
+                        .transition(AnyTransition.opacity)
                 }
-                .padding(.top, 2)
             }
-            .refreshable {
-                dashVM.refreshData()
-                try? await Task.sleep(nanoseconds: 1_200_000_000)
-            }
+            .animation(.easeInOut(duration: 0.3), value: dashVM.isLoading)
             .background(ds.pageBg.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -161,6 +138,45 @@ struct DashboardView: View {
         }
         .onAppear {
             authVM.connectWebSocket()
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MARK: — Main Content
+    // ═══════════════════════════════════════════════════════════════════════
+    private var mainContent: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 16) {
+                // ── 1. Header ──
+                headerSection
+                    .padding(.horizontal, 20)
+                    .padding(.top, 4)
+
+                // ── 2. Fleet Status ──
+                fleetStatusCard
+                    .padding(.horizontal, 20)
+
+                // ── 3. En Hızlı 3 Araç ──
+                fastestVehiclesCard
+                    .padding(.horizontal, 20)
+
+                // ── 4. Sürücü Skoru & Bugün KM (side-by-side) ──
+                HStack(spacing: 12) {
+                    driverScoreCard
+                    dailyKmCard
+                }
+                .padding(.horizontal, 20)
+
+                // ── 5. Son 5 Alarm ──
+                recentAlarmsCard
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 16)
+            }
+            .padding(.top, 2)
+        }
+        .refreshable {
+            dashVM.refreshData()
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
         }
     }
 

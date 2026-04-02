@@ -1,5 +1,6 @@
 package com.arveya.arveygo.ui.screens.dashboard
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -14,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -52,6 +54,7 @@ fun DashboardScreen(
     val drivers by vm.drivers.collectAsState()
     val alerts by vm.alerts.collectAsState()
     val isRefreshing by vm.isRefreshing.collectAsState()
+    val isLoading by vm.isLoading.collectAsState()
     val isLoadingDrivers by vm.isLoadingDrivers.collectAsState()
     val isLoadingAlerts by vm.isLoadingAlerts.collectAsState()
     var selectedVehicle by remember { mutableStateOf<Vehicle?>(null) }
@@ -97,6 +100,9 @@ fun DashboardScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            if (isLoading) {
+                DashboardSkeletonScreen()
+            } else {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -182,6 +188,7 @@ fun DashboardScreen(
 
                 Spacer(Modifier.height(30.dp))
             }
+            } // else (isLoading)
         } // PullToRefreshBox
     }
 
@@ -1169,5 +1176,290 @@ private fun InsightBubble(
                     .padding(horizontal = 6.dp, vertical = 3.dp)
             )
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MARK: - Shimmer Utilities
+// ═══════════════════════════════════════════════════════════════════════════
+@Composable
+private fun shimmerBrush(): Brush {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val translateAnim by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer_translate"
+    )
+    return Brush.linearGradient(
+        colors = listOf(
+            Color(0xFFE8EAF0),
+            Color(0xFFF5F6FA),
+            Color(0xFFFFFFFF),
+            Color(0xFFF5F6FA),
+            Color(0xFFE8EAF0),
+        ),
+        start = Offset(translateAnim - 400f, 0f),
+        end = Offset(translateAnim, 0f)
+    )
+}
+
+@Composable
+private fun SkeletonBox(
+    modifier: Modifier = Modifier,
+    height: Int = 14,
+    cornerRadius: Int = 6
+) {
+    val brush = shimmerBrush()
+    Box(
+        modifier = modifier
+            .height(height.dp)
+            .clip(RoundedCornerShape(cornerRadius.dp))
+            .background(brush)
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MARK: - Dashboard Skeleton Screen
+// ═══════════════════════════════════════════════════════════════════════════
+@Composable
+internal fun DashboardSkeletonScreen() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .background(AppColors.Bg)
+    ) {
+        // ─── Header Skeleton ───
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                SkeletonBox(modifier = Modifier.width(80.dp), height = 12)
+                Spacer(Modifier.height(6.dp))
+                SkeletonBox(modifier = Modifier.width(150.dp), height = 20)
+            }
+            SkeletonBox(modifier = Modifier.width(72.dp), height = 28, cornerRadius = 14)
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // ─── Fleet Status Card Skeleton ───
+        SkeletonCard(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    SkeletonBox(modifier = Modifier.width(90.dp), height = 15)
+                    Spacer(Modifier.weight(1f))
+                    SkeletonBox(modifier = Modifier.width(55.dp), height = 12)
+                }
+                SkeletonBox(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    height = 6,
+                    cornerRadius = 3
+                )
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = Color(0xFFE2E8F0)
+                )
+                Row(
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 14.dp)
+                ) {
+                    repeat(3) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            SkeletonBox(modifier = Modifier.width(36.dp), height = 22)
+                            Spacer(Modifier.height(4.dp))
+                            SkeletonBox(modifier = Modifier.width(56.dp), height = 10)
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ─── Vehicles Card Skeleton ───
+        SkeletonCard(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    SkeletonBox(modifier = Modifier.width(65.dp), height = 15)
+                    Spacer(Modifier.weight(1f))
+                    SkeletonBox(modifier = Modifier.width(40.dp), height = 12)
+                }
+                SkeletonBox(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    height = 6,
+                    cornerRadius = 3
+                )
+                Spacer(Modifier.height(10.dp))
+                repeat(4) { index ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        SkeletonBox(modifier = Modifier.size(36.dp), cornerRadius = 10)
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            SkeletonBox(modifier = Modifier.width(80.dp), height = 13)
+                            Spacer(Modifier.height(4.dp))
+                            SkeletonBox(modifier = Modifier.width(110.dp), height = 10)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            SkeletonBox(modifier = Modifier.width(45.dp), height = 12)
+                            Spacer(Modifier.height(3.dp))
+                            SkeletonBox(modifier = Modifier.width(35.dp), height = 10)
+                        }
+                    }
+                    if (index < 3) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 56.dp),
+                            color = Color(0xFFE2E8F0)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ─── Driver Score + Daily KM (side-by-side) ───
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier
+                .padding(horizontal = 20.dp)
+                .fillMaxWidth()
+        ) {
+            repeat(2) {
+                SkeletonCard(modifier = Modifier.weight(1f)) {
+                    Column {
+                        SkeletonBox(
+                            modifier = Modifier
+                                .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 10.dp)
+                                .width(75.dp),
+                            height = 13
+                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            val brush = shimmerBrush()
+                            Box(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(CircleShape)
+                                    .background(brush)
+                            )
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp)
+                        ) {
+                            repeat(2) {
+                                Column {
+                                    SkeletonBox(modifier = Modifier.width(24.dp), height = 15)
+                                    Spacer(Modifier.height(3.dp))
+                                    SkeletonBox(modifier = Modifier.width(32.dp), height = 9)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        SkeletonBox(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp)
+                                .padding(bottom = 14.dp),
+                            height = 30,
+                            cornerRadius = 8
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ─── Alarms Card Skeleton ───
+        SkeletonCard(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    SkeletonBox(modifier = Modifier.width(90.dp), height = 15)
+                    Spacer(Modifier.weight(1f))
+                    SkeletonBox(modifier = Modifier.width(38.dp), height = 12)
+                }
+                repeat(4) { index ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        SkeletonBox(modifier = Modifier.size(32.dp), cornerRadius = 8)
+                        Spacer(Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            SkeletonBox(modifier = Modifier.width(130.dp), height = 13)
+                            Spacer(Modifier.height(4.dp))
+                            SkeletonBox(modifier = Modifier.width(90.dp), height = 10)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            SkeletonBox(modifier = Modifier.width(38.dp), height = 10)
+                            Spacer(Modifier.height(3.dp))
+                            SkeletonBox(modifier = Modifier.width(30.dp), height = 10)
+                        }
+                    }
+                    if (index < 3) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 52.dp),
+                            color = Color(0xFFE2E8F0)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+
+        Spacer(Modifier.height(30.dp))
+    }
+}
+
+@Composable
+private fun SkeletonCard(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+    ) {
+        content()
     }
 }

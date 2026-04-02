@@ -33,8 +33,7 @@ struct DriversView: View {
                 AppTheme.bg.ignoresSafeArea()
 
                 if vm.isLoading && vm.drivers.isEmpty {
-                    ProgressView()
-                        .scaleEffect(1.2)
+                    DriversSkeletonView()
                 } else {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 12) {
@@ -1081,6 +1080,82 @@ struct VehicleDriverAssignSheet: View {
             } catch {
                 await MainActor.run { isAssigning = false }
                 print("[VehicleDriverAssign] Clear error: \(error)")
+            }
+        }
+    }
+}
+
+// MARK: - Drivers Skeleton View
+struct DriversSkeletonView: View {
+    @State private var phase: CGFloat = 0
+
+    var body: some View {
+        let shimmer = LinearGradient(
+            gradient: Gradient(stops: [
+                .init(color: Color(.systemGray5), location: max(0, phase - 0.3)),
+                .init(color: Color(.systemGray4).opacity(0.6), location: phase),
+                .init(color: Color(.systemGray5), location: min(1, phase + 0.3))
+            ]),
+            startPoint: .leading, endPoint: .trailing
+        )
+
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 12) {
+                // Stats strip skeleton
+                HStack(spacing: 8) {
+                    ForEach(0..<5, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 20).fill(shimmer).frame(width: 80, height: 34)
+                    }
+                }
+
+                // Search bar skeleton
+                RoundedRectangle(cornerRadius: 10).fill(shimmer).frame(height: 40)
+
+                // Filter chips skeleton
+                HStack(spacing: 6) {
+                    ForEach(0..<4, id: \.self) { i in
+                        RoundedRectangle(cornerRadius: 20).fill(shimmer).frame(width: i == 0 ? 50 : 80, height: 30)
+                    }
+                    Spacer()
+                }
+
+                // Driver card skeletons
+                ForEach(0..<6, id: \.self) { _ in
+                    VStack(spacing: 0) {
+                        HStack(spacing: 12) {
+                            // Avatar
+                            Circle().fill(shimmer).frame(width: 44, height: 44)
+                            // Name & info
+                            VStack(alignment: .leading, spacing: 6) {
+                                RoundedRectangle(cornerRadius: 4).fill(shimmer).frame(width: 130, height: 13)
+                                RoundedRectangle(cornerRadius: 4).fill(shimmer).frame(width: 90, height: 11)
+                                RoundedRectangle(cornerRadius: 4).fill(shimmer).frame(width: 70, height: 10)
+                            }
+                            Spacer()
+                            // Score circle
+                            Circle().fill(shimmer).frame(width: 42, height: 42)
+                        }.padding(14)
+
+                        // Mini stats row
+                        HStack(spacing: 0) {
+                            ForEach(0..<4, id: \.self) { _ in
+                                RoundedRectangle(cornerRadius: 4).fill(shimmer).frame(height: 10).frame(maxWidth: .infinity).padding(.horizontal, 4)
+                            }
+                        }.padding(.horizontal, 14).padding(.bottom, 10)
+                    }
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.systemGray5), lineWidth: 1))
+                }
+
+                Spacer().frame(height: 16)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+        }
+        .onAppear {
+            withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) {
+                phase = 1.3
             }
         }
     }
