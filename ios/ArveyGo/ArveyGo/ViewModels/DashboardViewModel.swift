@@ -6,11 +6,14 @@ import Combine
 class DashboardViewModel: ObservableObject {
     @Published var vehicles: [Vehicle] = []
     @Published var drivers: [DriverScore] = []
-    @Published var alerts: [FleetAlert] = []
+    @Published var alerts: [AlarmEvent] = []
+    @Published var vehiclesErrorMessage: String?
+    @Published var alertsErrorMessage: String?
     @Published var selectedPeriod: String = "today"
     @Published var isLoading = true
     @Published var isRefreshing = false
     @Published var isLoadingDrivers = false
+    @Published var isLoadingDailyKm = true
     @Published var isLoadingAlerts = false
 
     private var cancellables = Set<AnyCancellable>()
@@ -85,6 +88,7 @@ class DashboardViewModel: ObservableObject {
 
     init() {
         subscribeToWebSocket()
+        loadVehiclesFromAPI()
         loadDriversFromAPI()
         loadAlertsFromAPI()
     }
@@ -106,7 +110,9 @@ class DashboardViewModel: ObservableObject {
                         }
                         return newVehicle
                     }
+                    self.vehiclesErrorMessage = nil
                     self.isLoading = false
+                    self.isLoadingDailyKm = false
                 }
             }
             .store(in: &cancellables)
@@ -126,7 +132,9 @@ class DashboardViewModel: ObservableObject {
                         }
                         return newVehicle
                     }
+                    self.vehiclesErrorMessage = nil
                     self.isLoading = false
+                    self.isLoadingDailyKm = false
                 case .update(let vehicle, _):
                     if let idx = self.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
                         self.vehicles[idx].mergeUpdate(from: vehicle)
@@ -137,13 +145,6 @@ class DashboardViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
-
-        // Fallback: load dummy vehicle data after 3 seconds if no WS data
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-            guard let self = self, self.vehicles.isEmpty else { return }
-            self.loadDummyData()
-            self.isLoading = false
-        }
     }
 
     func formatKm(_ km: Int) -> String {
@@ -153,18 +154,35 @@ class DashboardViewModel: ObservableObject {
         return formatter.string(from: NSNumber(value: km)) ?? "\(km)"
     }
 
-    func loadDummyData() {
-        // Same dummy data as the Laravel dashboard (vehicle fallback)
-        vehicles = [
-            Vehicle(id: "1", plate: "34 ABC 123", model: "Ford Transit", status: .ignitionOn, kontakOn: true, totalKm: 48320, todayKm: 312, driver: "Ahmet Yılmaz", city: "İstanbul", lat: 41.0082, lng: 28.9784),
-            Vehicle(id: "2", plate: "06 XYZ 789", model: "Mercedes Sprinter", status: .ignitionOff, kontakOn: false, totalKm: 92100, todayKm: 0, driver: "Mehmet Demir", city: "Ankara", lat: 39.9334, lng: 32.8597),
-            Vehicle(id: "3", plate: "35 DEF 456", model: "Renault Master", status: .ignitionOn, kontakOn: true, totalKm: 31540, todayKm: 187, driver: "Ayşe Kaya", city: "İzmir", lat: 38.4192, lng: 27.1287),
-            Vehicle(id: "4", plate: "16 GHI 321", model: "Volkswagen Crafter", status: .noData, kontakOn: false, totalKm: 67890, todayKm: 0, driver: "Can Öztürk", city: "Bursa", lat: 40.1885, lng: 29.0610),
-            Vehicle(id: "5", plate: "41 JKL 654", model: "Fiat Ducato", status: .ignitionOn, kontakOn: true, totalKm: 22430, todayKm: 95, driver: "Zeynep Şahin", city: "Kocaeli", lat: 40.7654, lng: 29.9408),
-            Vehicle(id: "6", plate: "07 MNO 987", model: "Peugeot Boxer", status: .ignitionOff, kontakOn: false, totalKm: 55670, todayKm: 0, driver: "Ali Çelik", city: "Antalya", lat: 36.8969, lng: 30.7133),
-            Vehicle(id: "7", plate: "34 PRS 111", model: "Iveco Daily", status: .ignitionOn, kontakOn: true, totalKm: 14220, todayKm: 241, driver: "Fatma Arslan", city: "İstanbul", lat: 41.0422, lng: 29.0083),
-            Vehicle(id: "8", plate: "06 TUV 222", model: "Ford Transit Custom", status: .sleeping, kontakOn: false, totalKm: 38900, todayKm: 0, driver: "Hasan Koç", city: "Ankara", lat: 39.9208, lng: 32.8541),
-        ]
+    /// Fetch vehicle list from REST API and merge dailyKm data
+    func loadVehiclesFromAPI() {
+        isLoadingDailyKm = true
+        vehiclesErrorMessage = nil
+        Task {
+            do {
+                let apiVehicles = try await APIService.shared.fetchVehicles()
+                // Merge: prefer WS live positions, but take dailyKm from API
+                let currentMap = Dictionary(uniqueKeysWithValues: vehicles.map { ($0.id, $0) })
+                let merged = apiVehicles.map { apiV -> Vehicle in
+                    if var existing = currentMap[apiV.id] {
+                        existing.mergeUpdate(from: apiV)
+                        if apiV.dailyKm > existing.dailyKm { existing.dailyKm = apiV.dailyKm }
+                        if apiV.todayKm > existing.todayKm { existing.todayKm = apiV.todayKm }
+                        return existing
+                    }
+                    return apiV
+                }
+                vehicles = merged
+                vehiclesErrorMessage = nil
+                isLoading = false
+                isLoadingDailyKm = false
+            } catch {
+                print("[DashboardVM] fetchVehicles error: \(error)")
+                vehiclesErrorMessage = error.localizedDescription
+                isLoading = false
+                isLoadingDailyKm = false
+            }
+        }
     }
 
     /// Load drivers from API and convert to DriverScore for dashboard display
@@ -207,91 +225,28 @@ class DashboardViewModel: ObservableObject {
     /// Load alerts from API
     func loadAlertsFromAPI() {
         isLoadingAlerts = true
+        alertsErrorMessage = nil
         Task {
             do {
                 let json = try await APIService.shared.get("/api/mobile/alarms?per_page=5")
-                if let dataArr = json["data"] as? [[String: Any]], !dataArr.isEmpty {
-                    let alertList: [FleetAlert] = dataArr.compactMap { a in
-                        let type = a["type"] as? String ?? ""
-                        let severity: AlertSeverity = {
-                            if type.contains("overspeed") || type.contains("sos") || type.contains("power") { return .red }
-                            if type.contains("brake") || type.contains("disconnect") || type.contains("idle") { return .amber }
-                            if type.contains("geofence") { return .green }
-                            return .blue
-                        }()
-                        let typeLabel: String = {
-                            switch type.lowercased() {
-                            case "overspeed": return "Hız Aşımı"
-                            case "harsh_brake": return "Sert Fren"
-                            case "harsh_acceleration": return "Sert Hızlanma"
-                            case "idle": return "Rölanti"
-                            case "geofence_enter": return "Bölgeye Giriş"
-                            case "geofence_exit": return "Bölgeden Çıkış"
-                            case "disconnect": return "Bağlantı Koptu"
-                            case "sos": return "SOS / Panik"
-                            case "power_cut": return "Güç Kesildi"
-                            default: return type.replacingOccurrences(of: "_", with: " ").prefix(1).uppercased() + type.replacingOccurrences(of: "_", with: " ").dropFirst()
-                            }
-                        }()
-                        let plate = a["plate"] as? String ?? ""
-                        let vehicleName = a["vehicle_name"] as? String ?? ""
-                        let code = a["code"] as? String ?? ""
-                        let desc = !plate.isEmpty ? "\(plate) — \(code)" : !vehicleName.isEmpty ? "\(vehicleName) — \(code)" : code
-                        let createdAt = a["created_at"] as? String ?? ""
-                        let timeAgo = self.formatTimeAgo(createdAt)
-                        let id = "\(a["id"] ?? 0)"
-                        return FleetAlert(id: id, title: typeLabel, description: desc, time: timeAgo, severity: severity, createdAt: createdAt)
-                    }
-                    await MainActor.run {
-                        self.alerts = alertList
-                        self.isLoadingAlerts = false
-                    }
-                } else {
-                    await MainActor.run {
-                        self.loadDummyAlerts()
-                        self.isLoadingAlerts = false
-                    }
+                let dataArr = json["data"] as? [[String: Any]] ?? []
+                let alertList = dataArr.enumerated().map { index, item in
+                    AlarmEvent.from(json: item, index: index)
+                }
+                await MainActor.run {
+                    self.alerts = alertList
+                    self.alertsErrorMessage = nil
+                    self.isLoadingAlerts = false
                 }
             } catch {
                 print("[DashboardVM] fetchAlarms error: \(error)")
                 await MainActor.run {
-                    self.loadDummyAlerts()
+                    self.alerts = []
+                    self.alertsErrorMessage = "Alarm verisi şu anda alınamıyor."
                     self.isLoadingAlerts = false
                 }
             }
         }
-    }
-
-    private func formatTimeAgo(_ dateStr: String) -> String {
-        guard dateStr.count >= 16 else { return dateStr }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        formatter.locale = Locale(identifier: "tr_TR")
-        guard let date = formatter.date(from: dateStr) else { return dateStr }
-        let diff = Date().timeIntervalSince(date)
-        let minutes = Int(diff / 60)
-        let hours = minutes / 60
-        let days = hours / 24
-        if minutes < 1 { return "Az önce" }
-        if minutes < 60 { return "\(minutes) dk" }
-        if hours < 24 { return "\(hours) sa" }
-        if days < 7 { return "\(days) gün" }
-        let shortFormatter = DateFormatter()
-        shortFormatter.dateFormat = "d MMM"
-        shortFormatter.locale = Locale(identifier: "tr_TR")
-        return shortFormatter.string(from: date)
-    }
-
-    /// Load dummy alerts (alerts API not yet available)
-    func loadDummyAlerts() {
-        alerts = [
-            FleetAlert(id: "1", title: "Hız İhlali", description: "34 ABC 123 — 142 km/h, E-5 Karayolu", time: "3 dk", severity: .red, createdAt: "2026-03-29 21:45:00"),
-            FleetAlert(id: "2", title: "Geofence Çıkış", description: "35 DEF 456 — İzmir bölge dışına çıktı", time: "18 dk", severity: .amber, createdAt: "2026-03-29 21:30:00"),
-            FleetAlert(id: "3", title: "Bakım Hatırlatma", description: "07 MNO 987 — Yağ değişim zamanı", time: "1 sa", severity: .blue, createdAt: "2026-03-29 20:48:00"),
-            FleetAlert(id: "4", title: "Seyahat Tamamlandı", description: "41 JKL 654 — Kocaeli → İstanbul", time: "2 sa", severity: .green, createdAt: "2026-03-29 19:30:00"),
-            FleetAlert(id: "5", title: "Ani Fren", description: "34 PRS 111 — Kadıköy civarı", time: "35 dk", severity: .amber, createdAt: "2026-03-29 21:13:00"),
-            FleetAlert(id: "6", title: "Motor Arızası", description: "06 TUV 222 — Check Engine uyarısı", time: "4 sa", severity: .red, createdAt: "2026-03-29 17:48:00"),
-        ]
     }
 
     func setPeriod(_ period: String) {
@@ -303,6 +258,7 @@ class DashboardViewModel: ObservableObject {
     func refreshData() {
         isRefreshing = true
         wsManager.reconnect()
+        loadVehiclesFromAPI()
         loadDriversFromAPI()
         loadAlertsFromAPI()
         // 2 saniye sonra refreshing durumunu kapat

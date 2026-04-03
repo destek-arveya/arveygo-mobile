@@ -1,10 +1,26 @@
 package com.arveya.arveygo.models
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.CarCrash
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Emergency
+import androidx.compose.material.icons.filled.HourglassBottom
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PowerOff
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.VpnKey
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.arveya.arveygo.ui.theme.AppColors
 import org.json.JSONObject
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
@@ -138,6 +154,10 @@ data class Vehicle(
     var fuelPer100km: Double = 0.0
 ) {
     val isMotorcycle: Boolean get() = vehicleCategory == "motorcycle"
+    val hasValidCoordinates: Boolean
+        get() = lat.isFinite() && lng.isFinite() &&
+            lat in -90.0..90.0 && lng in -180.0..180.0 &&
+            !(lat == 0.0 && lng == 0.0)
 
     /** Estimated daily fuel consumption in liters: dailyKm * fuelPer100km / 100 */
     val estimatedDailyFuelLiters: Double
@@ -281,6 +301,13 @@ data class Vehicle(
             }
         }
 
+    val listLastInfoLabel: String
+        get() = when {
+            formattedLastPacketAt.isNotBlank() && formattedLastPacketAt != "—" -> formattedLastPacketAt
+            formattedDeviceTime.isNotBlank() && formattedDeviceTime != "—" -> formattedDeviceTime
+            else -> ""
+        }
+
     // Fleet extensions
     val fleetStatus: FleetVehicleStatus
         get() = when (status) {
@@ -309,19 +336,25 @@ data class Vehicle(
         get() {
             if (address.isNotEmpty()) return address
             if (city.isNotEmpty()) return city
-            if (lat != 0.0 && lng != 0.0) return String.format("%.4f, %.4f", lat, lng)
+            if (hasValidCoordinates) return String.format("%.4f, %.4f", lat, lng)
             return "—"
         }
 
     companion object {
+        private fun safeLatitude(value: Double): Double =
+            value.takeIf { it.isFinite() && it in -90.0..90.0 } ?: 0.0
+
+        private fun safeLongitude(value: Double): Double =
+            value.takeIf { it.isFinite() && it in -180.0..180.0 } ?: 0.0
+
         fun fromWSPayload(json: JSONObject): Vehicle? {
             val imei = json.optString("imei", "")
             if (imei.isEmpty()) return null
 
             val plate = json.optString("plate", "")
             val name = json.optString("name", "")
-            val lat = json.optDouble("lat", 0.0)
-            val lon = json.optDouble("lon", 0.0)
+            val lat = safeLatitude(json.optDouble("lat", 0.0))
+            val lon = safeLongitude(json.optDouble("lon", 0.0))
             val speed = json.optDouble("speed", 0.0)
             val direction = json.optDouble("direction", 0.0)
             val ignition = json.optBoolean("ignition", false)
@@ -491,8 +524,8 @@ data class Vehicle(
         return this.copy(
             plate = if (patch.plate.isNotEmpty()) patch.plate else plate,
             model = if (patch.model.isNotEmpty()) patch.model else model,
-            lat = if (patch.lat != 0.0 || patch.lng != 0.0) patch.lat else lat,
-            lng = if (patch.lat != 0.0 || patch.lng != 0.0) patch.lng else lng,
+            lat = if (patch.hasValidCoordinates) patch.lat else lat,
+            lng = if (patch.hasValidCoordinates) patch.lng else lng,
             speed = patch.speed, direction = patch.direction,
             ignition = patch.ignition, isOnline = patch.isOnline,
             kontakOn = patch.ignition, status = patch.status,
@@ -554,7 +587,7 @@ data class Vehicle(
 // MARK: - Fleet Vehicle Status
 enum class FleetVehicleStatus(val label: String, val color: Color) {
     ACTIVE("Aktif", AppColors.Online),
-    PASSIVE("Pasif", Color(0xFF94A3B8)),
+    PASSIVE("Kapalı", AppColors.Offline),
     MAINTENANCE("Bakımda", AppColors.Idle)
 }
 
@@ -890,6 +923,171 @@ data class DriverScore(
         }
 }
 
+// MARK: - Shared Alarm Event
+data class AlarmEvent(
+    val id: String,
+    val imei: String,
+    val plate: String,
+    val vehicleName: String,
+    val type: String,
+    val code: String,
+    val description: String,
+    val lat: Double,
+    val lng: Double,
+    val speed: Int,
+    val createdAt: String,
+    val isActive: Boolean = true
+) {
+    val alarmKey: String
+        get() = listOf(type, code, description).filter { it.isNotBlank() }.joinToString(" ")
+
+    val statusLabel: String get() = if (isActive) "Aktif" else "Kapandı"
+    val statusColor: Color get() = if (isActive) Color(0xFFEF4444) else Color(0xFF22C55E)
+
+    private val normalizedKey: String
+        get() = "${type.lowercase()} ${code.lowercase()} ${description.lowercase()}"
+
+    private val normalizedType: String
+        get() = type.lowercase()
+
+    val severity: AlertSeverity
+        get() = when {
+            normalizedKey.contains("overspeed") || normalizedKey.contains("hız") || normalizedKey.contains("sos") || normalizedKey.contains("power") -> AlertSeverity.RED
+            normalizedKey.contains("ignition_on") || normalizedKey.contains("kontak aç") -> AlertSeverity.GREEN
+            normalizedKey.contains("ignition_off") || normalizedKey.contains("kontak kapa") -> AlertSeverity.AMBER
+            normalizedKey.contains("brake") || normalizedKey.contains("fren") || normalizedKey.contains("disconnect") || normalizedKey.contains("idle") || normalizedKey.contains("movement") || normalizedKey.contains("hareket") -> AlertSeverity.AMBER
+            normalizedKey.contains("geofence") || normalizedKey.contains("gf_") -> AlertSeverity.GREEN
+            else -> AlertSeverity.BLUE
+        }
+
+    val icon: ImageVector
+        get() = when {
+            normalizedKey.contains("overspeed") || normalizedKey.contains("hız") -> Icons.Default.Speed
+            normalizedKey.contains("ignition_on") || normalizedKey.contains("kontak aç") -> Icons.Default.VpnKey
+            normalizedKey.contains("ignition_off") || normalizedKey.contains("kontak kapa") -> Icons.Default.PowerOff
+            normalizedKey.contains("brake") || normalizedKey.contains("fren") -> Icons.Default.Warning
+            normalizedKey.contains("idle") || normalizedKey.contains("rölanti") -> Icons.Default.HourglassBottom
+            normalizedKey.contains("geofence") || normalizedKey.contains("gf_") || normalizedKey.contains("bölge") -> Icons.Default.LocationOn
+            normalizedKey.contains("disconnect") || normalizedKey.contains("bağlantı") -> Icons.Default.WifiOff
+            normalizedKey.contains("sos") || normalizedKey.contains("panik") -> Icons.Default.Emergency
+            normalizedKey.contains("tow") || normalizedKey.contains("çek") || normalizedKey.contains("taşı") -> Icons.Default.CarCrash
+            normalizedKey.contains("power") || normalizedKey.contains("güç") -> Icons.Default.PowerOff
+            normalizedKey.contains("battery") || normalizedKey.contains("batarya") -> Icons.Default.BatteryAlert
+            normalizedKey.contains("movement") || normalizedKey.contains("hareket") -> Icons.Default.DirectionsCar
+            else -> Icons.Default.Notifications
+        }
+
+    val color: Color
+        get() = when (severity) {
+            AlertSeverity.RED -> Color(0xFFEF4444)
+            AlertSeverity.AMBER -> Color(0xFFF59E0B)
+            AlertSeverity.GREEN -> Color(0xFF22C55E)
+            AlertSeverity.BLUE -> AppColors.Indigo
+        }
+
+    val typeLabel: String
+        get() = when {
+            normalizedKey.contains("t_movement") || normalizedKey.contains("hareket") -> "Hareket Algılandı"
+            normalizedKey.contains("t_towing") || normalizedKey.contains("çekme") || normalizedKey.contains("taşıma") -> "Çekme/Taşıma Alarmı"
+            normalizedKey.contains("ignition_on") || normalizedKey.contains("kontak aç") -> "Kontak Açıldı"
+            normalizedKey.contains("ignition_off") || normalizedKey.contains("kontak kapa") -> "Kontak Kapatıldı"
+            normalizedKey.contains("gf_exit") -> "Bölgeden Çıkış"
+            normalizedKey.contains("gf_enter") -> "Bölgeye Giriş"
+            normalizedKey.contains("overspeed") || normalizedKey.contains("hız") -> "Hız Aşımı"
+            normalizedKey.contains("harsh_brake") || normalizedKey.contains("fren") -> "Sert Fren"
+            normalizedKey.contains("idle") || normalizedKey.contains("rölanti") -> "Rölanti"
+            normalizedKey.contains("disconnect") -> "Bağlantı Koptu"
+            normalizedKey.contains("sos") || normalizedKey.contains("panik") -> "SOS / Panik"
+            normalizedKey.contains("power_cut") -> "Güç Kesildi"
+            normalizedKey.contains("low_battery") -> "Düşük Batarya"
+            description.isNotEmpty() && !description.equals(code, true) -> description
+            else -> code.replace("_", " ").replaceFirstChar { it.uppercase() }
+        }
+
+    val dashboardTitle: String
+        get() = when {
+            normalizedType == "geofence_enter" || normalizedType == "geofence_exit" || normalizedType.contains("gf_") || normalizedKey.contains("gf_enter") || normalizedKey.contains("gf_exit") -> "Geofence"
+            else -> typeLabel
+        }
+
+    val dashboardDescription: String
+        get() {
+            val vehicleLabel = plate.ifEmpty { vehicleName }
+            val rawDescription = description.trim()
+            return when {
+                normalizedType == "geofence_enter" || normalizedKey.contains("gf_enter") ->
+                    if (vehicleLabel.isEmpty()) "Giriş Yapıldı" else "$vehicleLabel • Giriş Yapıldı"
+                normalizedType == "geofence_exit" || normalizedKey.contains("gf_exit") ->
+                    if (vehicleLabel.isEmpty()) "Çıkış Yapıldı" else "$vehicleLabel • Çıkış Yapıldı"
+                rawDescription.isNotEmpty() && vehicleLabel.isNotEmpty() && !rawDescription.equals(vehicleLabel, true) ->
+                    "$vehicleLabel • $rawDescription"
+                rawDescription.isNotEmpty() -> rawDescription
+                vehicleLabel.isNotEmpty() && code.isNotEmpty() -> "$vehicleLabel • $code"
+                vehicleLabel.isNotEmpty() -> vehicleLabel
+                else -> code
+            }
+        }
+
+    val dashboardDisplayTime: String
+        get() = formatDate(createdAt, "dd.MM.yyyy HH:mm") ?: createdAt
+
+    val formattedDate: String
+        get() = formatDate(createdAt, "dd MMM HH:mm") ?: createdAt
+
+    val formattedFullDate: String
+        get() = formatDate(createdAt, "dd MMMM yyyy, HH:mm") ?: createdAt
+
+    companion object {
+        fun from(json: JSONObject, index: Int = 0): AlarmEvent = try {
+            AlarmEvent(
+                id = json.optString("id", "alarm_$index"),
+                imei = json.optString("imei", ""),
+                plate = json.optString("plate", ""),
+                vehicleName = json.optString("vehicle_name", ""),
+                type = json.optString("type", ""),
+                code = json.optString("code", ""),
+                description = json.optString("description", ""),
+                lat = json.optString("lat", "0").toDoubleOrNull() ?: 0.0,
+                lng = json.optString("lng", "0").toDoubleOrNull() ?: 0.0,
+                speed = json.optInt("speed", 0),
+                createdAt = json.optString("created_at", ""),
+                isActive = json.optBoolean("is_active", true)
+            )
+        } catch (_: Exception) {
+            AlarmEvent("alarm_$index", "", "", "", "", "", "", 0.0, 0.0, 0, "")
+        }
+
+        private fun formatDate(raw: String, outputPattern: String): String? {
+            if (raw.isBlank()) return null
+            val cleaned = raw.replace(Regex("\\.\\d+"), "")
+            val inputPatterns = listOf(
+                "yyyy-MM-dd HH:mm:ssXXX",
+                "yyyy-MM-dd HH:mm:ssX",
+                "yyyy-MM-dd'T'HH:mm:ssXXX",
+                "yyyy-MM-dd'T'HH:mm:ssX",
+                "yyyy-MM-dd HH:mm:ss",
+                "yyyy-MM-dd'T'HH:mm:ss"
+            )
+
+            val parsed: Date? = inputPatterns.firstNotNullOfOrNull { pattern ->
+                try {
+                    SimpleDateFormat(pattern, Locale.US).apply {
+                        timeZone = if (pattern.contains("X")) TimeZone.getTimeZone("UTC") else TimeZone.getTimeZone("Europe/Istanbul")
+                    }.parse(cleaned)
+                } catch (_: Exception) {
+                    null
+                }
+            }
+
+            return parsed?.let {
+                SimpleDateFormat(outputPattern, Locale("tr", "TR")).apply {
+                    timeZone = TimeZone.getTimeZone("Europe/Istanbul")
+                }.format(it)
+            }
+        }
+    }
+}
+
 // MARK: - Fleet Alert
 data class FleetAlert(
     val id: String,
@@ -899,13 +1097,17 @@ data class FleetAlert(
     val severity: AlertSeverity,
     val createdAt: String = ""
 ) {
-    /** e.g. "2025.03.29" */
+    /** e.g. "29 Mar 2026" */
     val dateString: String
         get() {
             if (createdAt.length < 10) return time
             return try {
                 val parts = createdAt.substring(0, 10).split("-")
-                "${parts[0]}.${parts[1]}.${parts[2]}"
+                val months = arrayOf("", "Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara")
+                val year = parts[0]
+                val month = parts[1].toIntOrNull()?.coerceIn(0, 12) ?: 0
+                val day = parts[2]
+                "$day ${months[month]} $year"
             } catch (_: Exception) { time }
         }
 

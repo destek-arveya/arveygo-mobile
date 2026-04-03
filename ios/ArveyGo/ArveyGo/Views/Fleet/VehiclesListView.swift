@@ -2,64 +2,110 @@ import SwiftUI
 import Combine
 
 struct VehiclesListView: View {
+    enum DisplayMode {
+        case standalone
+        case embedded
+    }
+
     @EnvironmentObject var authVM: AuthViewModel
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var vm = VehiclesListViewModel()
     @Binding var showSideMenu: Bool
     @Binding var selectedPage: AppPage
     @Binding var alarmsSearchText: String
     @Binding var alarmsAutoOpenCreate: Bool
     @Binding var alarmsPrePlate: String
+    var displayMode: DisplayMode = .standalone
+
     @State private var selectedVehicle: Vehicle?
+    @State private var routeHistoryVehicle: Vehicle?
+    @State private var showRouteHistoryPage = false
+    
+    private var isDark: Bool { colorScheme == .dark }
+    private var pageBackground: Color {
+        isDark ? Color(red: 14/255, green: 18/255, blue: 34/255) : Color(UIColor.systemGroupedBackground)
+    }
+    private var cardSurface: Color {
+        isDark ? Color(red: 22/255, green: 28/255, blue: 49/255) : .white
+    }
+    private var elevatedSurface: Color {
+        isDark ? Color(red: 19/255, green: 24/255, blue: 43/255) : Color(UIColor.secondarySystemGroupedBackground)
+    }
+    private var borderColor: Color {
+        isDark ? Color.white.opacity(0.08) : Color.black.opacity(0.08)
+    }
+    private var primaryText: Color {
+        isDark ? AppTheme.darkText : AppTheme.textPrimary
+    }
+    private var secondaryText: Color {
+        isDark ? AppTheme.darkTextSub : AppTheme.textSecondary
+    }
+    private var mutedText: Color {
+        isDark ? AppTheme.darkTextMuted : AppTheme.textMuted
+    }
+    private var cardShadow: Color {
+        isDark ? Color.black.opacity(0.20) : Color.black.opacity(0.06)
+    }
 
     var body: some View {
-        NavigationStack {
+        Group {
+            if displayMode == .standalone {
+                NavigationStack {
+                    vehiclesContent
+                }
+            } else {
+                vehiclesContent
+            }
+        }
+    }
+
+    private var vehiclesContent: some View {
             ZStack {
-                AppTheme.darkBg.ignoresSafeArea()
+                pageBackground.ignoresSafeArea()
 
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 12) {
-                        // Status summary chips
-                        statusChips
+                if vm.isLoading && vm.vehicles.isEmpty {
+                    VehiclesListSkeletonView()
+                } else if let error = vm.errorMessage, vm.vehicles.isEmpty {
+                    vehicleErrorState(message: error)
+                } else {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 10) {
+                            // Status summary chips
+                            statusChips
 
-                        // Search & Filter
-                        searchAndFilter
+                            // Search & Filter
+                            searchAndFilter
 
-                        // Vehicle Cards
-                        vehicleCards
+                            // Vehicle Cards
+                            vehicleCards
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 6)
+                        .padding(.bottom, 24)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 6)
-                    .padding(.bottom, 24)
+                    .refreshable {
+                        await vm.refresh()
+                    }
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(AppTheme.darkBg, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(pageBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(isDark ? .dark : .light, for: .navigationBar)
             .toolbar {
-
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 1) {
                         Text("Araçlarım")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(AppTheme.darkText)
+                            .foregroundColor(primaryText)
                         Text("Filo Yönetimi / Araçlar")
                             .font(.system(size: 10))
-                            .foregroundColor(AppTheme.darkTextMuted)
+                            .foregroundColor(mutedText)
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 12) {
-                        Button(action: {}) {
-                            Image(systemName: "bell")
-                                .font(.system(size: 16))
-                                .foregroundColor(AppTheme.textMuted)
-                                .overlay(
-                                    Circle()
-                                        .fill(Color.red)
-                                        .frame(width: 7, height: 7)
-                                        .offset(x: 6, y: -6)
-                                )
-                        }
+
+                if displayMode == .standalone {
+                    ToolbarItem(placement: .navigationBarTrailing) {
                         AvatarCircle(
                             initials: authVM.currentUser?.avatar ?? "A",
                             size: 30
@@ -67,34 +113,45 @@ struct VehiclesListView: View {
                     }
                 }
             }
-            .fullScreenCover(item: $selectedVehicle) { vehicle in
-                VehicleDetailView(
-                    vehicle: vehicle,
-                    onNavigateToRouteHistory: { v in
-                        selectedVehicle = nil
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                            selectedPage = .routeHistory
-                        }
-                    },
-                    onNavigateToAlarms: { plateText in
-                        selectedVehicle = nil
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                            alarmsSearchText = plateText
-                            selectedPage = .alarms
-                        }
-                    },
-                    onNavigateToAddAlarm: { plate in
-                        selectedVehicle = nil
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                            alarmsSearchText = ""
-                            alarmsAutoOpenCreate = true
-                            alarmsPrePlate = plate
-                            selectedPage = .alarms
-                        }
-                    }
+            .navigationDestination(isPresented: $showRouteHistoryPage) {
+                RouteHistoryView(
+                    showSideMenu: .constant(false),
+                    displayMode: .embedded,
+                    initialVehicle: routeHistoryVehicle,
+                    autoLoadInitialVehicle: routeHistoryVehicle != nil
                 )
             }
-        }
+            .fullScreenCover(item: $selectedVehicle) { vehicle in
+                NavigationStack {
+                    VehicleDetailFifthView(
+                        vehicle: vehicle,
+                        presentationMode: .modal,
+                        onNavigateToRouteHistory: { v in
+                            selectedVehicle = nil
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                routeHistoryVehicle = v
+                                showRouteHistoryPage = true
+                            }
+                        },
+                        onNavigateToAlarms: { plateText in
+                            selectedVehicle = nil
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                alarmsSearchText = plateText
+                                selectedPage = .alarms
+                            }
+                        },
+                        onNavigateToAddAlarm: { plate in
+                            selectedVehicle = nil
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                alarmsSearchText = ""
+                                alarmsAutoOpenCreate = true
+                                alarmsPrePlate = plate
+                                selectedPage = .alarms
+                            }
+                        }
+                    )
+                }
+            }
     }
 
     // MARK: - Status Summary Chips
@@ -128,26 +185,26 @@ struct VehiclesListView: View {
                     .frame(width: 8, height: 8)
                 Text(label)
                     .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
-                    .foregroundColor(isSelected ? color : AppTheme.darkTextSub)
+                    .foregroundColor(isSelected ? color : secondaryText)
                 Text("\(count)")
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(isSelected ? color : AppTheme.darkTextMuted)
+                    .foregroundColor(isSelected ? color : mutedText)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 1)
                     .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(isSelected ? color.opacity(0.15) : AppTheme.darkCard)
+                        Capsule(style: .continuous)
+                            .fill(isSelected ? color.opacity(isDark ? 0.16 : 0.12) : elevatedSurface)
                     )
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(isSelected ? color.opacity(0.12) : AppTheme.darkSurface)
+                Capsule(style: .continuous)
+                    .fill(isSelected ? color.opacity(isDark ? 0.12 : 0.08) : cardSurface)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(isSelected ? color.opacity(0.3) : AppTheme.darkBorder, lineWidth: 1)
+                Capsule(style: .continuous)
+                    .stroke(isSelected ? color.opacity(0.32) : borderColor, lineWidth: 1)
             )
         }
     }
@@ -159,24 +216,25 @@ struct VehiclesListView: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 16))
-                    .foregroundColor(AppTheme.darkTextMuted)
+                    .foregroundColor(mutedText)
                 TextField("Plaka, araç veya sürücü ara...", text: $vm.searchText)
                     .font(.system(size: 14))
+                    .foregroundColor(primaryText)
                 if !vm.searchText.isEmpty {
                     Button(action: { vm.searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 16))
-                            .foregroundColor(AppTheme.darkTextMuted)
+                            .foregroundColor(mutedText)
                     }
                 }
             }
             .padding(.horizontal, 14)
             .frame(height: 44)
-            .background(AppTheme.darkSurface)
+            .background(elevatedSurface)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(AppTheme.darkBorder, lineWidth: 1)
+                    .stroke(borderColor, lineWidth: 1)
             )
 
             // Group filter + count
@@ -190,20 +248,20 @@ struct VehiclesListView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "folder")
                             .font(.system(size: 12))
-                            .foregroundColor(AppTheme.darkTextMuted)
+                            .foregroundColor(mutedText)
                         Text(vm.groupFilter ?? "Tüm Gruplar")
                             .font(.system(size: 12, weight: .medium))
                         Image(systemName: "chevron.down")
                             .font(.system(size: 9, weight: .semibold))
                     }
-                    .foregroundColor(AppTheme.darkText)
+                    .foregroundColor(primaryText)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(AppTheme.darkSurface)
+                    .background(elevatedSurface)
                     .cornerRadius(8)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(AppTheme.darkBorder, lineWidth: 1)
+                            .stroke(borderColor, lineWidth: 1)
                     )
                 }
 
@@ -211,19 +269,28 @@ struct VehiclesListView: View {
 
                 Text("\(vm.filteredVehicles.count) araç listeleniyor")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(AppTheme.darkTextMuted)
+                    .foregroundColor(mutedText)
             }
         }
+        .padding(12)
+        .background(cardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(borderColor, lineWidth: 1)
+        )
+        .shadow(color: cardShadow, radius: 10, x: 0, y: 5)
     }
 
     // MARK: - Vehicle Cards
     var vehicleCards: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             ForEach(vm.filteredVehicles) { vehicle in
-                Button(action: { selectedVehicle = vehicle }) {
-                    vehicleCard(vehicle)
-                }
-                .buttonStyle(.plain)
+                vehicleCard(vehicle)
+                    .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .gesture(TapGesture().onEnded {
+                        selectedVehicle = vehicle
+                    }, including: .gesture)
             }
 
             if vm.filteredVehicles.isEmpty {
@@ -246,184 +313,175 @@ struct VehiclesListView: View {
 
     // MARK: - Vehicle Card
     func vehicleCard(_ vehicle: Vehicle) -> some View {
-        VStack(spacing: 0) {
-            // ── Header: Status + Plate + Type + Fleet Badge + Chevron ──
-            HStack(spacing: 10) {
-                // Status indicator
-                Circle()
-                    .fill(vehicle.status.color)
-                    .frame(width: 12, height: 12)
+        let driverText = vehicle.listDriverName
+        let metricSurface = isDark ? Color.white.opacity(0.03) : elevatedSurface
+        let secondaryMeta = driverText.isEmpty ? vehicle.group : driverText
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(vehicle.status.color.opacity(isDark ? 0.18 : 0.12))
+                    .frame(width: 40, height: 40)
                     .overlay(
-                        Circle()
-                            .stroke(vehicle.status.color.opacity(0.3), lineWidth: 2)
-                            .frame(width: 16, height: 16)
+                        Image(systemName: vehicle.mapIcon)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(vehicle.status.color)
                     )
 
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(vehicle.plate)
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundColor(AppTheme.darkText)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(primaryText)
 
-                    if !vehicle.vehicleType.isEmpty && vehicle.vehicleType != "Ticari" {
+                    HStack(spacing: 6) {
                         Text(vehicle.vehicleType)
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.darkTextMuted)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(secondaryText)
+                            .lineLimit(1)
+                        Text("•")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(mutedText)
+                        Text(vehicle.kontakOn ? "Kontak Açık" : "Kontak Kapalı")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(vehicle.kontakOn ? AppTheme.online : AppTheme.offline)
                             .lineLimit(1)
                     }
                 }
 
-                Spacer()
+                Spacer(minLength: 12)
 
-                fleetStatusBadge(vehicle.fleetStatus)
+                HStack(spacing: 10) {
+                    fleetStatusBadge(vehicle.fleetStatus)
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppTheme.textFaint)
-                    .padding(.leading, 4)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(mutedText)
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
 
-            // ── Stats Grid: 4 columns ──
-            HStack(spacing: 0) {
-                compactStatItem(
-                    icon: "speedometer",
+            HStack(spacing: 8) {
+                refinedMetricCard(
+                    title: "Hız",
                     value: vehicle.formattedSpeed,
-                    label: "Hız",
-                    color: vehicle.speed > 0 ? AppTheme.online : AppTheme.textMuted
+                    icon: "speedometer",
+                    tint: vehicle.speed > 0 ? AppTheme.online : mutedText,
+                    background: metricSurface
                 )
-                compactStatItem(
-                    icon: "calendar",
+                refinedMetricCard(
+                    title: "Bugün",
                     value: vehicle.formattedTodayKm,
-                    label: "Bugün",
-                    color: AppTheme.indigo
+                    icon: "calendar",
+                    tint: AppTheme.indigo,
+                    background: metricSurface
                 )
-                compactStatItem(
+                refinedMetricCard(
+                    title: "Toplam",
+                    value: "\(vehicle.formattedTotalKm) km",
                     icon: "road.lanes",
-                    value: vehicle.formattedTotalKm,
-                    label: "Toplam",
-                    color: AppTheme.navy
-                )
-                compactStatItem(
-                    icon: vehicle.kontakOn ? "key.fill" : "key",
-                    value: vehicle.kontakOn ? "Açık" : "Kapalı",
-                    label: "Kontak",
-                    color: vehicle.kontakOn ? AppTheme.online : AppTheme.offline
+                    tint: isDark ? AppTheme.lavender : AppTheme.navy,
+                    background: metricSurface
                 )
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(AppTheme.darkBg.opacity(0.7))
-            .cornerRadius(12)
-            .padding(.horizontal, 12)
 
-            Spacer().frame(height: 8)
-
-            // ── Location row (if available) ──
-            if !vehicle.locationDisplay.isEmpty && vehicle.locationDisplay != "—" {
-                HStack(spacing: 4) {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 11))
-                        .foregroundColor(AppTheme.lavender.opacity(0.6))
-                    Text(vehicle.locationDisplay)
-                        .font(.system(size: 11))
-                        .foregroundColor(AppTheme.darkTextSub)
+            HStack(alignment: .center, spacing: 8) {
+                if secondaryMeta != "—" {
+                    Text(secondaryMeta)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(mutedText)
                         .lineLimit(1)
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
-            }
 
-            // ── Footer: Time + Temp/Humidity + Driver ──
-            HStack(spacing: 0) {
-                // Device time
-                if vehicle.deviceTime != nil {
-                    HStack(spacing: 3) {
-                        Image(systemName: "clock")
-                            .font(.system(size: 10))
-                            .foregroundColor(AppTheme.darkTextMuted)
-                        Text(vehicle.formattedDeviceTime)
-                            .font(.system(size: 10))
-                            .foregroundColor(AppTheme.darkTextMuted)
-                    }
+                Spacer(minLength: 8)
+
+                if !vehicle.listLastInfoLabel.isEmpty {
+                    vehicleMetaLabel(
+                        icon: "clock.fill",
+                        text: vehicle.listLastInfoLabel,
+                        tint: mutedText
+                    )
                 }
 
-                // Temperature
                 if let temp = vehicle.temperatureC {
-                    if vehicle.deviceTime != nil {
-                        HStack(spacing: 0) {
-                            Spacer().frame(width: 8)
-                            Circle()
-                                .fill(AppTheme.darkBorder)
-                                .frame(width: 3, height: 3)
-                            Spacer().frame(width: 8)
-                        }
-                    }
-                    Text(String(format: "🌡️%.1f°C", temp))
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(temp < 0 ? .blue : temp < 30 ? AppTheme.online : .red)
+                    vehicleMetaLabel(
+                        icon: "thermometer.medium",
+                        text: String(format: "%.1f°C", temp),
+                        tint: temp < 0 ? .blue : temp < 30 ? AppTheme.online : .red
+                    )
                 }
 
-                // Humidity
                 if let hum = vehicle.humidityPct {
-                    Spacer().frame(width: 6)
-                    Text(String(format: "💧%.0f%%", hum))
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(AppTheme.lavender)
-                }
-
-                Spacer()
-
-                // Driver
-                let driverText = !vehicle.driverName.isEmpty ? vehicle.driverName : vehicle.driver
-                if !driverText.isEmpty {
-                    HStack(spacing: 3) {
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 10))
-                            .foregroundColor(AppTheme.darkTextMuted)
-                        Text(driverText)
-                            .font(.system(size: 10))
-                            .foregroundColor(AppTheme.darkTextMuted)
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: 120, alignment: .trailing)
+                    vehicleMetaLabel(icon: "humidity.fill", text: "%\(Int(hum))", tint: AppTheme.indigo)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(AppTheme.darkCard.opacity(0.4))
         }
-        .background(AppTheme.darkSurface)
-        .cornerRadius(16)
+        .padding(12)
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(AppTheme.darkBorder, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(borderColor, lineWidth: 1)
+        )
+        .shadow(color: cardShadow, radius: 8, x: 0, y: 4)
+    }
+
+    func refinedMetricCard(title: String, value: String, icon: String, tint: Color, background: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(tint)
+                .frame(width: 24, height: 24)
+                .background(tint.opacity(isDark ? 0.16 : 0.10), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(mutedText)
+                Text(value)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 8)
+        .background(background, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(borderColor, lineWidth: 1)
         )
     }
 
-    // MARK: - Compact Stat Item
-    func compactStatItem(icon: String, value: String, label: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            RoundedRectangle(cornerRadius: 7)
-                .fill(color.opacity(0.1))
-                .frame(width: 28, height: 28)
-                .overlay(
-                    Image(systemName: icon)
-                        .font(.system(size: 12))
-                        .foregroundColor(color)
-                )
-
+    func detailPill(title: String, value: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(mutedText)
             Text(value)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundColor(color)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(tint)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
-
-            Text(label)
-                .font(.system(size: 9))
-                .foregroundColor(AppTheme.darkTextMuted)
+                .minimumScaleFactor(0.75)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(elevatedSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(borderColor, lineWidth: 1)
+        )
+    }
+
+    func vehicleMetaLabel(icon: String, text: String, tint: Color? = nil) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(tint ?? mutedText)
+            Text(text)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(mutedText)
+        }
     }
 
     // MARK: - Fleet Status Badge
@@ -431,10 +489,36 @@ struct VehiclesListView: View {
         Text(status.label)
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(status.color)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 9)
             .padding(.vertical, 4)
-            .background(status.color.opacity(0.1))
-            .cornerRadius(20)
+            .background(status.color.opacity(isDark ? 0.16 : 0.10))
+            .clipShape(Capsule(style: .continuous))
+    }
+
+    private func vehicleErrorState(message: String) -> some View {
+        VStack(spacing: 14) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundColor(AppTheme.offline)
+            Text("Araç verisi alınamadı")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(primaryText)
+            Text(message)
+                .font(.system(size: 12))
+                .foregroundColor(mutedText)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 28)
+            Button("Tekrar Dene") {
+                Task { await vm.refresh() }
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .background(AppTheme.indigo, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 24)
     }
 }
 
@@ -445,7 +529,7 @@ enum FleetVehicleStatus: String {
     var label: String {
         switch self {
         case .active: return "Aktif"
-        case .passive: return "Pasif"
+        case .passive: return "Kapalı"
         case .maintenance: return "Bakımda"
         }
     }
@@ -453,7 +537,7 @@ enum FleetVehicleStatus: String {
     var color: Color {
         switch self {
         case .active: return AppTheme.online
-        case .passive: return Color(red: 148/255, green: 163/255, blue: 184/255)
+        case .passive: return AppTheme.offline
         case .maintenance: return AppTheme.idle
         }
     }
@@ -461,6 +545,12 @@ enum FleetVehicleStatus: String {
 
 // MARK: - Vehicle Extensions for Fleet
 extension Vehicle {
+    var listDriverName: String {
+        if !driverName.isEmpty { return driverName }
+        if !driver.isEmpty { return driver }
+        return ""
+    }
+
     var fleetStatus: FleetVehicleStatus {
         switch status {
         case .ignitionOn: return .active
@@ -492,6 +582,16 @@ extension Vehicle {
     }
 
     var totalCost: String { "—" }
+
+    var listLastInfoLabel: String {
+        if let lastPacketAt, !lastPacketAt.isEmpty {
+            return formattedLastPacketAt
+        }
+        if let deviceTime, !deviceTime.isEmpty {
+            return formattedDeviceTime
+        }
+        return ""
+    }
 }
 
 // MARK: - Vehicles List ViewModel
@@ -501,6 +601,9 @@ class VehiclesListViewModel: ObservableObject {
     @Published var searchText = ""
     @Published var statusFilter: VehicleStatus? = nil
     @Published var groupFilter: String? = nil
+    @Published var isLoading = true
+    @Published var isRefreshing = false
+    @Published var errorMessage: String?
 
     // Alert counts
     var expiredDocs: Int { 0 }
@@ -554,6 +657,7 @@ class VehiclesListViewModel: ObservableObject {
 
     init() {
         subscribeToWebSocket()
+        loadVehiclesFromAPI()
     }
 
     private func subscribeToWebSocket() {
@@ -562,7 +666,16 @@ class VehiclesListViewModel: ObservableObject {
             .sink { [weak self] list in
                 guard let self = self else { return }
                 if !list.isEmpty {
-                    self.vehicles = list
+                    let currentMap = Dictionary(uniqueKeysWithValues: self.vehicles.map { ($0.id, $0) })
+                    self.vehicles = list.map { incoming in
+                        if var existing = currentMap[incoming.id] {
+                            existing.mergeUpdate(from: incoming)
+                            return existing
+                        }
+                        return incoming
+                    }
+                    self.errorMessage = nil
+                    self.isLoading = false
                 }
             }
             .store(in: &cancellables)
@@ -573,10 +686,19 @@ class VehiclesListViewModel: ObservableObject {
                 guard let self = self else { return }
                 switch event {
                 case .snapshot(let vehicles, _, _):
-                    self.vehicles = vehicles
+                    let currentMap = Dictionary(uniqueKeysWithValues: self.vehicles.map { ($0.id, $0) })
+                    self.vehicles = vehicles.map { incoming in
+                        if var existing = currentMap[incoming.id] {
+                            existing.mergeUpdate(from: incoming)
+                            return existing
+                        }
+                        return incoming
+                    }
+                    self.errorMessage = nil
+                    self.isLoading = false
                 case .update(let vehicle, _):
                     if let idx = self.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
-                        self.vehicles[idx] = vehicle
+                        self.vehicles[idx].mergeUpdate(from: vehicle)
                     } else {
                         self.vehicles.append(vehicle)
                     }
@@ -584,6 +706,41 @@ class VehiclesListViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    func refresh() async {
+        isRefreshing = true
+        wsManager.reconnect()
+        await loadVehiclesFromAPI()
+        isRefreshing = false
+    }
+
+    func loadVehiclesFromAPI() {
+        Task {
+            await loadVehiclesFromAPI()
+        }
+    }
+
+    private func loadVehiclesFromAPI() async {
+        errorMessage = nil
+        do {
+            let apiVehicles = try await APIService.shared.fetchVehicles()
+            let currentMap = Dictionary(uniqueKeysWithValues: vehicles.map { ($0.id, $0) })
+            vehicles = apiVehicles.map { apiVehicle in
+                if var existing = currentMap[apiVehicle.id] {
+                    existing.mergeUpdate(from: apiVehicle)
+                    return existing
+                }
+                return apiVehicle
+            }
+            errorMessage = nil
+            isLoading = false
+        } catch {
+            if vehicles.isEmpty {
+                errorMessage = error.localizedDescription
+            }
+            isLoading = false
+        }
     }
 }
 

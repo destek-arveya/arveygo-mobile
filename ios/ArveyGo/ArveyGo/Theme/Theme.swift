@@ -3,8 +3,8 @@ import SwiftUI
 // MARK: - Theme Colors & Styles (matching web app CSS variables)
 struct AppTheme {
     // Primary colors from web
-    static let navy = Color(red: 9/255, green: 15/255, blue: 65/255)        // #090F41
-    static let indigo = Color(red: 74/255, green: 83/255, blue: 160/255)    // #4A53A0
+    static let navy = Color(red: 7/255, green: 15/255, blue: 63/255)        // #070F3F
+    static let indigo = Color(red: 36/255, green: 58/255, blue: 132/255)
     static let lavender = Color(red: 139/255, green: 149/255, blue: 224/255) // #8B95E0
 
     // Backgrounds
@@ -35,12 +35,34 @@ struct AppTheme {
     static let darkTextSub = Color(red: 176/255, green: 186/255, blue: 216/255)  // #B0BAD8
     static let darkTextMuted = Color(red: 107/255, green: 118/255, blue: 153/255) // #6B7699
 
+    // ── Auth Palette ──
+    static let authCanvas = Color(red: 238/255, green: 242/255, blue: 249/255)
+    static let authSurface = Color.white.opacity(0.96)
+    static let authField = Color.white.opacity(0.96)
+    static let authBorder = Color(red: 216/255, green: 224/255, blue: 238/255)
+    static let authTextPrimary = navy
+    static let authTextSecondary = Color(red: 76/255, green: 86/255, blue: 118/255)
+    static let authTextMuted = Color(red: 112/255, green: 122/255, blue: 152/255)
+    static let authAccent = Color(red: 31/255, green: 57/255, blue: 136/255)
+    static let authShadow = Color.black.opacity(0.12)
+    static let authNightTop = Color(red: 6/255, green: 14/255, blue: 53/255)
+    static let authNightBottom = Color(red: 2/255, green: 8/255, blue: 29/255)
+    static let authNightPanel = Color(red: 12/255, green: 22/255, blue: 68/255).opacity(0.92)
+    static let authNightPanelSecondary = Color(red: 18/255, green: 31/255, blue: 86/255).opacity(0.88)
+    static let authNightField = Color.white.opacity(0.08)
+    static let authNightBorder = Color.white.opacity(0.14)
+    static let authNightText = Color.white
+    static let authNightTextSecondary = Color.white.opacity(0.74)
+    static let authNightTextMuted = Color.white.opacity(0.56)
+    static let authNightChip = Color.white.opacity(0.10)
+    static let authNightGlow = Color(red: 89/255, green: 135/255, blue: 255/255).opacity(0.22)
+
     // Gradient for side panel / login background
     static let panelGradient = LinearGradient(
         colors: [
-            Color(red: 13/255, green: 21/255, blue: 80/255),
-            Color(red: 9/255, green: 15/255, blue: 65/255),
-            Color(red: 6/255, green: 11/255, blue: 48/255)
+            Color(red: 12/255, green: 22/255, blue: 86/255),
+            navy,
+            Color(red: 4/255, green: 12/255, blue: 48/255)
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -48,7 +70,7 @@ struct AppTheme {
 
     // Button gradient
     static let buttonGradient = LinearGradient(
-        colors: [navy, indigo],
+        colors: [navy, authAccent],
         startPoint: .leading,
         endPoint: .trailing
     )
@@ -63,9 +85,9 @@ struct ArveyButtonStyle: ButtonStyle {
             .font(.system(size: 15, weight: .semibold))
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
-            .frame(height: 50)
+            .frame(height: 54)
             .background(AppTheme.buttonGradient)
-            .cornerRadius(12)
+            .cornerRadius(14)
             .opacity(configuration.isPressed ? 0.85 : 1.0)
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)

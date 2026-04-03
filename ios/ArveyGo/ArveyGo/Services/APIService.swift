@@ -625,6 +625,13 @@ final class APIService {
         return json["vehicles"] as? [[String: Any]] ?? []
     }
 
+    /// GET /api/mobile/vehicles — fleet vehicle list with dailyKm
+    func fetchVehicles() async throws -> [Vehicle] {
+        let json = try await get("/api/mobile/vehicles")
+        let data = json["data"] as? [[String: Any]] ?? (json["vehicles"] as? [[String: Any]] ?? [])
+        return data.compactMap { Vehicle.fromWSPayload($0) }
+    }
+
     /// GET /api/mobile/vehicles/{id} — vehicle detail with driver info
     func fetchVehicleDetail(deviceId: Int) async throws -> [String: Any] {
         let json = try await get("/api/mobile/vehicles/\(deviceId)")

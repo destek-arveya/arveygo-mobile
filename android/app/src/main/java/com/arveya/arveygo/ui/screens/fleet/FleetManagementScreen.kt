@@ -138,7 +138,7 @@ fun FleetManagementScreen() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Filo Yönetimi", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy) },
+                title = { Text("Filo Yönetimi", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface) },
                 actions = {
                     IconButton(onClick = {
                         editingMaintenance = null; editingCost = null; editingDocument = null; editingTire = null
@@ -147,7 +147,7 @@ fun FleetManagementScreen() {
                         Icon(Icons.Default.Add, "Ekle", tint = AppColors.Indigo)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.Surface)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { padding ->
@@ -159,7 +159,7 @@ fun FleetManagementScreen() {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(AppColors.Bg)
+                    .background(MaterialTheme.colorScheme.background)
             ) {
                 // Reminders Banner
                 if (reminders.isNotEmpty()) {
@@ -258,7 +258,7 @@ fun FleetManagementScreen() {
                 showAddSheet = false
                 editingMaintenance = null; editingCost = null; editingDocument = null; editingTire = null
             },
-            containerColor = AppColors.Surface,
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
             tonalElevation = 0.dp,
             dragHandle = {
@@ -269,7 +269,7 @@ fun FleetManagementScreen() {
                             .width(40.dp)
                             .height(4.dp)
                             .clip(RoundedCornerShape(2.dp))
-                            .background(AppColors.BorderSoft)
+                            .background(MaterialTheme.colorScheme.outline)
                     )
                     Spacer(Modifier.height(12.dp))
                 }
@@ -333,31 +333,31 @@ private fun SearchFilterBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AppColors.Surface)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         // Search Row
         OutlinedTextField(
             value = searchText,
             onValueChange = onSearchChange,
-            placeholder = { Text("Plaka ara...", fontSize = 13.sp, color = AppColors.TextFaint) },
-            leadingIcon = { Icon(Icons.Default.Search, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp)) },
+            placeholder = { Text("Plaka ara...", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)) },
+            leadingIcon = { Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(18.dp)) },
             trailingIcon = {
                 if (searchText.isNotEmpty()) {
                     IconButton(onClick = { onSearchChange("") }) {
-                        Icon(Icons.Default.Close, null, tint = AppColors.TextMuted, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                     }
                 }
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(44.dp),
-            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = AppColors.Navy),
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface),
             singleLine = true,
             shape = RoundedCornerShape(10.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = AppColors.Indigo,
-                unfocusedBorderColor = AppColors.BorderSoft,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                 cursorColor = AppColors.Indigo
             ),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -392,7 +392,7 @@ private fun SearchFilterBar(
                         onClick = { onSelectVehicle(null) },
                         leadingIcon = { Icon(Icons.Default.SelectAll, null, modifier = Modifier.size(16.dp)) }
                     )
-                    HorizontalDivider(color = AppColors.BorderSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                     vehicles.forEach { v ->
                         DropdownMenuItem(
                             text = {
@@ -403,7 +403,7 @@ private fun SearchFilterBar(
                                 )
                             },
                             onClick = { onSelectVehicle(v.imei) },
-                            leadingIcon = { Icon(Icons.Default.DirectionsCar, null, modifier = Modifier.size(16.dp), tint = AppColors.TextMuted) }
+                            leadingIcon = { Icon(Icons.Default.DirectionsCar, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)) }
                         )
                     }
                 }
@@ -425,7 +425,7 @@ private fun SearchFilterBar(
             }
         }
     }
-    HorizontalDivider(color = AppColors.BorderSoft, thickness = 0.5.dp)
+    HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
 }
 
 // ============================================================================
@@ -466,7 +466,7 @@ private fun RemindersBanner(reminders: List<FleetReminder>) {
                 Text(
                     "Belge süreleri ve bakım planlarını kontrol edin",
                     fontSize = 11.sp,
-                    color = AppColors.TextMuted
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
             }
         }
@@ -480,17 +480,17 @@ private fun RemindersBanner(reminders: List<FleetReminder>) {
 private fun FleetTabSelector(selected: FleetTab, onSelect: (FleetTab) -> Unit) {
     ScrollableTabRow(
         selectedTabIndex = FleetTab.entries.indexOf(selected),
-        containerColor = AppColors.Surface,
+        containerColor = MaterialTheme.colorScheme.surface,
         contentColor = AppColors.Indigo,
         edgePadding = 8.dp,
-        divider = { HorizontalDivider(color = AppColors.BorderSoft, thickness = 0.5.dp) }
+        divider = { HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp) }
     ) {
         FleetTab.entries.forEach { tab ->
             Tab(
                 selected = selected == tab,
                 onClick = { onSelect(tab) },
                 selectedContentColor = AppColors.Indigo,
-                unselectedContentColor = AppColors.TextMuted
+                unselectedContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp),
@@ -679,8 +679,8 @@ private fun FleetCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        color = AppColors.Surface,
-        border = BorderStroke(1.dp, AppColors.BorderSoft),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         shadowElevation = 1.dp
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -718,9 +718,9 @@ private fun FleetCard(
             Spacer(Modifier.height(10.dp))
 
             // Title
-            Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
             if (!subtitle.isNullOrEmpty()) {
-                Text(subtitle, fontSize = 12.sp, color = AppColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
 
             Spacer(Modifier.height(10.dp))
@@ -736,7 +736,7 @@ private fun FleetCard(
             }
 
             Spacer(Modifier.height(10.dp))
-            HorizontalDivider(color = AppColors.BorderSoft)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             Spacer(Modifier.height(8.dp))
 
             // Action buttons
@@ -786,9 +786,9 @@ private fun FleetCard(
 @Composable
 private fun InfoChip(icon: ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, modifier = Modifier.size(12.dp), tint = AppColors.TextMuted)
+        Icon(icon, null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
         Spacer(Modifier.width(4.dp))
-        Text(text, fontSize = 11.sp, color = AppColors.TextSecondary, maxLines = 1)
+        Text(text, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), maxLines = 1)
     }
 }
 
@@ -1193,7 +1193,7 @@ private fun FormSheetContainer(
                 Icon(icon, null, tint = AppColors.Indigo, modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(12.dp))
-            Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+            Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         }
         Spacer(Modifier.height(20.dp))
         content()
@@ -1210,7 +1210,7 @@ private fun FormSectionHeader(title: String, icon: ImageVector) {
             title.uppercase(),
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            color = AppColors.TextMuted,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
             letterSpacing = 0.5.sp
         )
     }
@@ -1228,25 +1228,25 @@ private fun FormTextField(
     maxLines: Int = 1
 ) {
     Column(modifier = modifier.padding(bottom = 8.dp)) {
-        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
         Spacer(Modifier.height(4.dp))
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             placeholder = {
-                if (placeholder.isNotEmpty()) Text(placeholder, fontSize = 13.sp, color = AppColors.TextFaint)
+                if (placeholder.isNotEmpty()) Text(placeholder, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f))
             },
             modifier = Modifier.fillMaxWidth(),
-            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = AppColors.Navy),
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface),
             singleLine = maxLines == 1,
             maxLines = maxLines,
             shape = RoundedCornerShape(10.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = AppColors.Indigo,
-                unfocusedBorderColor = AppColors.BorderSoft,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                 cursorColor = AppColors.Indigo,
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color(0xFFFAFBFE)
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
             ),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType)
         )
@@ -1266,7 +1266,7 @@ private fun DropdownField(
     val displayText = options.find { it.first == selectedValue }?.second ?: selectedValue.ifEmpty { "Seçiniz" }
 
     Column(modifier = modifier.padding(bottom = 8.dp)) {
-        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
         Spacer(Modifier.height(4.dp))
         ExposedDropdownMenuBox(
             expanded = expanded,
@@ -1278,14 +1278,14 @@ private fun DropdownField(
                 readOnly = true,
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 modifier = Modifier.fillMaxWidth().menuAnchor(),
-                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = AppColors.Navy),
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface),
                 singleLine = true,
                 shape = RoundedCornerShape(10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = AppColors.Indigo,
-                    unfocusedBorderColor = AppColors.BorderSoft,
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color(0xFFFAFBFE)
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             )
             ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -1315,7 +1315,7 @@ private fun VehiclePicker(
     }
 
     Column(modifier = Modifier.padding(bottom = 8.dp)) {
-        Text("Araç Seçimi", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
+        Text("Araç Seçimi", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
         Spacer(Modifier.height(4.dp))
         Box {
             OutlinedTextField(
@@ -1327,15 +1327,15 @@ private fun VehiclePicker(
                     .clickable { expanded = true },
                 textStyle = androidx.compose.ui.text.TextStyle(
                     fontSize = 13.sp,
-                    color = if (selectedPlate.isNotEmpty()) AppColors.Navy else AppColors.TextFaint
+                    color = if (selectedPlate.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                 ),
                 singleLine = true,
                 enabled = false,
                 shape = RoundedCornerShape(10.dp),
                 leadingIcon = { Icon(Icons.Default.DirectionsCar, null, tint = AppColors.Indigo, modifier = Modifier.size(16.dp)) },
                 colors = OutlinedTextFieldDefaults.colors(
-                    disabledBorderColor = AppColors.BorderSoft,
-                    disabledTextColor = if (selectedPlate.isNotEmpty()) AppColors.Navy else AppColors.TextFaint,
+                    disabledBorderColor = MaterialTheme.colorScheme.outline,
+                    disabledTextColor = if (selectedPlate.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                     disabledContainerColor = Color(0xFFFAFBFE),
                     disabledLeadingIconColor = AppColors.Indigo
                 )
@@ -1352,8 +1352,8 @@ private fun VehiclePicker(
                 OutlinedTextField(
                     value = vehicleSearch,
                     onValueChange = { vehicleSearch = it },
-                    placeholder = { Text("Plaka ara...", fontSize = 12.sp, color = AppColors.TextFaint) },
-                    leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(16.dp), tint = AppColors.TextMuted) },
+                    placeholder = { Text("Plaka ara...", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 8.dp, vertical = 4.dp)
@@ -1363,17 +1363,17 @@ private fun VehiclePicker(
                     shape = RoundedCornerShape(8.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AppColors.Indigo,
-                        unfocusedBorderColor = AppColors.BorderSoft
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
                     )
                 )
-                HorizontalDivider(color = AppColors.BorderSoft)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 filteredVehicles.forEach { v ->
                     DropdownMenuItem(
                         text = {
                             Column {
-                                Text(v.plate, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
+                                Text(v.plate, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
                                 if (v.name.isNotEmpty()) {
-                                    Text(v.name, fontSize = 11.sp, color = AppColors.TextMuted)
+                                    Text(v.name, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                                 }
                             }
                         },
@@ -1386,7 +1386,7 @@ private fun VehiclePicker(
                             Icon(
                                 Icons.Default.DirectionsCar, null,
                                 modifier = Modifier.size(16.dp),
-                                tint = if (v.imei == selectedImei) AppColors.Indigo else AppColors.TextMuted
+                                tint = if (v.imei == selectedImei) AppColors.Indigo else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                             )
                         }
                     )
@@ -1396,7 +1396,7 @@ private fun VehiclePicker(
                         "Araç bulunamadı",
                         modifier = Modifier.padding(16.dp),
                         fontSize = 12.sp,
-                        color = AppColors.TextMuted
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
                 }
             }
@@ -1463,7 +1463,7 @@ private fun EmptyStateView(message: String, icon: ImageVector) {
             Icon(icon, null, tint = AppColors.Indigo.copy(alpha = 0.5f), modifier = Modifier.size(28.dp))
         }
         Spacer(Modifier.height(16.dp))
-        Text(message, fontSize = 14.sp, color = AppColors.TextMuted, textAlign = TextAlign.Center)
+        Text(message, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), textAlign = TextAlign.Center)
     }
 }
 
@@ -1477,7 +1477,7 @@ private fun ErrorView(message: String, onRetry: () -> Unit) {
     ) {
         Icon(Icons.Default.ErrorOutline, null, tint = Color(0xFFEF4444), modifier = Modifier.size(40.dp))
         Spacer(Modifier.height(12.dp))
-        Text(message, fontSize = 13.sp, color = AppColors.TextMuted, textAlign = TextAlign.Center)
+        Text(message, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), textAlign = TextAlign.Center)
         Spacer(Modifier.height(16.dp))
         OutlinedButton(onClick = onRetry, shape = RoundedCornerShape(8.dp)) {
             Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))

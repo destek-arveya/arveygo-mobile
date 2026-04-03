@@ -4,6 +4,7 @@ import MapKit
 // MARK: - Geofences View
 struct GeofencesView: View {
     @EnvironmentObject var authVM: AuthViewModel
+    @Environment(\.colorScheme) private var colorScheme
     @Binding var showSideMenu: Bool
     @StateObject private var vm = GeofencesViewModel()
 
@@ -15,49 +16,53 @@ struct GeofencesView: View {
         )
     )
 
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                // Map with geofence overlays
-                mapContent
+    private var isDark: Bool { colorScheme == .dark }
+    private var navigationBackground: Color {
+        isDark ? Color(red: 13/255, green: 18/255, blue: 36/255) : Color.white.opacity(0.96)
+    }
+    private var panelBackground: Color {
+        isDark ? Color(red: 16/255, green: 21/255, blue: 40/255).opacity(0.98) : Color.white
+    }
+    private var rowBackground: Color {
+        isDark ? Color(red: 27/255, green: 34/255, blue: 58/255) : Color(UIColor.systemGray6)
+    }
+    private var titleText: Color {
+        isDark ? AppTheme.darkText : AppTheme.navy
+    }
+    private var secondaryText: Color {
+        isDark ? AppTheme.darkTextSub : AppTheme.textMuted
+    }
+    private var borderColor: Color {
+        isDark ? Color.white.opacity(0.08) : Color.black.opacity(0.08)
+    }
 
-                // Bottom panel — list of geofences
-                VStack {
-                    Spacer()
-                    geofenceListPanel
+    var body: some View {
+        ZStack {
+            mapContent
+
+            VStack {
+                Spacer()
+                geofenceListPanel
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(navigationBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(isDark ? .dark : .light, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 1) {
+                    Text("Geofence")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(titleText)
+                    Text("Bölge Takibi")
+                        .font(.system(size: 10))
+                        .foregroundColor(secondaryText)
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3)) { showSideMenu.toggle() }
-                    }) {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(AppTheme.navy)
-                    }
-                }
-                ToolbarItem(placement: .principal) {
-                    VStack(spacing: 1) {
-                        Text("Geofence")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(AppTheme.navy)
-                        Text("Bölge Takibi")
-                            .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textMuted)
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    AvatarCircle(
-                        initials: authVM.currentUser?.avatar ?? "A",
-                        size: 30
-                    )
-                }
-            }
-            .onAppear {
-                vm.loadGeofences()
-            }
+        }
+        .onAppear {
+            vm.loadGeofences()
         }
     }
 
@@ -140,11 +145,11 @@ struct GeofencesView: View {
                         .foregroundColor(AppTheme.indigo)
                     Text("Bölgeler")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(AppTheme.navy)
+                        .foregroundColor(titleText)
                     Spacer()
                     Text("\(vm.geofences.count) bölge")
                         .font(.system(size: 11))
-                        .foregroundColor(AppTheme.textMuted)
+                        .foregroundColor(secondaryText)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
@@ -163,8 +168,12 @@ struct GeofencesView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white)
-                .shadow(color: .black.opacity(0.1), radius: 8, y: -2)
+                .fill(panelBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(borderColor, lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(isDark ? 0.24 : 0.1), radius: 8, y: -2)
         )
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
@@ -174,13 +183,13 @@ struct GeofencesView: View {
         VStack(spacing: 8) {
             Image(systemName: "hexagon")
                 .font(.system(size: 32))
-                .foregroundColor(AppTheme.textFaint)
+                .foregroundColor(secondaryText.opacity(0.7))
             Text("Henüz bölge tanımlanmamış")
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(secondaryText)
             Text("Bölge eklemek için web panelini kullanın")
                 .font(.system(size: 11))
-                .foregroundColor(AppTheme.textFaint)
+                .foregroundColor(secondaryText.opacity(0.7))
         }
         .padding(.vertical, 30)
     }
@@ -207,21 +216,21 @@ struct GeofencesView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(geofence.name)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(AppTheme.navy)
+                        .foregroundColor(titleText)
 
                     HStack(spacing: 4) {
                         Text(geofence.isCircle ? "Daire" : "Poligon")
                             .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(secondaryText)
                         if geofence.isCircle, let r = geofence.radius {
                             Text("· \(Int(r))m")
                                 .font(.system(size: 10))
-                                .foregroundColor(AppTheme.textMuted)
+                                .foregroundColor(secondaryText)
                         }
                         if !geofence.isCircle {
                             Text("· \(geofence.points.count) nokta")
                                 .font(.system(size: 10))
-                                .foregroundColor(AppTheme.textMuted)
+                                .foregroundColor(secondaryText)
                         }
                     }
                 }
@@ -230,17 +239,17 @@ struct GeofencesView: View {
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.textFaint)
+                    .foregroundColor(secondaryText.opacity(0.75))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(isSelected ? geofence.swiftUIColor.opacity(0.08) : Color(UIColor.systemGray6))
+                    .fill(isSelected ? geofence.swiftUIColor.opacity(isDark ? 0.18 : 0.08) : rowBackground)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(isSelected ? geofence.swiftUIColor : Color.clear, lineWidth: 1.5)
+                    .stroke(isSelected ? geofence.swiftUIColor : borderColor, lineWidth: isSelected ? 1.5 : 1)
             )
         }
     }

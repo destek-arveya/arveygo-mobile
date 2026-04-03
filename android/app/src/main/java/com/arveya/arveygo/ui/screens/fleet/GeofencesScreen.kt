@@ -23,10 +23,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.arveya.arveygo.LocalAuthViewModel
 import com.arveya.arveygo.models.Geofence
 import com.arveya.arveygo.services.APIService
-import com.arveya.arveygo.ui.components.AvatarCircle
 import com.arveya.arveygo.ui.theme.AppColors
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
@@ -39,9 +37,8 @@ import org.osmdroid.views.overlay.Polygon
 @Composable
 fun GeofencesScreen() {
     val context = LocalContext.current
-    val authVM = LocalAuthViewModel.current
-    val user by authVM.currentUser.collectAsState()
     val scope = rememberCoroutineScope()
+    val colors = MaterialTheme.colorScheme
 
     var geofences by remember { mutableStateOf<List<Geofence>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -85,20 +82,16 @@ fun GeofencesScreen() {
                             "Geofence",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = AppColors.Navy
+                            color = colors.onSurface
                         )
                         Text(
                             "Bölge Takibi",
                             fontSize = 10.sp,
-                            color = AppColors.TextMuted
+                            color = colors.onSurface.copy(alpha = 0.55f)
                         )
                     }
                 },
-                actions = {
-                    AvatarCircle(initials = user?.avatar ?: "A", size = 30.dp)
-                    Spacer(Modifier.width(12.dp))
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background)
             )
         }
     ) { padding ->
@@ -129,7 +122,7 @@ fun GeofencesScreen() {
             ) {
                 Card(
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = colors.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
                     Column {
@@ -145,7 +138,7 @@ fun GeofencesScreen() {
                                     .width(36.dp)
                                     .height(4.dp)
                                     .clip(RoundedCornerShape(2.dp))
-                                    .background(Color.Gray.copy(alpha = 0.4f))
+                                    .background(colors.onSurface.copy(alpha = 0.2f))
                             )
                         }
 
@@ -179,12 +172,12 @@ fun GeofencesScreen() {
                                     "Henüz bölge tanımlanmamış",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = AppColors.TextMuted
+                                    color = colors.onSurface.copy(alpha = 0.72f)
                                 )
                                 Text(
                                     "Bölge eklemek için web panelini kullanın",
                                     fontSize = 11.sp,
-                                    color = AppColors.TextFaint
+                                    color = colors.onSurface.copy(alpha = 0.45f)
                                 )
                             }
                         } else {
@@ -203,13 +196,13 @@ fun GeofencesScreen() {
                                     "Bölgeler",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = AppColors.Navy
+                                    color = colors.onSurface
                                 )
                                 Spacer(Modifier.weight(1f))
                                 Text(
                                     "${geofences.size} bölge",
                                     fontSize = 11.sp,
-                                    color = AppColors.TextMuted
+                                    color = colors.onSurface.copy(alpha = 0.55f)
                                 )
                             }
 
@@ -245,15 +238,16 @@ private fun GeofenceRow(
     onClick: () -> Unit
 ) {
     val color = geofence.composeColor
+    val colors = MaterialTheme.colorScheme
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(if (isSelected) color.copy(alpha = 0.08f) else AppColors.Bg)
+            .background(if (isSelected) color.copy(alpha = 0.10f) else colors.surfaceVariant)
             .then(
                 if (isSelected) Modifier.border(1.5.dp, color, RoundedCornerShape(10.dp))
-                else Modifier
+                else Modifier.border(1.dp, colors.outline.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp)
@@ -284,7 +278,7 @@ private fun GeofenceRow(
                 geofence.name,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = AppColors.Navy,
+                color = colors.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -292,20 +286,20 @@ private fun GeofenceRow(
                 Text(
                     if (geofence.isCircle) "Daire" else "Poligon",
                     fontSize = 10.sp,
-                    color = AppColors.TextMuted
+                    color = colors.onSurface.copy(alpha = 0.6f)
                 )
                 if (geofence.isCircle && geofence.radius != null) {
                     Text(
                         " · ${geofence.radius.toInt()}m",
                         fontSize = 10.sp,
-                        color = AppColors.TextMuted
+                        color = colors.onSurface.copy(alpha = 0.6f)
                     )
                 }
                 if (!geofence.isCircle) {
                     Text(
                         " · ${geofence.points.size} nokta",
                         fontSize = 10.sp,
-                        color = AppColors.TextMuted
+                        color = colors.onSurface.copy(alpha = 0.6f)
                     )
                 }
             }
@@ -313,7 +307,7 @@ private fun GeofenceRow(
 
         Icon(
             Icons.Default.ChevronRight, null,
-            tint = AppColors.TextFaint,
+            tint = colors.onSurface.copy(alpha = 0.4f),
             modifier = Modifier.size(14.dp)
         )
     }

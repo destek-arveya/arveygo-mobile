@@ -1,7 +1,6 @@
 package com.arveya.arveygo
 
 import android.Manifest
-import android.app.UiModeManager
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -19,7 +18,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.arveya.arveygo.services.ArveyGoMessagingService
 import com.arveya.arveygo.services.WebSocketManager
 import com.arveya.arveygo.ui.theme.ArveyGoTheme
+import com.arveya.arveygo.ui.theme.ThemeManager
 import com.arveya.arveygo.viewmodels.AuthViewModel
+import org.osmdroid.config.Configuration
+import java.io.File
 
 val LocalAuthViewModel = staticCompositionLocalOf<AuthViewModel> {
     error("AuthViewModel not provided")
@@ -36,12 +38,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Force light mode — disable dark theme
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val uiModeManager = getSystemService(UiModeManager::class.java)
-            uiModeManager?.setApplicationNightMode(UiModeManager.MODE_NIGHT_NO)
-        }
         enableEdgeToEdge()
+        ThemeManager.initialize(this)
+        configureMaps()
 
         // Create notification channels
         ArveyGoMessagingService.createNotificationChannels(this)
@@ -69,7 +68,7 @@ class MainActivity : ComponentActivity() {
         })
 
         setContent {
-            ArveyGoTheme {
+            ArveyGoTheme(themeMode = ThemeManager.mode) {
                 val authVM: AuthViewModel = viewModel()
                 CompositionLocalProvider(LocalAuthViewModel provides authVM) {
                     ArveyGoApp(authVM = authVM)
@@ -85,6 +84,20 @@ class MainActivity : ComponentActivity() {
             ) {
                 notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
+        }
+    }
+
+    private fun configureMaps() {
+        runCatching {
+            val basePath = File(cacheDir, "osmdroid").apply { mkdirs() }
+            val tileCache = File(basePath, "tiles").apply { mkdirs() }
+            Configuration.getInstance().apply {
+                userAgentValue = packageName
+                osmdroidBasePath = basePath
+                osmdroidTileCache = tileCache
+            }
+        }.onFailure { error ->
+            Log.e("Maps", "osmdroid configuration failed", error)
         }
     }
 }

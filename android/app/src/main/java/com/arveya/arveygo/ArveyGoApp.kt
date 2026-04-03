@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,13 +16,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.arveya.arveygo.models.AlarmEvent
 import com.arveya.arveygo.ui.navigation.AppPage
 import com.arveya.arveygo.ui.screens.auth.LoginScreen
-import com.arveya.arveygo.ui.screens.dashboard.DashboardScreen
+import com.arveya.arveygo.ui.screens.dashboard.DashboardParityScreen
 import com.arveya.arveygo.ui.screens.fleet.AlarmsScreen
 import com.arveya.arveygo.ui.screens.fleet.DriversScreen
 import com.arveya.arveygo.ui.screens.fleet.FleetManagementScreen
@@ -30,7 +33,7 @@ import com.arveya.arveygo.ui.screens.fleet.RouteHistoryScreen
 import com.arveya.arveygo.ui.screens.fleet.VehiclesListScreen
 import com.arveya.arveygo.ui.screens.fleet.ReportsScreen
 import com.arveya.arveygo.ui.screens.livemap.LiveMapScreen
-import com.arveya.arveygo.ui.screens.settings.SettingsScreen
+import com.arveya.arveygo.ui.screens.settings.SettingsParityScreen
 import com.arveya.arveygo.ui.screens.support.SupportRequestScreen
 import com.arveya.arveygo.ui.theme.AppColors
 import com.arveya.arveygo.viewmodels.AuthViewModel
@@ -74,12 +77,13 @@ fun ArveyGoApp(authVM: AuthViewModel) {
 
 @Composable
 fun MainContent(authVM: AuthViewModel) {
-    var selectedTab by remember { mutableStateOf(AppTab.DASHBOARD) }
-    var selectedPage by remember { mutableStateOf(AppPage.DASHBOARD) }
+    var selectedTab by remember { mutableStateOf(AppTab.LIVE_MAP) }
+    var selectedPage by remember { mutableStateOf(AppPage.LIVE_MAP) }
     var showSupportRequest by remember { mutableStateOf(false) }
     var alarmsSearchText by remember { mutableStateOf("") }
     var alarmsAutoOpenCreate by remember { mutableStateOf(false) }
     var alarmsPrePlate by remember { mutableStateOf("") }
+    var alarmsInitialEvent by remember { mutableStateOf<AlarmEvent?>(null) }
 
     // Observe consecutive failures to trigger support request page
     val consecutiveFailures by WebSocketManager.consecutiveFailures.collectAsState()
@@ -102,7 +106,7 @@ fun MainContent(authVM: AuthViewModel) {
 
     // If support request is showing, overlay it
     if (showSupportRequest) {
-        SupportRequestScreen(onBack = { showSupportRequest = false })
+                SupportRequestScreen(onBack = { showSupportRequest = false })
         return
     }
 
@@ -110,18 +114,32 @@ fun MainContent(authVM: AuthViewModel) {
         // ── Active Page Content (fills remaining space) ──
         Box(modifier = Modifier.weight(1f)) {
             when (selectedTab) {
-                AppTab.DASHBOARD -> DashboardScreen(
+                AppTab.DASHBOARD -> DashboardParityScreen(
                     onNavigateToMap = { selectedTab = AppTab.LIVE_MAP },
                     onNavigateToVehicles = { selectedPage = AppPage.VEHICLES; selectedTab = AppTab.HUB },
                     onNavigateToDrivers = { selectedPage = AppPage.DRIVERS; selectedTab = AppTab.HUB },
-                    onNavigateToAlarms = { searchText -> alarmsSearchText = searchText; alarmsAutoOpenCreate = false; alarmsPrePlate = ""; selectedTab = AppTab.ALARMS },
+                    onNavigateToAlarms = {
+                        alarmsSearchText = ""
+                        alarmsAutoOpenCreate = false
+                        alarmsPrePlate = ""
+                        alarmsInitialEvent = null
+                        selectedTab = AppTab.ALARMS
+                    },
+                    onNavigateToAlarmEvent = { event ->
+                        alarmsSearchText = ""
+                        alarmsAutoOpenCreate = false
+                        alarmsPrePlate = ""
+                        alarmsInitialEvent = event
+                        selectedTab = AppTab.ALARMS
+                    },
                     onNavigateToAddAlarm = { plate -> alarmsSearchText = ""; alarmsAutoOpenCreate = true; alarmsPrePlate = plate; selectedTab = AppTab.ALARMS },
                     onNavigateToRouteHistory = { selectedPage = AppPage.ROUTE_HISTORY; selectedTab = AppTab.HUB }
                 )
                 AppTab.ALARMS -> AlarmsScreen(
                     initialSearchText = alarmsSearchText,
                     autoOpenCreate = alarmsAutoOpenCreate,
-                    preSelectedPlate = alarmsPrePlate
+                    preSelectedPlate = alarmsPrePlate,
+                    initialAlarmEvent = alarmsInitialEvent
                 )
                 AppTab.LIVE_MAP -> LiveMapScreen(
                     onNavigateToRouteHistory = { _ -> selectedPage = AppPage.ROUTE_HISTORY; selectedTab = AppTab.HUB },
@@ -145,6 +163,7 @@ fun MainContent(authVM: AuthViewModel) {
                     alarmsSearchText = ""
                     alarmsAutoOpenCreate = false
                     alarmsPrePlate = ""
+                    alarmsInitialEvent = null
                 }
                 selectedTab = tab
             }
@@ -171,7 +190,7 @@ fun HubScreen(
         AppPage.ROUTE_HISTORY -> RouteHistoryScreen()
         AppPage.GEOFENCES -> GeofencesScreen()
         AppPage.REPORTS -> ReportsScreen()
-        AppPage.SETTINGS -> SettingsScreen()
+        AppPage.SETTINGS -> SettingsParityScreen()
         AppPage.SUPPORT -> SupportRequestScreen(onBack = { onPageSelected(AppPage.DASHBOARD) })
         else -> {
             // Default Hub grid (like iOS HubView)
@@ -190,33 +209,57 @@ fun HubScreen(
 fun HubGridView(onNavigate: (AppPage) -> Unit, onLogout: () -> Unit) {
     val authVM = LocalAuthViewModel.current
     val user by authVM.currentUser.collectAsState()
+    val colors = MaterialTheme.colorScheme
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(AppColors.Bg)
+            .background(colors.background)
     ) {
         // Top bar
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
+                .background(colors.background)
                 .padding(horizontal = 20.dp, vertical = 14.dp)
                 .statusBarsPadding()
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Hub",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    user?.name ?: "Admin",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .weight(1f)
+                    .background(colors.surface, RoundedCornerShape(22.dp))
+                    .padding(horizontal = 18.dp, vertical = 16.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Hub",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.onSurface
+                    )
+                    Text(
+                        user?.name ?: "Admin",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.onSurface.copy(alpha = 0.62f)
+                    )
+                }
+                FilledIconButton(
+                    onClick = { onNavigate(AppPage.SETTINGS) },
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = if (colors.background.luminance() < 0.5f) Color.White.copy(alpha = 0.10f) else AppColors.Navy.copy(alpha = 0.08f)
+                    ),
+                    modifier = Modifier.size(42.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Settings,
+                        null,
+                        tint = if (colors.background.luminance() < 0.5f) Color.White else AppColors.Navy,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
 
@@ -263,29 +306,30 @@ fun HubGridView(onNavigate: (AppPage) -> Unit, onLogout: () -> Unit) {
 
 @Composable
 private fun HubCard(title: String, icon: ImageVector, color: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
         modifier = modifier
-            .aspectRatio(1.2f)
-            .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
+            .aspectRatio(1.08f)
+            .background(colors.surface, RoundedCornerShape(22.dp))
+            .shadow(8.dp, RoundedCornerShape(22.dp), ambientColor = Color.Black.copy(alpha = 0.08f))
             .clickable { onClick() }
-            .padding(16.dp)
+            .padding(18.dp)
     ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(44.dp)
+                .size(48.dp)
                 .background(color.copy(alpha = 0.1f), CircleShape)
         ) {
             Icon(icon, null, tint = color, modifier = Modifier.size(22.dp))
         }
-        Spacer(Modifier.height(10.dp))
         Text(
             title,
-            fontSize = 13.sp,
+            fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = colors.onSurface,
             maxLines = 1
         )
     }

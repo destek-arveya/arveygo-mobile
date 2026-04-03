@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -21,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush as ComposeBrush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -30,13 +32,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.arveya.arveygo.LocalAuthViewModel
 import com.arveya.arveygo.models.Vehicle
 import com.arveya.arveygo.models.VehicleStatus
 import com.arveya.arveygo.services.APIService
-import com.arveya.arveygo.services.WSConnectionStatus
-import com.arveya.arveygo.ui.components.AvatarCircle
 import com.arveya.arveygo.ui.components.StatusBadge
 import com.arveya.arveygo.ui.theme.AppColors
 import com.arveya.arveygo.viewmodels.LiveMapViewModel
@@ -239,6 +240,8 @@ fun LiveMapScreen(
     var selectedVehicle by remember { mutableStateOf<Vehicle?>(null) }
     var detailVehicle by remember { mutableStateOf<Vehicle?>(null) }
     var trackingVehicleId by remember { mutableStateOf<String?>(null) }
+    var showVehicleSearch by remember { mutableStateOf(false) }
+    var vehicleSearchText by remember { mutableStateOf("") }
 
     // Trail history: keep last 20 positions per vehicle (persists through idle/rölanti)
     val trailHistory = remember { mutableMapOf<String, MutableList<GeoPoint>>() }
@@ -270,6 +273,9 @@ fun LiveMapScreen(
     }
 
     val filteredVehicles = vm.filteredVehicles()
+    val mappableVehicles = remember(filteredVehicles) {
+        filteredVehicles.filter { it.hasValidCoordinates }
+    }
 
     // osmdroid configuration
     LaunchedEffect(Unit) {
@@ -281,6 +287,54 @@ fun LiveMapScreen(
     // MapView reference & animated markers map
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
     val animatedMarkers = remember { mutableMapOf<String, AnimatedMarker>() }
+    val searchableVehicles = remember(vehicles, vehicleSearchText) {
+        val query = vehicleSearchText.trim().lowercase()
+        val sorted = vehicles.sortedWith(
+            compareBy<Vehicle> { it.status.sortOrder }
+                .thenBy { it.plate }
+        )
+        if (query.isEmpty()) {
+            sorted
+        } else {
+            sorted.filter {
+                it.plate.lowercase().contains(query) ||
+                    it.model.lowercase().contains(query) ||
+                    it.driver.lowercase().contains(query) ||
+                    it.city.lowercase().contains(query)
+            }
+        }
+    }
+
+    fun fitMapToVehicles(vehiclesToShow: List<Vehicle>) {
+        val mapView = mapViewRef.value ?: return
+        val validVehicles = vehiclesToShow.filter { it.hasValidCoordinates }
+        if (validVehicles.isEmpty()) return
+        try {
+            val north = validVehicles.maxOf { it.lat }
+            val south = validVehicles.minOf { it.lat }
+            val east = validVehicles.maxOf { it.lng }
+            val west = validVehicles.minOf { it.lng }
+            val box = BoundingBox(north + 0.15, east + 0.15, south - 0.15, west - 0.15)
+            mapView.zoomToBoundingBox(box, true, 80)
+        } catch (_: Exception) { }
+    }
+
+    fun focusVehicleOnMap(vehicle: Vehicle, liftForCard: Boolean = true) {
+        if (!vehicle.hasValidCoordinates) return
+        val mapView = mapViewRef.value ?: return
+        val target = GeoPoint(vehicle.lat, vehicle.lng)
+        mapView.controller?.animateTo(target, mapView.zoomLevelDouble.coerceAtLeast(14.5), 500L)
+        if (liftForCard) {
+            mapView.postDelayed({
+                val targetPoint = mapView.projection.toPixels(target, null)
+                val offsetY = (mapView.height * 0.27f).toInt()
+                val newCenter = mapView.projection.fromPixels(targetPoint.x, offsetY) as? GeoPoint
+                if (newCenter != null) {
+                    mapView.controller?.animateTo(newCenter, mapView.zoomLevelDouble, 350L)
+                }
+            }, 520L)
+        }
+    }
 
     // Geofences: fetch and draw on map
     var geofences by remember { mutableStateOf<List<com.arveya.arveygo.models.Geofence>>(emptyList()) }
@@ -326,7 +380,7 @@ fun LiveMapScreen(
     // Update markers when vehicle data changes (SMOOTH animation)
     LaunchedEffect(vehicleVersion, selectedVehicle, statusFilter) {
         val mapView = mapViewRef.value ?: return@LaunchedEffect
-        val currentIds = filteredVehicles.map { it.id }.toSet()
+        val currentIds = mappableVehicles.map { it.id }.toSet()
 
         // Remove markers for vehicles no longer visible
         val toRemove = animatedMarkers.keys.filter { it !in currentIds }
@@ -339,7 +393,7 @@ fun LiveMapScreen(
         }
 
         // Add or update markers
-        filteredVehicles.forEach { vehicle ->
+        mappableVehicles.forEach { vehicle ->
             val target = GeoPoint(vehicle.lat, vehicle.lng)
             val isSel = selectedVehicle?.id == vehicle.id
             val statusColor = when (vehicle.status) {
@@ -370,12 +424,7 @@ fun LiveMapScreen(
                     infoWindow = null
                     setOnMarkerClickListener { _, _ ->
                         selectedVehicle = vehicle
-                        // Aracı haritanın üst %25'lik kısmına taşı (modal alt yarıyı kaplayacağı için)
-                        val mapHeight = mapView.height
-                        val targetPoint = mapView.projection.toPixels(GeoPoint(vehicle.lat, vehicle.lng), null)
-                        val offsetY = (mapHeight * 0.25).toInt() // Ekranın üst çeyreğine
-                        val newCenter = mapView.projection.fromPixels(targetPoint.x, offsetY)
-                        mapView.controller?.animateTo(newCenter as GeoPoint, mapView.zoomLevelDouble.coerceAtLeast(14.0), 500L)
+                        focusVehicleOnMap(vehicle)
                         true
                     }
                 }
@@ -386,9 +435,8 @@ fun LiveMapScreen(
         mapView.invalidate()
 
         // Update trail polylines for moving vehicles
-        filteredVehicles.forEach { vehicle ->
+        mappableVehicles.forEach { vehicle ->
             val pos = GeoPoint(vehicle.lat, vehicle.lng)
-            if (vehicle.lat == 0.0 && vehicle.lng == 0.0) return@forEach
             val history = trailHistory.getOrPut(vehicle.id) { mutableListOf() }
             // Only add if position changed
             if (history.isEmpty() || history.last().latitude != pos.latitude || history.last().longitude != pos.longitude) {
@@ -421,7 +469,7 @@ fun LiveMapScreen(
             }
         }
         // Remove trails for vehicles no longer visible
-        val currentTrailIds = filteredVehicles.map { it.id }.toSet()
+        val currentTrailIds = mappableVehicles.map { it.id }.toSet()
         trailPolylines.keys.toList().forEach { id ->
             if (id !in currentTrailIds) {
                 trailPolylines[id]?.let { mapView.overlays.remove(it) }
@@ -433,7 +481,7 @@ fun LiveMapScreen(
 
         // If tracking a vehicle, keep centering on it
         trackingVehicleId?.let { trackId ->
-            filteredVehicles.find { it.id == trackId }?.let { trackedVehicle ->
+            mappableVehicles.find { it.id == trackId }?.let { trackedVehicle ->
                 mapView.controller?.animateTo(GeoPoint(trackedVehicle.lat, trackedVehicle.lng), 16.0, 600L)
             }
         }
@@ -441,18 +489,10 @@ fun LiveMapScreen(
 
     // Fit bounds on first load
     var hasFittedBounds by remember { mutableStateOf(false) }
-    LaunchedEffect(filteredVehicles.size) {
-        if (filteredVehicles.size > 1 && !hasFittedBounds) {
-            val mapView = mapViewRef.value ?: return@LaunchedEffect
-            try {
-                val north = filteredVehicles.maxOf { it.lat }
-                val south = filteredVehicles.minOf { it.lat }
-                val east = filteredVehicles.maxOf { it.lng }
-                val west = filteredVehicles.minOf { it.lng }
-                val box = BoundingBox(north + 0.5, east + 0.5, south - 0.5, west - 0.5)
-                mapView.zoomToBoundingBox(box, true, 80)
-                hasFittedBounds = true
-            } catch (_: Exception) {}
+    LaunchedEffect(mappableVehicles.size) {
+        if (mappableVehicles.size > 1 && !hasFittedBounds) {
+            fitMapToVehicles(mappableVehicles)
+            hasFittedBounds = true
         }
     }
 
@@ -472,17 +512,11 @@ fun LiveMapScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Canl\u0131 Harita", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-                        Text("Ara\u00e7 Takip / Canl\u0131 Harita", fontSize = 10.sp, color = AppColors.TextMuted)
+                        Text("Canlı Harita", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Araç Takip / Canlı Harita", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f))
                     }
                 },
-                actions = {
-                    WSStatusChip(wsStatus)
-                    Spacer(Modifier.width(8.dp))
-                    AvatarCircle(initials = user?.avatar ?: "A", size = 30.dp)
-                    Spacer(Modifier.width(12.dp))
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.Surface)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { padding ->
@@ -505,39 +539,59 @@ fun LiveMapScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Status filter chips
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
-                StatusFilterChip("T\u00fcm\u00fc (${vehicles.size})", null, statusFilter) { vm.setFilter(null) }
-                StatusFilterChip("Kontak Açık (${vm.onlineCount})", VehicleStatus.IGNITION_ON, statusFilter) { vm.setFilter(VehicleStatus.IGNITION_ON) }
-                StatusFilterChip("Kontak Kapalı (${vm.offlineCount})", VehicleStatus.IGNITION_OFF, statusFilter) { vm.setFilter(VehicleStatus.IGNITION_OFF) }
-                StatusFilterChip("Bilgi Yok (${vm.idleCount})", VehicleStatus.NO_DATA, statusFilter) { vm.setFilter(VehicleStatus.NO_DATA) }
-            }
-
-            // Zoom controls
-            Column(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 12.dp)
-            ) {
-                FloatingActionButton(
-                    onClick = { mapViewRef.value?.controller?.zoomIn() },
-                    containerColor = AppColors.Surface,
-                    modifier = Modifier.size(36.dp)
+                Surface(
+                    onClick = { showVehicleSearch = true },
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 2.dp,
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.Add, null, tint = AppColors.Navy, modifier = Modifier.size(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)
+                    ) {
+                        Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f), modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Araç Ara", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(Modifier.weight(1f))
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .background(AppColors.Indigo, RoundedCornerShape(100.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text("${vehicles.size}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
                 }
-                Spacer(Modifier.height(4.dp))
-                FloatingActionButton(
-                    onClick = { mapViewRef.value?.controller?.zoomOut() },
-                    containerColor = AppColors.Surface,
-                    modifier = Modifier.size(36.dp)
+
+                Surface(
+                    onClick = {
+                        selectedVehicle = null
+                        fitMapToVehicles(filteredVehicles.ifEmpty { vehicles })
+                    },
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color.Transparent,
+                    modifier = Modifier.background(
+                        brush = ComposeBrush.horizontalGradient(listOf(AppColors.Indigo, AppColors.Navy)),
+                        shape = RoundedCornerShape(18.dp)
+                    )
                 ) {
-                    Icon(Icons.Default.Remove, null, tint = AppColors.Navy, modifier = Modifier.size(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)
+                    ) {
+                        Icon(Icons.Default.MyLocation, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Filoyu Ortala", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    }
                 }
             }
 
@@ -601,12 +655,6 @@ fun LiveMapScreen(
                     }
                 }
 
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
-                ) {
-                }
-
                 // Selected vehicle popup
                 selectedVehicle?.let { sel ->
                     // Look up latest vehicle data for real-time updates
@@ -653,22 +701,12 @@ fun LiveMapScreen(
                         vehicle = enrichedVehicle,
                         onClose = { selectedVehicle = null },
                         onZoomTo = {
-                            selectedVehicle = null
-                            mapViewRef.value?.let { mv ->
-                                mv.controller?.animateTo(GeoPoint(enrichedVehicle.lat, enrichedVehicle.lng), 16.0, 600L)
-                                // Modal kapandıktan sonra üst %25'e taşı
-                                mv.postDelayed({
-                                    val targetPx = mv.projection.toPixels(GeoPoint(enrichedVehicle.lat, enrichedVehicle.lng), null)
-                                    val offsetY = (mv.height * 0.25).toInt()
-                                    val newCenter = mv.projection.fromPixels(targetPx.x, offsetY) as? GeoPoint
-                                    if (newCenter != null) mv.controller?.animateTo(newCenter, mv.zoomLevelDouble, 400L)
-                                }, 700)
-                            }
+                            focusVehicleOnMap(enrichedVehicle)
                         },
                         onLiveTrack = {
                             trackingVehicleId = enrichedVehicle.id
                             selectedVehicle = null
-                            mapViewRef.value?.controller?.animateTo(GeoPoint(enrichedVehicle.lat, enrichedVehicle.lng), 16.0, 600L)
+                            focusVehicleOnMap(enrichedVehicle, liftForCard = false)
                         },
                         onDetail = {
                             val vehicleToOpen = enrichedVehicle
@@ -691,45 +729,22 @@ fun LiveMapScreen(
                 }
             }
         }
-    }
-}
 
-// WS Status Chip
-@Composable
-private fun WSStatusChip(status: WSConnectionStatus) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .background(status.color.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
-            .border(1.dp, status.color.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
-            .padding(horizontal = 10.dp, vertical = 5.dp)
-    ) {
-        Box(Modifier.size(6.dp).clip(CircleShape).background(status.color))
-        Spacer(Modifier.width(6.dp))
-        Text(status.label, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = status.color)
-    }
-}
-
-// Status filter chip
-@Composable
-private fun StatusFilterChip(
-    label: String,
-    status: VehicleStatus?,
-    activeFilter: VehicleStatus?,
-    onClick: () -> Unit
-) {
-    val isActive = activeFilter == status
-    val color = status?.color ?: AppColors.Navy
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(if (isActive) color.copy(alpha = 0.15f) else AppColors.Surface.copy(alpha = 0.9f))
-            .border(1.dp, if (isActive) color else AppColors.BorderSoft, RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 5.dp)
-    ) {
-        Text(label, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = if (isActive) color else AppColors.TextSecondary)
+        if (showVehicleSearch) {
+            VehicleSearchDialog(
+                query = vehicleSearchText,
+                vehicles = searchableVehicles,
+                onQueryChange = { vehicleSearchText = it },
+                onDismiss = { showVehicleSearch = false },
+                onVehicleSelected = { vehicle ->
+                    showVehicleSearch = false
+                    vehicleSearchText = ""
+                    trackingVehicleId = null
+                    selectedVehicle = vehicle
+                    focusVehicleOnMap(vehicle)
+                }
+            )
+        }
     }
 }
 
@@ -752,8 +767,7 @@ private fun openMapsDirectionsLiveMap(context: Context, lat: Double, lng: Double
     }
 }
 
-// Vehicle Popup Sheet (clean flat-row design matching VehicleDetailScreen)
-@OptIn(ExperimentalMaterial3Api::class)
+// Vehicle Popup Card (fixed overlay, non-draggable)
 @Composable
 private fun VehiclePopupCard(
     vehicle: Vehicle,
@@ -766,39 +780,39 @@ private fun VehiclePopupCard(
     onNavigateToAddAlarm: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val surface = MaterialTheme.colorScheme.surface
+    val elevatedSurface = MaterialTheme.colorScheme.surfaceVariant
+    val primaryText = MaterialTheme.colorScheme.onSurface
+    val secondaryText = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+    val mutedText = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
 
-    ModalBottomSheet(
-        onDismissRequest = onClose,
-        sheetState = sheetState,
-        containerColor = Color.Transparent,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        dragHandle = null,
-        contentWindowInsets = { WindowInsets(0) },
-        scrimColor = Color.Black.copy(alpha = 0.15f)
+    Surface(
+        shape = RoundedCornerShape(26.dp),
+        color = surface,
+        tonalElevation = 8.dp,
+        shadowElevation = 16.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 12.dp)
     ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                    colors = listOf(AppColors.DarkSurface, AppColors.DarkBg)
-                ),
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-            )
             .padding(top = 0.dp)
     ) {
-        // ── Drag handle ──
-        Box(
-            modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 6.dp),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp, end = 12.dp),
+            horizontalArrangement = Arrangement.End
         ) {
-            Box(
-                Modifier
-                    .width(40.dp)
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(AppColors.DarkBorder)
+            Icon(
+                Icons.Default.Close,
+                null,
+                tint = mutedText,
+                modifier = Modifier
+                    .size(20.dp)
+                    .clickable(onClick = onClose)
             )
         }
 
@@ -833,7 +847,7 @@ private fun VehiclePopupCard(
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(vehicle.plate, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = AppColors.DarkText, letterSpacing = 0.5.sp)
+                    Text(vehicle.plate, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = primaryText, letterSpacing = 0.5.sp)
                     Spacer(Modifier.width(10.dp))
                     StatusBadge(vehicle.status)
                 }
@@ -849,7 +863,7 @@ private fun VehiclePopupCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .background(AppColors.DarkSurface, RoundedCornerShape(16.dp))
+                .background(elevatedSurface, RoundedCornerShape(16.dp))
                 .padding(vertical = 8.dp, horizontal = 4.dp)
         ) {
             // Row 1: Kontak - Hız
@@ -922,18 +936,18 @@ private fun VehiclePopupCard(
 
             // Son Güncelleme - ortalanmış
             if (vehicle.deviceTime != null) {
-                HorizontalDivider(color = AppColors.DarkBorder.copy(alpha = 0.4f), modifier = Modifier.padding(horizontal = 12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), modifier = Modifier.padding(horizontal = 12.dp))
                 Row(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp, horizontal = 12.dp)
                 ) {
-                    Icon(Icons.Default.Schedule, null, tint = AppColors.DarkTextMuted.copy(alpha = 0.6f), modifier = Modifier.size(12.dp))
+                    Icon(Icons.Default.Schedule, null, tint = mutedText, modifier = Modifier.size(12.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(
                         "Son Güncelleme: ${vehicle.formattedDeviceTime}",
                         fontSize = 11.sp,
-                        color = AppColors.DarkTextMuted,
+                        color = mutedText,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -948,7 +962,7 @@ private fun VehiclePopupCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .background(AppColors.DarkSurface, RoundedCornerShape(16.dp))
+                .background(elevatedSurface, RoundedCornerShape(16.dp))
                 .padding(horizontal = 12.dp, vertical = 14.dp)
         ) {
             PopupActionBtn(Icons.Default.Navigation, "Yol Tarifi", Color(0xFF3B82F6), Modifier.weight(1f)) {
@@ -985,7 +999,7 @@ private fun VehiclePopupCard(
             Button(
                 onClick = onDetail,
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AppColors.DarkCard),
+                colors = ButtonDefaults.buttonColors(containerColor = AppColors.Navy),
                 modifier = Modifier.weight(1f).height(46.dp)
             ) {
                 Icon(Icons.Default.OpenInFull, null, modifier = Modifier.size(14.dp))
@@ -996,7 +1010,7 @@ private fun VehiclePopupCard(
 
         Spacer(Modifier.height(16.dp))
     }
-    } // ModalBottomSheet
+    }
 }
 
 @Composable
@@ -1039,6 +1053,8 @@ private fun CompactInfoTile(
     iconTint: Color = AppColors.Indigo,
     modifier: Modifier = Modifier
 ) {
+    val primaryText = MaterialTheme.colorScheme.onSurface
+    val mutedText = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -1054,10 +1070,10 @@ private fun CompactInfoTile(
         }
         Spacer(Modifier.width(8.dp))
         Column {
-            Text(label, fontSize = 10.sp, color = AppColors.DarkTextMuted, fontWeight = FontWeight.Medium)
+            Text(label, fontSize = 10.sp, color = mutedText, fontWeight = FontWeight.Medium)
             Text(
                 value, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                color = valueColor ?: AppColors.DarkText,
+                color = valueColor ?: primaryText,
                 maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
@@ -1072,6 +1088,7 @@ private fun PopupActionBtn(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val mutedText = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier.clickable(onClick = onClick)
@@ -1085,7 +1102,7 @@ private fun PopupActionBtn(
             Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
         }
         Spacer(Modifier.height(4.dp))
-        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.DarkTextMuted, textAlign = TextAlign.Center, maxLines = 1)
+        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = mutedText, textAlign = TextAlign.Center, maxLines = 1)
     }
 }
 
@@ -1184,3 +1201,106 @@ private fun VehicleListRow(vehicle: Vehicle, onClick: () -> Unit) {
 }
 
 // (VehiclePopupCard and related components are defined above VehicleListSheet)
+
+@Composable
+private fun VehicleSearchDialog(
+    query: String,
+    vehicles: List<Vehicle>,
+    onQueryChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onVehicleSelected: (Vehicle) -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Araç Ara", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Seçilen araç haritada odaklanır ve bilgi kartı açılır.", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f))
+                    }
+                    Icon(
+                        Icons.Default.Close,
+                        null,
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clickable(onClick = onDismiss)
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                ) {
+                    Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    BasicTextField(
+                        value = query,
+                        onValueChange = onQueryChange,
+                        textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface),
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        decorationBox = { inner ->
+                            Box(contentAlignment = Alignment.CenterStart) {
+                                if (query.isEmpty()) {
+                                    Text("Plaka, araç veya sürücü ara", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f))
+                                }
+                                inner()
+                            }
+                        }
+                    )
+                }
+
+                LazyColumn(modifier = Modifier.height(360.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(vehicles) { vehicle ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(18.dp))
+                                .clickable { onVehicleSelected(vehicle) }
+                                .padding(horizontal = 14.dp, vertical = 12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .background(vehicle.status.color, CircleShape)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(vehicle.plate, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                                Text(vehicle.model, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(vehicle.formattedSpeed, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                                Text(vehicle.city.ifBlank { vehicle.status.label }, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f), maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private val VehicleStatus.sortOrder: Int
+    get() = when (this) {
+        VehicleStatus.IGNITION_ON -> 0
+        VehicleStatus.SLEEPING -> 1
+        VehicleStatus.IGNITION_OFF -> 2
+        VehicleStatus.NO_DATA -> 3
+    }

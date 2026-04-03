@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - User Model
 struct AppUser: Codable, Identifiable {
@@ -105,6 +106,12 @@ struct Vehicle: Identifiable, Equatable {
     var fuelPer100km: Double = 0
 
     var isMotorcycle: Bool { vehicleCategory == "motorcycle" }
+    var hasValidCoordinates: Bool {
+        lat.isFinite && lng.isFinite &&
+        (-90.0...90.0).contains(lat) &&
+        (-180.0...180.0).contains(lng) &&
+        !(lat == 0 && lng == 0)
+    }
 
     var mapIcon: String {
         switch vehicleCategory {
@@ -185,48 +192,60 @@ struct Vehicle: Identifiable, Equatable {
         ignition ? "Kontak Açık" : "Kontak Kapalı"
     }
 
-    func formatTimestamp(_ raw: String?) -> String {
-        guard let raw = raw, !raw.isEmpty else { return "—" }
+    func parseTimestamp(_ raw: String?) -> Date? {
+        guard let raw = raw, !raw.isEmpty else { return nil }
         let cleaned = raw.replacingOccurrences(of: "\\.\\d+", with: "", options: .regularExpression)
-        
-        func formatSmart(_ date: Date) -> String {
-            let outFormatter = DateFormatter()
-            outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
-            outFormatter.locale = Locale(identifier: "tr_TR")
-            // Bugün ise sadece saat göster
-            if Calendar.current.isDateInToday(date) {
-                outFormatter.dateFormat = "HH:mm"
-            } else if Calendar.current.isDateInYesterday(date) {
-                outFormatter.dateFormat = "'Dün' HH:mm"
-            } else {
-                outFormatter.dateFormat = "dd.MM HH:mm"
-            }
-            return outFormatter.string(from: date)
-        }
-        
+
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         if let date = formatter.date(from: cleaned) {
-            return formatSmart(date)
+            return date
         }
+
         let formatter1b = ISO8601DateFormatter()
         formatter1b.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let date1b = formatter1b.date(from: raw) {
-            return formatSmart(date1b)
+            return date1b
         }
+
         let formatter2 = DateFormatter()
         formatter2.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
         formatter2.timeZone = TimeZone(abbreviation: "UTC")
-        if let date2 = formatter2.date(from: cleaned) {
-            return formatSmart(date2)
+        return formatter2.date(from: cleaned)
+    }
+
+    func formatTimestamp(_ raw: String?, alwaysShowDate: Bool = false) -> String {
+        guard let raw = raw, !raw.isEmpty else { return "—" }
+        guard let date = parseTimestamp(raw) else { return raw }
+
+        let outFormatter = DateFormatter()
+        outFormatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
+        outFormatter.locale = Locale(identifier: "tr_TR")
+
+        if alwaysShowDate {
+            outFormatter.dateFormat = "dd.MM.yyyy HH:mm"
+            return outFormatter.string(from: date)
         }
-        return raw
+
+        if Calendar.current.isDateInToday(date) {
+            outFormatter.dateFormat = "HH:mm"
+        } else if Calendar.current.isDateInYesterday(date) {
+            outFormatter.dateFormat = "'Dün' HH:mm"
+        } else {
+            outFormatter.dateFormat = "dd.MM HH:mm"
+        }
+
+        return outFormatter.string(from: date)
     }
 
     var formattedFirstIgnitionToday: String { formatTimestamp(firstIgnitionOnAtToday) }
     var formattedLastIgnitionOn: String { formatTimestamp(lastIgnitionOnAt) }
     var formattedLastIgnitionOff: String { formatTimestamp(lastIgnitionOffAt) }
     var formattedLastPacketAt: String { formatTimestamp(lastPacketAt) }
+    var formattedFirstIgnitionTodayFull: String { formatTimestamp(firstIgnitionOnAtToday, alwaysShowDate: true) }
+    var formattedLastIgnitionOnFull: String { formatTimestamp(lastIgnitionOnAt, alwaysShowDate: true) }
+    var formattedLastIgnitionOffFull: String { formatTimestamp(lastIgnitionOffAt, alwaysShowDate: true) }
+    var formattedLastPacketAtFull: String { formatTimestamp(lastPacketAt, alwaysShowDate: true) }
 
     /// Liveness status display label
     var livenessLabel: String {
@@ -288,8 +307,32 @@ struct Vehicle: Identifiable, Equatable {
         let plate = (json["plate"] as? String) ?? ""
         let name = (json["name"] as? String) ?? ""
         let vehicleCategory = (json["vehicle_category"] as? String) ?? "car"
-        let lat = (json["lat"] as? Double) ?? 0
-        let lon = (json["lon"] as? Double) ?? 0
+        let lat: Double = {
+            let parsed: Double
+            if let double = json["lat"] as? Double {
+                parsed = double
+            } else if let int = json["lat"] as? Int {
+                parsed = Double(int)
+            } else if let string = json["lat"] as? String, let double = Double(string) {
+                parsed = double
+            } else {
+                parsed = 0
+            }
+            return parsed.isFinite && (-90.0...90.0).contains(parsed) ? parsed : 0
+        }()
+        let lon: Double = {
+            let parsed: Double
+            if let double = json["lon"] as? Double {
+                parsed = double
+            } else if let int = json["lon"] as? Int {
+                parsed = Double(int)
+            } else if let string = json["lon"] as? String, let double = Double(string) {
+                parsed = double
+            } else {
+                parsed = 0
+            }
+            return parsed.isFinite && (-180.0...180.0).contains(parsed) ? parsed : 0
+        }()
         let speed = (json["speed"] as? Double) ?? ((json["speed"] as? Int).map { Double($0) } ?? 0)
         let direction = (json["direction"] as? Double) ?? ((json["direction"] as? Int).map { Double($0) } ?? 0)
         let ignition = (json["ignition"] as? Bool) ?? false
@@ -498,7 +541,7 @@ struct Vehicle: Identifiable, Equatable {
         if !patch.plate.isEmpty { plate = patch.plate }
         if !patch.model.isEmpty { model = patch.model }
         if patch.vehicleCategory != "car" { vehicleCategory = patch.vehicleCategory }
-        if patch.lat != 0 || patch.lng != 0 { lat = patch.lat; lng = patch.lng }
+        if patch.hasValidCoordinates { lat = patch.lat; lng = patch.lng }
         speed = patch.speed
         direction = patch.direction
         ignition = patch.ignition
@@ -610,46 +653,233 @@ struct DriverScore: Identifiable {
     }
 }
 
-// MARK: - Alert Item
-struct FleetAlert: Identifiable {
+// MARK: - Alarm Event
+struct AlarmEvent: Identifiable, Hashable {
     let id: String
-    let title: String
+    let imei: String
+    let plate: String
+    let vehicleName: String
+    let type: String
+    let code: String
     let description: String
-    let time: String
-    let severity: AlertSeverity
-    let createdAt: String  // raw "yyyy-MM-dd HH:mm:ss"
+    let lat: Double
+    let lng: Double
+    let speed: Int
+    let createdAt: String
+    let isActive: Bool
 
-    init(id: String, title: String, description: String, time: String, severity: AlertSeverity, createdAt: String = "") {
-        self.id = id
-        self.title = title
-        self.description = description
-        self.time = time
-        self.severity = severity
-        self.createdAt = createdAt
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+    static func == (lhs: AlarmEvent, rhs: AlarmEvent) -> Bool { lhs.id == rhs.id }
+
+    var alarmKey: String { "\(code) \(type) \(description)" }
+
+    var statusLabel: String { isActive ? "Aktif" : "Kapandı" }
+    var statusColor: Color { isActive ? .green : .gray }
+
+    var severity: AlertSeverity {
+        let key = normalizedKey
+        if key.contains("overspeed") || key.contains("hız") || key.contains("sos") || key.contains("power") {
+            return .red
+        }
+        if key.contains("ignition_on") || key.contains("kontak aç") {
+            return .green
+        }
+        if key.contains("ignition_off") || key.contains("kontak kapa") {
+            return .amber
+        }
+        if key.contains("brake") || key.contains("fren") || key.contains("disconnect") || key.contains("idle") || key.contains("movement") || key.contains("hareket") {
+            return .amber
+        }
+        if key.contains("geofence") || key.contains("gf_") {
+            return .green
+        }
+        return .blue
     }
 
-    /// "2025.03.29" format
-    var dateString: String {
-        guard createdAt.count >= 10 else { return time }
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        f.locale = Locale(identifier: "tr_TR")
-        guard let date = f.date(from: createdAt) else { return time }
-        let out = DateFormatter()
-        out.dateFormat = "yyyy.MM.dd"
-        return out.string(from: date)
+    var icon: String {
+        let key = normalizedKey
+        if key.contains("overspeed") || key.contains("hız") { return "gauge.with.dots.needle.33percent" }
+        if key.contains("ignition_on") || key.contains("kontak aç") { return "power.circle.fill" }
+        if key.contains("ignition_off") || key.contains("kontak kapa") { return "power.circle" }
+        if key.contains("brake") || key.contains("fren") { return "exclamationmark.octagon.fill" }
+        if key.contains("idle") || key.contains("rölanti") { return "clock.fill" }
+        if key.contains("gf_exit") || key.contains("geofence") || key.contains("bölge") { return "mappin.and.ellipse" }
+        if key.contains("disconnect") || key.contains("bağlantı") { return "antenna.radiowaves.left.and.right.slash" }
+        if key.contains("sos") || key.contains("panik") { return "sos" }
+        if key.contains("t_towing") || key.contains("çekici") || key.contains("taşıma") || key.contains("çekme") { return "car.side.rear.and.collision.and.car.side.front" }
+        if key.contains("t_movement") || key.contains("hareket") { return "figure.walk.motion" }
+        return "bell.fill"
     }
 
-    /// "14:32" format
-    var timeString: String {
-        guard createdAt.count >= 16 else { return "" }
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        f.locale = Locale(identifier: "tr_TR")
-        guard let date = f.date(from: createdAt) else { return "" }
-        let out = DateFormatter()
-        out.dateFormat = "HH:mm"
-        return out.string(from: date)
+    var color: Color {
+        switch severity {
+        case .red: return .red
+        case .amber: return .orange
+        case .green: return .green
+        case .blue: return AppTheme.indigo
+        }
+    }
+
+    var typeLabel: String {
+        let key = normalizedKey
+        if key.contains("t_movement") || key.contains("hareket") { return "Hareket Algılandı" }
+        if key.contains("t_towing") || key.contains("çekme") || key.contains("taşıma") { return "Çekme/Taşıma Alarmı" }
+        if key.contains("ignition_on") || key.contains("kontak aç") { return "Kontak Açıldı" }
+        if key.contains("ignition_off") || key.contains("kontak kapa") { return "Kontak Kapatıldı" }
+        if key.contains("gf_exit") { return "Bölgeden Çıkış" }
+        if key.contains("gf_enter") { return "Bölgeye Giriş" }
+        if key.contains("overspeed") || key.contains("hız") { return "Hız Aşımı" }
+        if key.contains("harsh_brake") || key.contains("fren") { return "Sert Fren" }
+        if key.contains("idle") || key.contains("rölanti") { return "Rölanti" }
+        if key.contains("disconnect") { return "Bağlantı Koptu" }
+        if key.contains("sos") || key.contains("panik") { return "SOS / Panik" }
+        if key.contains("power_cut") { return "Güç Kesildi" }
+        if key.contains("low_battery") { return "Düşük Batarya" }
+        if !description.isEmpty { return description }
+        return type.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
+    var dashboardTitle: String {
+        let key = normalizedType
+        if key == "geofence_enter" || key == "geofence_exit" || key.contains("gf_") {
+            return "Geofence"
+        }
+        return typeLabel
+    }
+
+    var dashboardDescription: String {
+        let key = normalizedType
+        let vehicleLabel = !plate.isEmpty ? plate : vehicleName
+        let rawDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        switch key {
+        case "geofence_enter", "gf_enter":
+            return vehicleLabel.isEmpty ? "Giriş Yapıldı" : "\(vehicleLabel) • Giriş Yapıldı"
+        case "geofence_exit", "gf_exit":
+            return vehicleLabel.isEmpty ? "Çıkış Yapıldı" : "\(vehicleLabel) • Çıkış Yapıldı"
+        default:
+            if !rawDescription.isEmpty, !vehicleLabel.isEmpty, rawDescription != vehicleLabel {
+                return "\(vehicleLabel) • \(rawDescription)"
+            }
+            if !rawDescription.isEmpty { return rawDescription }
+            if !vehicleLabel.isEmpty, !code.isEmpty { return "\(vehicleLabel) — \(code)" }
+            if !vehicleLabel.isEmpty { return vehicleLabel }
+            return code
+        }
+    }
+
+    var dashboardDisplayTime: String {
+        Self.formattedDate(createdAt, format: "dd.MM.yyyy HH:mm") ?? createdAt
+    }
+
+    var formattedDate: String {
+        Self.formattedDate(createdAt, format: "dd MMM HH:mm") ?? createdAt
+    }
+
+    var formattedFullDate: String {
+        Self.formattedDate(createdAt, format: "dd MMMM yyyy, HH:mm") ?? createdAt
+    }
+
+    private var normalizedKey: String {
+        "\(type) \(code) \(description)".lowercased()
+    }
+
+    private var normalizedType: String {
+        type.lowercased()
+    }
+
+    static func from(json: [String: Any], index: Int = 0) -> AlarmEvent {
+        let latVal = parseDouble(json["lat"])
+        let lngVal = parseDouble(json["lng"])
+        let speedVal = Int(parseDouble(json["speed"]))
+        let rawIsActive = json["is_active"]
+        let isActive: Bool = {
+            if let bool = rawIsActive as? Bool { return bool }
+            if let int = rawIsActive as? Int { return int != 0 }
+            if let string = rawIsActive as? String {
+                return ["1", "true", "active"].contains(string.lowercased())
+            }
+            return true
+        }()
+
+        return AlarmEvent(
+            id: "\(json["id"] ?? "alarm_\(index)")",
+            imei: json["imei"] as? String ?? "",
+            plate: json["plate"] as? String ?? "",
+            vehicleName: json["vehicle_name"] as? String ?? "",
+            type: json["type"] as? String ?? "",
+            code: json["code"] as? String ?? "",
+            description: json["description"] as? String ?? "",
+            lat: latVal,
+            lng: lngVal,
+            speed: speedVal,
+            createdAt: json["created_at"] as? String ?? "",
+            isActive: isActive
+        )
+    }
+
+    private static func parseDouble(_ value: Any?) -> Double {
+        if let double = value as? Double { return double }
+        if let int = value as? Int { return Double(int) }
+        if let string = value as? String, let double = Double(string) { return double }
+        return 0
+    }
+
+    private static func parseCreatedAt(_ raw: String) -> Date? {
+        guard !raw.isEmpty else { return nil }
+
+        let normalizedCandidates = [
+            raw,
+            raw.replacingOccurrences(of: " ", with: "T"),
+            raw.replacingOccurrences(of: "+03", with: "+03:00"),
+            raw.replacingOccurrences(of: " ", with: "T").replacingOccurrences(of: "+03", with: "+03:00")
+        ]
+
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime]
+
+        let isoFractionalFormatter = ISO8601DateFormatter()
+        isoFractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        for candidate in normalizedCandidates {
+            if let date = isoFormatter.date(from: candidate) {
+                return date
+            }
+            if let date = isoFractionalFormatter.date(from: candidate) {
+                return date
+            }
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
+
+        let formats = [
+            "yyyy-MM-dd HH:mm:ssXXXXX",
+            "yyyy-MM-dd HH:mm:ssX",
+            "yyyy-MM-dd'T'HH:mm:ssXXXXX",
+            "yyyy-MM-dd'T'HH:mm:ssX",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd'T'HH:mm:ss"
+        ]
+
+        for format in formats {
+            formatter.dateFormat = format
+            if let date = formatter.date(from: raw) {
+                return date
+            }
+        }
+
+        return nil
+    }
+
+    private static func formattedDate(_ raw: String, format: String) -> String? {
+        guard let date = parseCreatedAt(raw) else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "tr_TR")
+        formatter.timeZone = TimeZone(identifier: "Europe/Istanbul")
+        formatter.dateFormat = format
+        return formatter.string(from: date)
     }
 }
 
@@ -697,8 +927,6 @@ enum ChangeType {
         }
     }
 }
-
-import SwiftUI
 
 // MARK: - Geofence Model
 struct GeofencePoint: Codable, Hashable {

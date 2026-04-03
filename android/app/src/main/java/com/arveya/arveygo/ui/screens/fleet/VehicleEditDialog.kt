@@ -17,7 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arveya.arveygo.models.Vehicle
 import com.arveya.arveygo.services.APIService
-import com.arveya.arveygo.ui.theme.AppColors
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,8 +64,8 @@ fun VehicleEditDialog(
                     Icon(Icons.Default.Check, null, tint = Color(0xFF22C55E), modifier = Modifier.size(26.dp))
                 }
             },
-            title = { Text("Başarılı", fontWeight = FontWeight.Bold, color = AppColors.Navy) },
-            text = { Text("Araç bilgileri başarıyla güncellendi.", fontSize = 14.sp, color = AppColors.TextMuted) },
+            title = { Text("Başarılı", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text("Araç bilgileri başarıyla güncellendi.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(
                     onClick = { onSaved() },
@@ -94,8 +93,8 @@ fun VehicleEditDialog(
                 }
                 Spacer(Modifier.width(10.dp))
                 Column {
-                    Text("Araç Düzenle", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AppColors.Navy)
-                    Text(vehicle.plate, fontSize = 11.sp, color = AppColors.TextMuted)
+                    Text("Araç Düzenle", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(vehicle.plate, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         },
@@ -112,7 +111,7 @@ fun VehicleEditDialog(
                     value = plate,
                     onValueChange = { plate = it.uppercase() },
                     label = { Text("Plaka", fontSize = 12.sp) },
-                    leadingIcon = { Icon(Icons.Default.DirectionsCar, null, modifier = Modifier.size(16.dp), tint = AppColors.Indigo) },
+                    leadingIcon = { Icon(Icons.Default.DirectionsCar, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -127,7 +126,7 @@ fun VehicleEditDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Araç Adı / Takma Ad", fontSize = 12.sp) },
-                    leadingIcon = { Icon(Icons.Default.Label, null, modifier = Modifier.size(16.dp), tint = AppColors.Indigo) },
+                    leadingIcon = { Icon(Icons.Default.Label, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -142,7 +141,7 @@ fun VehicleEditDialog(
                     value = brand,
                     onValueChange = { brand = it },
                     label = { Text("Marka", fontSize = 12.sp) },
-                    leadingIcon = { Icon(Icons.Default.CarRental, null, modifier = Modifier.size(16.dp), tint = AppColors.Indigo) },
+                    leadingIcon = { Icon(Icons.Default.CarRental, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -157,7 +156,7 @@ fun VehicleEditDialog(
                     value = model,
                     onValueChange = { model = it },
                     label = { Text("Model", fontSize = 12.sp) },
-                    leadingIcon = { Icon(Icons.Default.Info, null, modifier = Modifier.size(16.dp), tint = AppColors.Indigo) },
+                    leadingIcon = { Icon(Icons.Default.Info, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -172,7 +171,7 @@ fun VehicleEditDialog(
                     value = year,
                     onValueChange = { year = it.filter { c -> c.isDigit() }.take(4) },
                     label = { Text("Model Yılı", fontSize = 12.sp) },
-                    leadingIcon = { Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(16.dp), tint = AppColors.Indigo) },
+                    leadingIcon = { Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -192,7 +191,7 @@ fun VehicleEditDialog(
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Araç Tipi", fontSize = 12.sp) },
-                        leadingIcon = { Icon(Icons.Default.Category, null, modifier = Modifier.size(16.dp), tint = AppColors.Indigo) },
+                        leadingIcon = { Icon(Icons.Default.Category, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
@@ -225,8 +224,8 @@ fun VehicleEditDialog(
                     value = odometer,
                     onValueChange = { odometer = it.filter { c -> c.isDigit() } },
                     label = { Text("Kilometre (Odometer)", fontSize = 12.sp) },
-                    leadingIcon = { Icon(Icons.Default.Speed, null, modifier = Modifier.size(16.dp), tint = AppColors.Indigo) },
-                    suffix = { Text("km", fontSize = 12.sp, color = AppColors.TextMuted) },
+                    leadingIcon = { Icon(Icons.Default.Speed, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) },
+                    suffix = { Text("km", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -298,7 +297,7 @@ fun VehicleEditDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss, enabled = !isSaving) {
-                Text("İptal", color = AppColors.TextMuted)
+                Text("İptal", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )

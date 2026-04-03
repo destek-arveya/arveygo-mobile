@@ -21,14 +21,16 @@ struct CountryPickerSheet: View {
                 // Search bar
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .foregroundColor(.gray)
+                        .foregroundColor(AppTheme.authTextMuted)
                         .font(.system(size: 14))
                     TextField("Ülke ara / Search country", text: $searchText)
                         .font(.system(size: 14))
+                        .foregroundColor(AppTheme.authTextPrimary)
+                        .tint(AppTheme.navy)
                         .autocorrectionDisabled()
                 }
                 .padding(10)
-                .background(Color(.systemGray6))
+                .background(AppTheme.authField)
                 .cornerRadius(10)
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -46,17 +48,17 @@ struct CountryPickerSheet: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(country.name)
                                     .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.primary)
+                                    .foregroundColor(AppTheme.authTextPrimary)
                                 Text(country.dialCode)
                                     .font(.system(size: 12))
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(AppTheme.authTextMuted)
                             }
 
                             Spacer()
 
                             if country.id == selected.id {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(AppTheme.authAccent)
                                     .font(.system(size: 18))
                             }
                         }
@@ -65,17 +67,19 @@ struct CountryPickerSheet: View {
                 }
                 .listStyle(.plain)
             }
+            .background(AppTheme.authCanvas.ignoresSafeArea())
             .navigationTitle("Ülke Kodu / Country Code")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { isPresented = false }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.gray)
+                            .foregroundColor(AppTheme.authTextMuted)
                             .font(.system(size: 20))
                     }
                 }
             }
         }
+        .tint(AppTheme.navy)
     }
 }

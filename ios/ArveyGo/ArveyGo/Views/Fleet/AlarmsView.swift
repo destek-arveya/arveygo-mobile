@@ -1,128 +1,7 @@
 import SwiftUI
 import MapKit
 
-// MARK: - Alarm Model
-struct AlarmEvent: Identifiable, Hashable {
-    let id: String
-    let imei: String
-    let plate: String
-    let vehicleName: String
-    let type: String
-    let code: String
-    let description: String
-    let lat: Double
-    let lng: Double
-    let speed: Int
-    let createdAt: String
-    let isActive: Bool
-
-    func hash(into hasher: inout Hasher) { hasher.combine(id) }
-    static func == (lhs: AlarmEvent, rhs: AlarmEvent) -> Bool { lhs.id == rhs.id }
-
-    /// Combined key for matching: code + type + description
-    var alarmKey: String { "\(code) \(type) \(description)" }
-
-    var statusLabel: String { isActive ? "Aktif" : "Kapandı" }
-    var statusColor: Color { isActive ? .green : .gray }
-
-    var icon: String {
-        let key = alarmKey.lowercased()
-        if key.contains("overspeed") || key.contains("hız") { return "gauge.with.dots.needle.33percent" }
-        if key.contains("brake") || key.contains("fren") { return "exclamationmark.octagon.fill" }
-        if key.contains("idle") || key.contains("rölanti") { return "clock.fill" }
-        if key.contains("gf_exit") || key.contains("geofence") || key.contains("bölge") { return "mappin.and.ellipse" }
-        if key.contains("disconnect") || key.contains("bağlantı") { return "antenna.radiowaves.left.and.right.slash" }
-        if key.contains("sos") || key.contains("panik") { return "sos" }
-        if key.contains("t_towing") || key.contains("çekici") || key.contains("taşıma") || key.contains("çekme") { return "car.side.rear.and.collision.and.car.side.front" }
-        if key.contains("t_movement") || key.contains("hareket") { return "figure.walk.motion" }
-        return "bell.fill"
-    }
-
-    var color: Color {
-        let key = alarmKey.lowercased()
-        if key.contains("overspeed") || key.contains("hız") || key.contains("sos") || key.contains("panik") { return .red }
-        if key.contains("t_towing") || key.contains("çekme") || key.contains("taşıma") { return .red }
-        if key.contains("brake") || key.contains("fren") || key.contains("disconnect") { return .orange }
-        if key.contains("t_movement") || key.contains("hareket") { return .orange }
-        if key.contains("idle") || key.contains("rölanti") { return Color(red: 245/255, green: 158/255, blue: 11/255) }
-        if key.contains("geofence") || key.contains("gf_") { return .green }
-        return AppTheme.indigo
-    }
-
-    var typeLabel: String {
-        let key = alarmKey.lowercased()
-        if key.contains("t_movement") || key.contains("hareket") { return "Hareket Algılandı" }
-        if key.contains("t_towing") || key.contains("çekme") || key.contains("taşıma") { return "Çekme/Taşıma Alarmı" }
-        if key.contains("gf_exit") { return "Bölgeden Çıkış" }
-        if key.contains("gf_enter") { return "Bölgeye Giriş" }
-        if key.contains("overspeed") || key.contains("hız") { return "Hız Aşımı" }
-        if key.contains("harsh_brake") || key.contains("fren") { return "Sert Fren" }
-        if key.contains("idle") || key.contains("rölanti") { return "Rölanti" }
-        if key.contains("disconnect") { return "Bağlantı Koptu" }
-        if key.contains("sos") || key.contains("panik") { return "SOS / Panik" }
-        if key.contains("power_cut") { return "Güç Kesildi" }
-        if key.contains("low_battery") { return "Düşük Batarya" }
-        // Fallback: use description if available
-        if !description.isEmpty { return description }
-        return type.replacingOccurrences(of: "_", with: " ").capitalized
-    }
-
-    var formattedDate: String {
-        // "2026-03-26 14:30:00" → "26 Mar 14:30"
-        guard createdAt.count >= 16 else { return createdAt }
-        let parts = createdAt.split(separator: " ")
-        guard parts.count >= 2 else { return createdAt }
-        let dateParts = parts[0].split(separator: "-")
-        guard dateParts.count == 3 else { return createdAt }
-        let months = ["", "Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
-        let month = Int(dateParts[1]) ?? 0
-        let day = dateParts[2]
-        let time = String(parts[1].prefix(5))
-        return "\(day) \(months[min(month, 12)]) \(time)"
-    }
-
-    var formattedFullDate: String {
-        // "2026-03-26 14:30:00" → "26 Mart 2026, 14:30"
-        guard createdAt.count >= 16 else { return createdAt }
-        let parts = createdAt.split(separator: " ")
-        guard parts.count >= 2 else { return createdAt }
-        let dateParts = parts[0].split(separator: "-")
-        guard dateParts.count == 3 else { return createdAt }
-        let monthsFull = ["", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
-        let year = dateParts[0]
-        let month = Int(dateParts[1]) ?? 0
-        let day = dateParts[2]
-        let time = String(parts[1].prefix(5))
-        return "\(day) \(monthsFull[min(month, 12)]) \(year), \(time)"
-    }
-
-    static func from(json: [String: Any], index: Int = 0) -> AlarmEvent {
-        let latVal: Double
-        if let d = json["lat"] as? Double { latVal = d }
-        else if let s = json["lat"] as? String, let d = Double(s) { latVal = d }
-        else { latVal = 0 }
-
-        let lngVal: Double
-        if let d = json["lng"] as? Double { lngVal = d }
-        else if let s = json["lng"] as? String, let d = Double(s) { lngVal = d }
-        else { lngVal = 0 }
-
-        return AlarmEvent(
-            id: "\(json["id"] ?? "alarm_\(index)")",
-            imei: json["imei"] as? String ?? "",
-            plate: json["plate"] as? String ?? "",
-            vehicleName: json["vehicle_name"] as? String ?? "",
-            type: json["type"] as? String ?? "",
-            code: json["code"] as? String ?? "",
-            description: json["description"] as? String ?? "",
-            lat: latVal,
-            lng: lngVal,
-            speed: json["speed"] as? Int ?? 0,
-            createdAt: json["created_at"] as? String ?? "",
-            isActive: json["is_active"] as? Bool ?? true
-        )
-    }
-}
+private let mobilePrivateIgnitionAlarmPrefix = "__mobile_private_ign__"
 
 // MARK: - Alarms ViewModel
 @MainActor
@@ -239,6 +118,8 @@ struct AlarmSet: Identifiable, Hashable {
         case "idle_alarm": return "clock.fill"
         case "movement_detection": return "figure.walk.motion"
         case "off_hours_usage": return "clock.badge.exclamationmark"
+        case "ignition_on": return "power.circle.fill"
+        case "ignition_off": return "power.circle"
         default: return "bell.badge.fill"
         }
     }
@@ -250,6 +131,8 @@ struct AlarmSet: Identifiable, Hashable {
         case "idle_alarm": return Color(red: 245/255, green: 158/255, blue: 11/255)
         case "movement_detection": return .orange
         case "off_hours_usage": return AppTheme.indigo
+        case "ignition_on": return .green
+        case "ignition_off": return .red
         default: return AppTheme.indigo
         }
     }
@@ -261,6 +144,8 @@ struct AlarmSet: Identifiable, Hashable {
         case "movement_detection": return "Hareket Algılama"
         case "off_hours_usage": return "Mesai Dışı Kullanım"
         case "geofence_alarm": return "Bölge Alarmı"
+        case "ignition_on": return "Kontak Açılma"
+        case "ignition_off": return "Kontak Kapanma"
         default: return alarmType.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }
@@ -318,6 +203,10 @@ struct AlarmSet: Identifiable, Hashable {
             recipientCount: json["recipient_count"] as? Int ?? 0,
             createdAt: json["created_at"] as? String ?? ""
         )
+    }
+
+    var isHiddenMobileIgnitionRule: Bool {
+        name.hasPrefix(mobilePrivateIgnitionAlarmPrefix)
     }
 }
 
@@ -394,10 +283,15 @@ struct AlarmsView: View {
     var initialSearchText: String = ""
     var autoOpenCreate: Bool = false
     var preSelectedPlate: String = ""
+    var initialAlarmEvent: AlarmEvent? = nil
     @EnvironmentObject var authVM: AuthViewModel
     @StateObject private var vm = AlarmsViewModel()
     @State private var showFilters = false
     @State private var selectedTab = 0 // 0: Gelen Alarmlar, 1: Alarm Kuralları
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var ds: DS { DS(isDark: colorScheme == .dark) }
+    private var isDark: Bool { colorScheme == .dark }
     @State private var searchText = ""
     @State private var selectedAlarm: AlarmEvent? = nil
     @State private var selectedRule: AlarmSet? = nil
@@ -425,7 +319,7 @@ struct AlarmsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                AppTheme.bg.ignoresSafeArea()
+                ds.pageBg.ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     // Tab Selector
@@ -443,7 +337,7 @@ struct AlarmsView: View {
                             }
 
                             if vm.isLoading && vm.alarms.isEmpty {
-                                loadingView
+                                AlarmEventsSkeletonView()
                             } else if let error = vm.errorMessage, vm.alarms.isEmpty {
                                 errorView(error)
                             } else if vm.alarms.isEmpty {
@@ -465,25 +359,19 @@ struct AlarmsView: View {
                     VStack(spacing: 1) {
                         Text("Alarmlar")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(AppTheme.navy)
+                            .foregroundColor(ds.text1)
                         Text("İzleme / Alarmlar")
                             .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(ds.text3)
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 12) {
-                        if selectedTab == 0 {
-                            Button(action: { withAnimation { showFilters.toggle() } }) {
-                                Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                                    .font(.system(size: 18))
-                                    .foregroundColor(hasActiveFilters ? AppTheme.indigo : AppTheme.textMuted)
-                            }
+                    if selectedTab == 0 {
+                        Button(action: { withAnimation { showFilters.toggle() } }) {
+                            Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                                .font(.system(size: 18))
+                                .foregroundColor(hasActiveFilters ? AppTheme.indigo : ds.text3)
                         }
-                        AvatarCircle(
-                            initials: authVM.currentUser?.avatar ?? "A",
-                            size: 30
-                        )
                     }
                 }
             }
@@ -510,13 +398,23 @@ struct AlarmsView: View {
             if !initialSearchText.isEmpty {
                 searchText = initialSearchText
             }
+            await vm.fetchAlarms()
+            if let initialAlarmEvent, !autoOpenCreate {
+                selectedTab = 0
+                openInitialAlarm(initialAlarmEvent)
+            }
             if autoOpenCreate {
                 selectedTab = 1
                 showCreateSheet = true
             }
-            await vm.fetchAlarms()
             await fetchAlarmSets()
             await fetchCatalog()
+        }
+        .onChange(of: vm.alarms) { _, alarms in
+            guard let initialAlarmEvent, selectedAlarm == nil, !autoOpenCreate else { return }
+            if let match = alarms.first(where: { $0.id == initialAlarmEvent.id }) {
+                selectedAlarm = match
+            }
         }
     }
 
@@ -556,6 +454,14 @@ struct AlarmsView: View {
         actionLoadingId = nil
     }
 
+    private func openInitialAlarm(_ initialAlarmEvent: AlarmEvent) {
+        if let match = vm.alarms.first(where: { $0.id == initialAlarmEvent.id }) {
+            selectedAlarm = match
+        } else {
+            selectedAlarm = nil
+        }
+    }
+
     // MARK: - Tab Selector
     var tabSelector: some View {
         HStack(spacing: 0) {
@@ -563,11 +469,11 @@ struct AlarmsView: View {
             tabButton(title: "Alarm Kuralları", icon: "gearshape.fill", index: 1)
         }
         .padding(4)
-        .background(AppTheme.surface)
+        .background(ds.cardBg)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
+                .stroke(ds.divider, lineWidth: 1)
         )
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -581,10 +487,10 @@ struct AlarmsView: View {
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
             }
-            .foregroundColor(selectedTab == index ? .white : AppTheme.textMuted)
+            .foregroundColor(selectedTab == index ? .white : ds.text3)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
-            .background(selectedTab == index ? AppTheme.navy : Color.clear)
+            .background(selectedTab == index ? ds.primary : Color.clear)
             .cornerRadius(10)
         }
     }
@@ -607,9 +513,10 @@ struct AlarmsView: View {
 
     // Filtered rules based on search
     var filteredRules: [AlarmSet] {
-        guard !searchText.isEmpty else { return alarmSets }
+        let visibleRules = alarmSets.filter { !$0.isHiddenMobileIgnitionRule }
+        guard !searchText.isEmpty else { return visibleRules }
         let q = searchText.lowercased()
-        return alarmSets.filter {
+        return visibleRules.filter {
             $0.name.lowercased().contains(q) ||
             $0.typeLabel.lowercased().contains(q) ||
             $0.conditionSummary.lowercased().contains(q)
@@ -621,27 +528,27 @@ struct AlarmsView: View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 14))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(ds.text3)
 
             TextField(selectedTab == 0 ? "Alarm ara (plaka, tür, açıklama...)" : "Kural ara (isim, tür, araç...)", text: $searchText)
                 .font(.system(size: 13))
-                .foregroundColor(AppTheme.textPrimary)
+                .foregroundColor(ds.text1)
 
             if !searchText.isEmpty {
                 Button(action: { searchText = "" }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 14))
-                        .foregroundColor(AppTheme.textMuted)
+                        .foregroundColor(ds.text3)
                 }
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .background(AppTheme.surface)
+        .background(ds.cardBg)
         .cornerRadius(10)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(AppTheme.borderSoft, lineWidth: 1)
+                .stroke(ds.divider, lineWidth: 1)
         )
         .padding(.horizontal, 16)
         .padding(.bottom, 4)
@@ -651,7 +558,7 @@ struct AlarmsView: View {
     var alarmRulesTab: some View {
         Group {
             if isLoadingSets && alarmSets.isEmpty {
-                loadingView
+                AlarmRulesSkeletonView()
             } else if let error = setsError, alarmSets.isEmpty {
                 errorView(error)
             } else {
@@ -667,7 +574,7 @@ struct AlarmsView: View {
                         HStack {
                             Text("\(filteredRules.count) kural tanımlı")
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(AppTheme.textMuted)
+                                .foregroundColor(ds.text3)
                             Spacer()
                         }
                         .padding(.horizontal, 16)
@@ -677,13 +584,13 @@ struct AlarmsView: View {
                             VStack(spacing: 8) {
                                 Image(systemName: "gearshape")
                                     .font(.system(size: 36))
-                                    .foregroundColor(AppTheme.textFaint)
+                                    .foregroundColor(ds.text3)
                                 Text("Henüz alarm kuralı yok")
                                     .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(AppTheme.textMuted)
+                                    .foregroundColor(ds.text3)
                                 Text("Yukarıdaki butona tıklayarak yeni kural ekleyin")
                                     .font(.system(size: 12))
-                                    .foregroundColor(AppTheme.textFaint)
+                                    .foregroundColor(ds.text3)
                             }
                             .padding(.vertical, 40)
                         }
@@ -695,6 +602,9 @@ struct AlarmsView: View {
                     }
                     .padding(.bottom, 20)
                 }
+                .refreshable {
+                    await refreshCurrentTab()
+                }
             }
         }
     }
@@ -702,38 +612,43 @@ struct AlarmsView: View {
     // MARK: - New Rule Button (Kart tarzı)
     var newRuleButton: some View {
         Button(action: { showCreateSheet = true }) {
+            let accentForeground = isDark ? Color.white : AppTheme.indigo
+            let accentFill = isDark ? AppTheme.indigo.opacity(0.92) : AppTheme.indigo.opacity(0.04)
+            let accentStroke = isDark ? Color.white.opacity(0.10) : AppTheme.indigo.opacity(0.15)
+            let iconBubble = isDark ? Color.white.opacity(0.14) : AppTheme.indigo.opacity(0.12)
+
             HStack(spacing: 10) {
                 ZStack {
                     Circle()
-                        .fill(AppTheme.indigo.opacity(0.12))
+                        .fill(iconBubble)
                         .frame(width: 34, height: 34)
                     Image(systemName: "plus")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(AppTheme.indigo)
+                        .foregroundColor(accentForeground)
                 }
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Yeni Alarm Kuralı Ekle")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(AppTheme.indigo)
+                        .foregroundColor(accentForeground)
                     Text("Araçlarınız için özel alarm kuralı tanımlayın")
                         .font(.system(size: 10))
-                        .foregroundColor(AppTheme.textMuted)
+                        .foregroundColor(isDark ? Color.white.opacity(0.76) : ds.text3)
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.indigo.opacity(0.5))
+                    .foregroundColor(isDark ? Color.white.opacity(0.72) : AppTheme.indigo.opacity(0.5))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(AppTheme.indigo.opacity(0.04))
+            .background(accentFill)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(AppTheme.indigo.opacity(0.15), lineWidth: 1)
+                    .stroke(accentStroke, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -757,10 +672,10 @@ struct AlarmsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(rule.name)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(AppTheme.textPrimary)
+                        .foregroundColor(ds.text1)
                     Text(rule.typeLabel)
                         .font(.system(size: 11))
-                        .foregroundColor(AppTheme.textMuted)
+                        .foregroundColor(ds.text3)
                 }
 
                 Spacer()
@@ -785,19 +700,19 @@ struct AlarmsView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 10))
-                        .foregroundColor(AppTheme.textFaint)
+                        .foregroundColor(ds.text3)
                     Text("Koşul: \(rule.conditionSummary)")
                         .font(.system(size: 11))
-                        .foregroundColor(AppTheme.textSecondary)
+                        .foregroundColor(ds.text2)
                         .lineLimit(1)
                 }
                 HStack(spacing: 6) {
                     Image(systemName: "car.fill")
                         .font(.system(size: 10))
-                        .foregroundColor(AppTheme.textFaint)
+                        .foregroundColor(ds.text3)
                     Text("\(rule.targetCount) araç")
                         .font(.system(size: 11))
-                        .foregroundColor(AppTheme.textSecondary)
+                        .foregroundColor(ds.text2)
 
                     Spacer().frame(width: 8)
 
@@ -805,14 +720,14 @@ struct AlarmsView: View {
                     ForEach(rule.channelList, id: \.self) { ch in
                         Image(systemName: ch == "email" ? "envelope.fill" : ch == "sms" ? "message.fill" : "bell.fill")
                             .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textFaint)
+                            .foregroundColor(ds.text3)
                     }
                 }
             }
             .padding(.leading, 48)
         }
         .padding(12)
-        .background(AppTheme.surface)
+        .background(ds.cardBg)
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.03), radius: 2, y: 1)
         .padding(.horizontal, 16)
@@ -851,7 +766,7 @@ struct AlarmsView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
         }
-        .background(AppTheme.surface)
+        .background(ds.cardBg)
     }
 
     func filterChip(label: String, onRemove: @escaping () -> Void) -> some View {
@@ -862,7 +777,7 @@ struct AlarmsView: View {
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 12))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(ds.text3)
             }
         }
         .padding(.horizontal, 10)
@@ -879,7 +794,7 @@ struct AlarmsView: View {
                 HStack {
                     Text("\(filteredAlarms.count) alarm")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppTheme.textMuted)
+                        .foregroundColor(ds.text3)
                     Spacer()
                     if vm.isLoading && searchText.isEmpty {
                         ProgressView()
@@ -905,7 +820,7 @@ struct AlarmsView: View {
                         ProgressView()
                         Text("Yükleniyor...")
                             .font(.system(size: 12))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(ds.text3)
                     }
                     .padding()
                 }
@@ -913,7 +828,7 @@ struct AlarmsView: View {
             .padding(.bottom, 20)
         }
         .refreshable {
-            await vm.refresh()
+            await refreshCurrentTab()
         }
     }
 
@@ -923,7 +838,7 @@ struct AlarmsView: View {
             // İkon
             ZStack {
                 Circle()
-                    .fill(alarm.color.opacity(0.12))
+                    .fill(alarm.color.opacity(isDark ? 0.2 : 0.12))
                     .frame(width: 40, height: 40)
                 Image(systemName: alarm.icon)
                     .font(.system(size: 16))
@@ -935,21 +850,21 @@ struct AlarmsView: View {
                 HStack {
                     Text(alarm.typeLabel)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(AppTheme.textPrimary)
+                        .foregroundColor(isDark ? Color.white.opacity(0.96) : ds.text1)
                     Spacer()
                     Text(alarm.formattedDate)
                         .font(.system(size: 10))
-                        .foregroundColor(AppTheme.textFaint)
+                        .foregroundColor(isDark ? ds.text2 : ds.text3)
                 }
 
                 HStack(spacing: 6) {
                     // Plaka
                     Text(alarm.plate.isEmpty ? alarm.vehicleName : alarm.plate)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(AppTheme.indigo)
+                        .foregroundColor(isDark ? .white : AppTheme.indigo)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(AppTheme.indigo.opacity(0.08))
+                        .background(isDark ? Color.white.opacity(0.12) : AppTheme.indigo.opacity(0.08))
                         .cornerRadius(4)
 
                     if alarm.speed > 0 {
@@ -959,7 +874,7 @@ struct AlarmsView: View {
                             Text("\(alarm.speed) km/s")
                                 .font(.system(size: 10))
                         }
-                        .foregroundColor(AppTheme.textMuted)
+                        .foregroundColor(isDark ? ds.text2 : ds.text3)
                     }
                 }
 
@@ -976,7 +891,7 @@ struct AlarmsView: View {
 
                         Text(alarm.description.isEmpty ? alarm.code : alarm.description)
                             .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(ds.text3)
                             .lineLimit(1)
                     }
                 }
@@ -985,12 +900,12 @@ struct AlarmsView: View {
             // Ok
             Image(systemName: "chevron.right")
                 .font(.system(size: 11))
-                .foregroundColor(AppTheme.textFaint)
+                .foregroundColor(ds.text3)
         }
         .padding(12)
-        .background(AppTheme.surface)
+        .background(ds.cardBg)
         .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.03), radius: 2, y: 1)
+        .shadow(color: isDark ? Color.clear : Color.black.opacity(0.03), radius: 2, y: 1)
         .padding(.horizontal, 16)
     }
 
@@ -1005,7 +920,7 @@ struct AlarmsView: View {
                     }) {
                         HStack {
                             Text("Tümü")
-                                .foregroundColor(AppTheme.textPrimary)
+                                .foregroundColor(ds.text1)
                             Spacer()
                             if vm.selectedType == nil {
                                 Image(systemName: "checkmark")
@@ -1019,7 +934,7 @@ struct AlarmsView: View {
                         }) {
                             HStack {
                                 Text(label)
-                                    .foregroundColor(AppTheme.textPrimary)
+                                    .foregroundColor(ds.text1)
                                 Spacer()
                                 if vm.selectedType == key {
                                     Image(systemName: "checkmark")
@@ -1080,7 +995,7 @@ struct AlarmsView: View {
                 .scaleEffect(1.2)
             Text("Alarmlar yükleniyor...")
                 .font(.system(size: 13))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(ds.text3)
             Spacer()
         }
     }
@@ -1093,14 +1008,14 @@ struct AlarmsView: View {
                 .foregroundColor(.orange)
             Text("Bir hata oluştu")
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(AppTheme.textPrimary)
+                .foregroundColor(ds.text1)
             Text(message)
                 .font(.system(size: 12))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(ds.text3)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
             Button("Tekrar Dene") {
-                Task { await vm.refresh() }
+                Task { await refreshCurrentTab() }
             }
             .font(.system(size: 13, weight: .semibold))
             .foregroundColor(.white)
@@ -1112,18 +1027,28 @@ struct AlarmsView: View {
         }
     }
 
+    @MainActor
+    private func refreshCurrentTab() async {
+        if selectedTab == 0 {
+            await vm.refresh()
+        } else {
+            await fetchAlarmSets()
+            await fetchCatalog()
+        }
+    }
+
     var emptyView: some View {
         VStack(spacing: 16) {
             Spacer()
             Image(systemName: "bell.slash")
                 .font(.system(size: 44))
-                .foregroundColor(AppTheme.textFaint)
+                .foregroundColor(ds.text3)
             Text("Alarm Bulunamadı")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(AppTheme.textPrimary)
+                .foregroundColor(ds.text1)
             Text("Seçili filtrelere uygun alarm kaydı yok.\nFiltrelerinizi değiştirerek tekrar deneyebilirsiniz.")
                 .font(.system(size: 12))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(ds.text3)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
             if hasActiveFilters {
@@ -1146,7 +1071,7 @@ struct AlarmsView: View {
                     VStack(spacing: 12) {
                         ZStack {
                             Circle()
-                                .fill(alarm.color.opacity(0.12))
+                                .fill(alarm.color.opacity(isDark ? 0.2 : 0.12))
                                 .frame(width: 60, height: 60)
                             Image(systemName: alarm.icon)
                                 .font(.system(size: 26))
@@ -1155,15 +1080,15 @@ struct AlarmsView: View {
 
                         Text(alarm.typeLabel)
                             .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(AppTheme.textPrimary)
+                            .foregroundColor(ds.text1)
 
                         Text(alarm.formattedFullDate)
                             .font(.system(size: 12))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(ds.text3)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 24)
-                    .background(alarm.color.opacity(0.04))
+                    .background(alarm.color.opacity(isDark ? 0.08 : 0.04))
 
                     // Details
                     VStack(spacing: 0) {
@@ -1192,7 +1117,7 @@ struct AlarmsView: View {
                                     .foregroundColor(AppTheme.indigo)
                                 Text("Alarm Konumu")
                                     .font(.system(size: 13, weight: .semibold))
-                                    .foregroundColor(AppTheme.textPrimary)
+                                    .foregroundColor(ds.text1)
                             }
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
@@ -1245,7 +1170,7 @@ struct AlarmsView: View {
                     }
                 }
             }
-            .background(AppTheme.bg)
+            .background(ds.pageBg)
             .navigationTitle("Alarm Detayı")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1267,7 +1192,7 @@ struct AlarmsView: View {
                     VStack(spacing: 12) {
                         ZStack {
                             Circle()
-                                .fill(rule.color.opacity(0.12))
+                                .fill(rule.color.opacity(isDark ? 0.2 : 0.12))
                                 .frame(width: 60, height: 60)
                             Image(systemName: rule.icon)
                                 .font(.system(size: 26))
@@ -1276,12 +1201,12 @@ struct AlarmsView: View {
 
                         Text(rule.name)
                             .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(AppTheme.textPrimary)
+                            .foregroundColor(ds.text1)
 
                         if let desc = rule.description {
                             Text(desc)
                                 .font(.system(size: 12))
-                                .foregroundColor(AppTheme.textMuted)
+                                .foregroundColor(ds.text3)
                         }
 
                         // Status badge
@@ -1377,7 +1302,7 @@ struct AlarmsView: View {
                     }
                 }
             }
-            .background(AppTheme.bg)
+            .background(ds.pageBg)
             .navigationTitle("Kural Detayı")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1404,16 +1329,16 @@ struct AlarmsView: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 14))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(ds.text3)
                 .frame(width: 20)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.textFaint)
+                    .foregroundColor(ds.text3)
                 Text(value)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(AppTheme.textPrimary)
+                    .foregroundColor(ds.text1)
             }
 
             Spacer()
@@ -1430,6 +1355,10 @@ struct CreateAlarmSetView: View {
     let onCreated: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var ds: DS { DS(isDark: colorScheme == .dark) }
+    private var isDark: Bool { colorScheme == .dark }
 
     // Step state (1=İsim&Tür, 2=Araçlar, 3=Koşullar, 4=Bildirim)
     @State private var currentStep = 1
@@ -1454,7 +1383,9 @@ struct CreateAlarmSetView: View {
             AlarmTypeOption(value: "idle_alarm", label: "Rölanti", description: "Araç belirli süreden fazla rölantide kaldığında uyar"),
             AlarmTypeOption(value: "movement_detection", label: "Hareket Algılama", description: "Park halindeki aracın hareket etmesinde uyar"),
             AlarmTypeOption(value: "off_hours_usage", label: "Mesai Dışı Kullanım", description: "Mesai saatleri dışında kullanımda uyar"),
-            AlarmTypeOption(value: "geofence_alarm", label: "Bölge Alarmı", description: "Bölgeye giriş/çıkışta bildirim alın")
+            AlarmTypeOption(value: "geofence_alarm", label: "Bölge Alarmı", description: "Bölgeye giriş/çıkışta bildirim alın"),
+            AlarmTypeOption(value: "ignition_on", label: "Kontak Açılma", description: "Araç kontağı açıldığında bildirim alın"),
+            AlarmTypeOption(value: "ignition_off", label: "Kontak Kapanma", description: "Araç kontağı kapandığında bildirim alın")
         ]
     }
 
@@ -1465,6 +1396,8 @@ struct CreateAlarmSetView: View {
         case "movement_detection": return "car.fill"
         case "off_hours_usage": return "clock.fill"
         case "geofence_alarm": return "location.fill"
+        case "ignition_on": return "power.circle.fill"
+        case "ignition_off": return "power.circle"
         default: return "bell.fill"
         }
     }
@@ -1476,6 +1409,8 @@ struct CreateAlarmSetView: View {
         case "movement_detection": return Color(red: 0.133, green: 0.773, blue: 0.369) // 22C55E
         case "off_hours_usage": return Color(red: 0.659, green: 0.333, blue: 0.969) // A855F7
         case "geofence_alarm": return AppTheme.indigo
+        case "ignition_on": return Color(red: 0.133, green: 0.773, blue: 0.369)
+        case "ignition_off": return Color(red: 0.937, green: 0.267, blue: 0.267)
         default: return AppTheme.indigo
         }
     }
@@ -1524,7 +1459,7 @@ struct CreateAlarmSetView: View {
                                     } else {
                                         Text("\(stepNum)")
                                             .font(.system(size: 11, weight: .bold))
-                                            .foregroundColor(isActive ? AppTheme.navy : .white.opacity(0.5))
+                                            .foregroundColor(isActive ? ds.text1 : .white.opacity(0.5))
                                     }
                                 }
                                 Text(label)
@@ -1546,7 +1481,7 @@ struct CreateAlarmSetView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
-            .background(AppTheme.navy)
+            .background(ds.text1)
 
             // ── Step Content ──
             ScrollView(showsIndicators: false) {
@@ -1587,12 +1522,12 @@ struct CreateAlarmSetView: View {
                             Text("Geri")
                                 .font(.system(size: 14, weight: .semibold))
                         }
-                        .foregroundColor(AppTheme.textPrimary)
+                        .foregroundColor(ds.text1)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(AppTheme.borderSoft, lineWidth: 1)
+                                .stroke(ds.divider, lineWidth: 1)
                         )
                     }
                 }
@@ -1630,16 +1565,16 @@ struct CreateAlarmSetView: View {
                     .frame(height: 48)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(currentStep == 4 ? Color(red: 0.133, green: 0.773, blue: 0.369) : AppTheme.navy)
+                            .fill(currentStep == 4 ? Color(red: 0.133, green: 0.773, blue: 0.369) : ds.text1)
                     )
                 }
                 .disabled(isSaving)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
-            .background(AppTheme.surface)
+            .background(ds.cardBg)
         }
-        .background(AppTheme.bg)
+        .background(ds.pageBg)
         .onAppear {
             // Pre-select vehicle by plate
             if !preSelectedPlate.isEmpty, let vehicles = catalog?.vehicles {
@@ -1659,18 +1594,18 @@ struct CreateAlarmSetView: View {
     private var stepNameAndType: some View {
         Text("Alarm Adı")
             .font(.system(size: 13, weight: .semibold))
-            .foregroundColor(AppTheme.textPrimary)
+            .foregroundColor(ds.text1)
 
         TextField("ör. Hız İhlali Alarmı, Depo Kontrolü...", text: $name)
             .font(.system(size: 14))
             .padding(12)
-            .background(AppTheme.surface)
+            .background(ds.cardBg)
             .cornerRadius(10)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(ds.divider, lineWidth: 1))
 
         Text("Alarm Türü Seçin")
             .font(.system(size: 13, weight: .semibold))
-            .foregroundColor(AppTheme.textPrimary)
+            .foregroundColor(ds.text1)
             .padding(.top, 4)
 
         ForEach(typeOptions) { type in
@@ -1691,11 +1626,11 @@ struct CreateAlarmSetView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(type.label)
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(AppTheme.textPrimary)
+                            .foregroundColor(ds.text1)
                         if !type.description.isEmpty {
                             Text(type.description)
                                 .font(.system(size: 11))
-                                .foregroundColor(AppTheme.textMuted)
+                                .foregroundColor(ds.text3)
                                 .lineLimit(2)
                         }
                     }
@@ -1716,11 +1651,11 @@ struct CreateAlarmSetView: View {
                 .padding(14)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(isSelected ? typeColor.opacity(0.06) : AppTheme.surface)
+                        .fill(isSelected ? typeColor.opacity(0.06) : ds.cardBg)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(isSelected ? typeColor.opacity(0.3) : AppTheme.borderSoft, lineWidth: 1.5)
+                        .stroke(isSelected ? typeColor.opacity(0.3) : ds.divider, lineWidth: 1.5)
                 )
             }
             .buttonStyle(.plain)
@@ -1732,20 +1667,20 @@ struct CreateAlarmSetView: View {
     private var stepVehicles: some View {
         Text("Hangi araçlar için geçerli olsun?")
             .font(.system(size: 13, weight: .semibold))
-            .foregroundColor(AppTheme.textPrimary)
+            .foregroundColor(ds.text1)
 
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 14))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(ds.text3)
             TextField("Plaka veya araç ara...", text: $vehicleSearch)
                 .font(.system(size: 13))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(AppTheme.surface)
+        .background(ds.cardBg)
         .cornerRadius(10)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(ds.divider, lineWidth: 1))
 
         HStack(spacing: 12) {
             Button(action: {
@@ -1788,7 +1723,7 @@ struct CreateAlarmSetView: View {
                                 .frame(width: 20, height: 20)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 4)
-                                        .stroke(isVSel ? AppTheme.indigo : AppTheme.textMuted, lineWidth: 1.5)
+                                        .stroke(isVSel ? AppTheme.indigo : ds.text3, lineWidth: 1.5)
                                 )
                             if isVSel {
                                 Image(systemName: "checkmark")
@@ -1800,11 +1735,11 @@ struct CreateAlarmSetView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(v.label)
                                 .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(AppTheme.textPrimary)
+                                .foregroundColor(ds.text1)
                             if !v.plate.isEmpty && v.plate != v.label {
                                 Text(v.plate)
                                     .font(.system(size: 11))
-                                    .foregroundColor(AppTheme.textMuted)
+                                    .foregroundColor(ds.text3)
                             }
                         }
 
@@ -1819,11 +1754,11 @@ struct CreateAlarmSetView: View {
                     .padding(12)
                     .background(
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(isVSel ? AppTheme.indigo.opacity(0.06) : AppTheme.surface)
+                            .fill(isVSel ? AppTheme.indigo.opacity(0.06) : ds.cardBg)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(isVSel ? AppTheme.indigo.opacity(0.2) : AppTheme.borderSoft, lineWidth: 1)
+                            .stroke(isVSel ? AppTheme.indigo.opacity(0.2) : ds.divider, lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)
@@ -1833,7 +1768,7 @@ struct CreateAlarmSetView: View {
                 ProgressView().scaleEffect(0.8)
                 Text("Araçlar yükleniyor...")
                     .font(.system(size: 12))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(ds.text3)
             }
             .frame(maxWidth: .infinity)
             .padding(20)
@@ -1846,7 +1781,7 @@ struct CreateAlarmSetView: View {
         let typeLabel = typeOptions.first(where: { $0.value == selectedType })?.label ?? selectedType
         Text("\(typeLabel) Koşulları")
             .font(.system(size: 13, weight: .semibold))
-            .foregroundColor(AppTheme.textPrimary)
+            .foregroundColor(ds.text1)
 
         switch selectedType {
         case "speed_violation":
@@ -1859,6 +1794,20 @@ struct CreateAlarmSetView: View {
             conditionMovementView
         case "off_hours_usage":
             conditionOffHoursView
+        case "ignition_on":
+            conditionIgnitionView(
+                title: "Kontak Açılma",
+                icon: "power.circle.fill",
+                accent: Color(red: 0.133, green: 0.773, blue: 0.369),
+                description: "Araç kontağı açıldığı anda otomatik bildirim alırsınız. Bu alarm tipi için ek koşul tanımlamanıza gerek yoktur."
+            )
+        case "ignition_off":
+            conditionIgnitionView(
+                title: "Kontak Kapanma",
+                icon: "power.circle",
+                accent: Color(red: 0.937, green: 0.267, blue: 0.267),
+                description: "Araç kontağı kapandığı anda otomatik bildirim alırsınız. Bu alarm tipi için ek koşul tanımlamanıza gerek yoktur."
+            )
         default:
             EmptyView()
         }
@@ -1868,7 +1817,7 @@ struct CreateAlarmSetView: View {
     private var conditionSpeedView: some View {
         Text("Araçlarınızın aşmaması gereken hız limitini belirleyin.")
             .font(.system(size: 12))
-            .foregroundColor(AppTheme.textMuted)
+            .foregroundColor(ds.text3)
 
         HStack(spacing: 10) {
             Image(systemName: "speedometer")
@@ -1879,13 +1828,13 @@ struct CreateAlarmSetView: View {
                 .keyboardType(.numberPad)
         }
         .padding(12)
-        .background(AppTheme.surface)
+        .background(ds.cardBg)
         .cornerRadius(10)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(ds.divider, lineWidth: 1))
 
         Text("Hızlı Seçim")
             .font(.system(size: 11))
-            .foregroundColor(AppTheme.textMuted)
+            .foregroundColor(ds.text3)
 
         HStack(spacing: 8) {
             ForEach(["50", "80", "100", "120"], id: \.self) { preset in
@@ -1893,11 +1842,11 @@ struct CreateAlarmSetView: View {
                 Button(action: { speedLimit = preset }) {
                     Text("\(preset) km/s")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(isSel ? .white : AppTheme.textPrimary)
+                        .foregroundColor(isSel ? .white : ds.text1)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(isSel ? AppTheme.indigo : AppTheme.surface))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(isSel ? AppTheme.indigo : AppTheme.borderSoft, lineWidth: 1))
+                        .background(RoundedRectangle(cornerRadius: 8).fill(isSel ? AppTheme.indigo : ds.cardBg))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(isSel ? AppTheme.indigo : ds.divider, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             }
@@ -1908,7 +1857,7 @@ struct CreateAlarmSetView: View {
     private var conditionIdleView: some View {
         Text("Araçlarınızın rölantide kalabileceği maksimum süreyi belirleyin.")
             .font(.system(size: 12))
-            .foregroundColor(AppTheme.textMuted)
+            .foregroundColor(ds.text3)
 
         HStack(spacing: 10) {
             Image(systemName: "hourglass.bottomhalf.filled")
@@ -1919,13 +1868,13 @@ struct CreateAlarmSetView: View {
                 .keyboardType(.numberPad)
         }
         .padding(12)
-        .background(AppTheme.surface)
+        .background(ds.cardBg)
         .cornerRadius(10)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(ds.divider, lineWidth: 1))
 
         Text("Hızlı Seçim")
             .font(.system(size: 11))
-            .foregroundColor(AppTheme.textMuted)
+            .foregroundColor(ds.text3)
 
         HStack(spacing: 8) {
             ForEach([("180", "3 dk"), ("300", "5 dk"), ("600", "10 dk"), ("900", "15 dk")], id: \.0) { sec, label in
@@ -1933,11 +1882,11 @@ struct CreateAlarmSetView: View {
                 Button(action: { idleAfterSec = sec }) {
                     Text(label)
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(isSel ? .white : AppTheme.textPrimary)
+                        .foregroundColor(isSel ? .white : ds.text1)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(isSel ? AppTheme.indigo : AppTheme.surface))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(isSel ? AppTheme.indigo : AppTheme.borderSoft, lineWidth: 1))
+                        .background(RoundedRectangle(cornerRadius: 8).fill(isSel ? AppTheme.indigo : ds.cardBg))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(isSel ? AppTheme.indigo : ds.divider, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             }
@@ -1948,7 +1897,7 @@ struct CreateAlarmSetView: View {
     private var conditionGeofenceView: some View {
         Text("Alarm tetiklenecek bölgeyi seçin.")
             .font(.system(size: 12))
-            .foregroundColor(AppTheme.textMuted)
+            .foregroundColor(ds.text3)
 
         if let geofences = catalog?.geofences {
             ForEach(geofences) { gf in
@@ -1957,10 +1906,10 @@ struct CreateAlarmSetView: View {
                     HStack(spacing: 10) {
                         Image(systemName: "location.fill")
                             .font(.system(size: 14))
-                            .foregroundColor(isSel ? AppTheme.indigo : AppTheme.textMuted)
+                            .foregroundColor(isSel ? AppTheme.indigo : ds.text3)
                         Text(gf.name)
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(AppTheme.textPrimary)
+                            .foregroundColor(ds.text1)
                         Spacer()
                         if isSel {
                             Image(systemName: "checkmark.circle.fill")
@@ -1969,15 +1918,15 @@ struct CreateAlarmSetView: View {
                         }
                     }
                     .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(isSel ? AppTheme.indigo.opacity(0.06) : AppTheme.surface))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(isSel ? AppTheme.indigo.opacity(0.2) : AppTheme.borderSoft, lineWidth: 1))
+                    .background(RoundedRectangle(cornerRadius: 10).fill(isSel ? AppTheme.indigo.opacity(0.06) : ds.cardBg))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(isSel ? AppTheme.indigo.opacity(0.2) : ds.divider, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             }
         } else {
             Text("Bölge bulunamadı")
                 .font(.system(size: 12))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(ds.text3)
         }
     }
 
@@ -1989,10 +1938,10 @@ struct CreateAlarmSetView: View {
                 .foregroundColor(Color(red: 0.133, green: 0.773, blue: 0.369))
             Text("Hareket Algılama")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(AppTheme.textPrimary)
+                .foregroundColor(ds.text1)
             Text("Park halindeki araç sallanma, çekilme veya hareket etme durumunda otomatik uyarı alacaksınız. Ek koşul gerekmez.")
                 .font(.system(size: 12))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(ds.text3)
                 .lineSpacing(4)
         }
         .padding(16)
@@ -2008,10 +1957,10 @@ struct CreateAlarmSetView: View {
                 .foregroundColor(Color(red: 0.659, green: 0.333, blue: 0.969))
             Text("Mesai Dışı Kullanım")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(AppTheme.textPrimary)
+                .foregroundColor(ds.text1)
             Text("Varsayılan ayarlar: Hafta içi 08:00 - 18:00 arası mesai. Bu saat aralığı dışında araç kullanıldığında bildirim alırsınız.")
                 .font(.system(size: 12))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(ds.text3)
                 .lineSpacing(4)
             HStack(spacing: 6) {
                 ForEach(["Pzt", "Sal", "Çar", "Per", "Cum"], id: \.self) { day in
@@ -2033,10 +1982,10 @@ struct CreateAlarmSetView: View {
     private var stepNotifications: some View {
         Text("Bildirim Kanalları")
             .font(.system(size: 13, weight: .semibold))
-            .foregroundColor(AppTheme.textPrimary)
+            .foregroundColor(ds.text1)
         Text("Alarm tetiklendiğinde hangi kanallardan bildirim almak istiyorsunuz?")
             .font(.system(size: 12))
-            .foregroundColor(AppTheme.textMuted)
+            .foregroundColor(ds.text3)
 
         channelsList
         recipientsList
@@ -2070,10 +2019,10 @@ struct CreateAlarmSetView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(ch.label)
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(AppTheme.textPrimary)
+                            .foregroundColor(ds.text1)
                         Text(ch.desc)
                             .font(.system(size: 11))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(ds.text3)
                     }
 
                     Spacer()
@@ -2084,7 +2033,7 @@ struct CreateAlarmSetView: View {
                             .frame(width: 22, height: 22)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 4)
-                                    .stroke(isSel ? ch.color : AppTheme.textMuted, lineWidth: 1.5)
+                                    .stroke(isSel ? ch.color : ds.text3, lineWidth: 1.5)
                             )
                         if isSel {
                             Image(systemName: "checkmark")
@@ -2094,22 +2043,41 @@ struct CreateAlarmSetView: View {
                     }
                 }
                 .padding(14)
-                .background(RoundedRectangle(cornerRadius: 12).fill(isSel ? ch.color.opacity(0.06) : AppTheme.surface))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSel ? ch.color.opacity(0.3) : AppTheme.borderSoft, lineWidth: 1.5))
+                .background(RoundedRectangle(cornerRadius: 12).fill(isSel ? ch.color.opacity(0.06) : ds.cardBg))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSel ? ch.color.opacity(0.3) : ds.divider, lineWidth: 1.5))
             }
             .buttonStyle(.plain)
         }
     }
 
     @ViewBuilder
+    private func conditionIgnitionView(title: String, icon: String, accent: Color, description: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 28))
+                .foregroundColor(accent)
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(ds.text1)
+            Text(description)
+                .font(.system(size: 12))
+                .foregroundColor(ds.text3)
+                .lineSpacing(4)
+        }
+        .padding(16)
+        .background(accent.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    @ViewBuilder
     private var recipientsList: some View {
         Text("Alıcılar")
             .font(.system(size: 13, weight: .semibold))
-            .foregroundColor(AppTheme.textPrimary)
+            .foregroundColor(ds.text1)
             .padding(.top, 8)
         Text("Alarm bildirimlerini kimler alsın?")
             .font(.system(size: 12))
-            .foregroundColor(AppTheme.textMuted)
+            .foregroundColor(ds.text3)
 
         if let recipients = catalog?.recipients {
             ForEach(recipients) { r in
@@ -2131,10 +2099,10 @@ struct CreateAlarmSetView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(r.name)
                                 .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(AppTheme.textPrimary)
+                                .foregroundColor(ds.text1)
                             Text(r.email)
                                 .font(.system(size: 11))
-                                .foregroundColor(AppTheme.textMuted)
+                                .foregroundColor(ds.text3)
                         }
 
                         Spacer()
@@ -2145,7 +2113,7 @@ struct CreateAlarmSetView: View {
                                 .frame(width: 20, height: 20)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 4)
-                                        .stroke(isSel ? AppTheme.indigo : AppTheme.textMuted, lineWidth: 1.5)
+                                        .stroke(isSel ? AppTheme.indigo : ds.text3, lineWidth: 1.5)
                                 )
                             if isSel {
                                 Image(systemName: "checkmark")
@@ -2155,8 +2123,8 @@ struct CreateAlarmSetView: View {
                         }
                     }
                     .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(isSel ? AppTheme.indigo.opacity(0.06) : AppTheme.surface))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(isSel ? AppTheme.indigo.opacity(0.2) : AppTheme.borderSoft, lineWidth: 1))
+                    .background(RoundedRectangle(cornerRadius: 10).fill(isSel ? AppTheme.indigo.opacity(0.06) : ds.cardBg))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(isSel ? AppTheme.indigo.opacity(0.2) : ds.divider, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             }
@@ -2165,7 +2133,7 @@ struct CreateAlarmSetView: View {
                 ProgressView().scaleEffect(0.8)
                 Text("Alıcılar yükleniyor...")
                     .font(.system(size: 12))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(ds.text3)
             }
             .frame(maxWidth: .infinity)
             .padding(16)
@@ -2177,37 +2145,37 @@ struct CreateAlarmSetView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Özet")
                 .font(.system(size: 12, weight: .bold))
-                .foregroundColor(AppTheme.navy)
+                .foregroundColor(ds.text1)
 
             HStack(spacing: 4) {
                 Image(systemName: "tag.fill")
                     .font(.system(size: 12))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(ds.text3)
                 Text("Tür: \(typeOptions.first(where: { $0.value == selectedType })?.label ?? selectedType)")
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.textSecondary)
+                    .foregroundColor(ds.text2)
             }
             HStack(spacing: 4) {
                 Image(systemName: "car.fill")
                     .font(.system(size: 12))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(ds.text3)
                 Text("\(selectedVehicles.count) araç seçildi")
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.textSecondary)
+                    .foregroundColor(ds.text2)
             }
             HStack(spacing: 4) {
                 Image(systemName: "bell.fill")
                     .font(.system(size: 12))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(ds.text3)
                 Text("\(selectedChannels.count) kanal, \(selectedRecipients.count) alıcı")
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.textSecondary)
+                    .foregroundColor(ds.text2)
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(AppTheme.navy.opacity(0.04)))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.navy.opacity(0.1), lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 12).fill(ds.text1.opacity(0.04)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(ds.text1.opacity(0.1), lineWidth: 1))
         .padding(.top, 8)
     }
 

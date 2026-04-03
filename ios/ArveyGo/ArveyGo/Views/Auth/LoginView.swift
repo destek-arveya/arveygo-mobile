@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct LoginView: View {
+struct LoginViewBackup: View {
     @EnvironmentObject var authVM: AuthViewModel
     @ObservedObject private var L = LoginStrings.shared
     @FocusState private var focusedField: Field?
@@ -24,19 +24,19 @@ struct LoginView: View {
     var body: some View {
         ZStack {
             // Background
-            AppTheme.bg.ignoresSafeArea()
+            AppTheme.panelGradient.ignoresSafeArea()
 
             // Decorative background circles
             GeometryReader { geo in
                 Circle()
-                    .fill(AppTheme.navy.opacity(0.03))
-                    .frame(width: 400, height: 400)
-                    .offset(x: -100, y: -150)
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 380, height: 380)
+                    .offset(x: -110, y: -130)
 
                 Circle()
-                    .fill(AppTheme.indigo.opacity(0.04))
+                    .fill(Color.white.opacity(0.06))
                     .frame(width: 300, height: 300)
-                    .offset(x: geo.size.width - 100, y: geo.size.height - 200)
+                    .offset(x: geo.size.width - 110, y: geo.size.height - 220)
             }
 
             ScrollView(showsIndicators: false) {
@@ -52,24 +52,12 @@ struct LoginView: View {
 
                     // Logo
                     VStack(spacing: 8) {
-                        AsyncImage(url: URL(string: "https://arveya.com/images/genel/logo.webp")) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFit()
-                            case .failure(_):
-                                Image(systemName: "car.fill")
-                                    .font(.system(size: 32))
-                                    .foregroundColor(AppTheme.indigo)
-                            default:
-                                ProgressView()
-                            }
-                        }
-                        .frame(height: 64)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-
-                        
+                        Image("LoginLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 72)
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .shadow(color: .black.opacity(0.14), radius: 18, x: 0, y: 10)
                     }
                     .padding(.bottom, 24)
 
@@ -78,11 +66,11 @@ struct LoginView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(L.welcomeBack)
                                 .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(AppTheme.navy)
+                                .foregroundColor(AppTheme.authTextPrimary)
 
                             Text(L.loginSubtitle)
                                 .font(.system(size: 13))
-                                .foregroundColor(AppTheme.textMuted)
+                                .foregroundColor(AppTheme.authTextMuted)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.bottom, 20)
@@ -103,20 +91,20 @@ struct LoginView: View {
                                         Text(tabLabel)
                                             .font(.system(size: 12, weight: .semibold))
                                     }
-                                    .foregroundColor(loginMode == mode ? .white : AppTheme.textMuted)
+                                    .foregroundColor(loginMode == mode ? .white : AppTheme.authTextMuted)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
+                                    .padding(.vertical, 10)
                                     .background(loginMode == mode ? AppTheme.navy : Color.clear)
                                     .cornerRadius(8)
                                 }
                             }
                         }
                         .padding(3)
-                        .background(AppTheme.bg)
+                        .background(AppTheme.authCanvas.opacity(0.96))
                         .cornerRadius(10)
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(AppTheme.borderSoft, lineWidth: 1)
+                                .stroke(AppTheme.authBorder, lineWidth: 1)
                         )
                         .padding(.bottom, 20)
 
@@ -143,32 +131,33 @@ struct LoginView: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(L.emailLabel)
                                     .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(AppTheme.textSecondary)
+                                    .foregroundColor(AppTheme.authTextSecondary)
 
                                 HStack(spacing: 12) {
                                     Image(systemName: "envelope")
                                         .font(.system(size: 15))
-                                        .foregroundColor(AppTheme.textMuted)
+                                        .foregroundColor(AppTheme.authTextMuted)
                                         .frame(width: 20)
 
                                     TextField(L.emailPlaceholder, text: $authVM.loginEmail)
                                         .font(.system(size: 14))
-                                        .foregroundColor(AppTheme.navy)
+                                        .foregroundColor(AppTheme.authTextPrimary)
                                         .textContentType(.emailAddress)
                                         .keyboardType(.emailAddress)
+                                        .tint(AppTheme.navy)
                                         .autocapitalization(.none)
                                         .disableAutocorrection(true)
                                         .focused($focusedField, equals: .email)
                                 }
                                 .padding(.horizontal, 16)
                                 .frame(height: 56)
-                                .background(AppTheme.bg)
+                                .background(AppTheme.authField)
                                 .cornerRadius(12)
                                 .contentShape(Rectangle())
                                 .onTapGesture { focusedField = .email }
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .stroke(focusedField == .email ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .email ? 1.5 : 1)
+                                        .stroke(focusedField == .email ? AppTheme.navy : AppTheme.authBorder, lineWidth: focusedField == .email ? 1.5 : 1)
                                 )
                             }
                             .padding(.bottom, 16)
@@ -177,29 +166,30 @@ struct LoginView: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(L.passwordLabel)
                                     .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(AppTheme.textSecondary)
+                                    .foregroundColor(AppTheme.authTextSecondary)
 
                                 HStack(spacing: 12) {
                                     Image(systemName: "lock")
                                         .font(.system(size: 15))
-                                        .foregroundColor(AppTheme.textMuted)
+                                        .foregroundColor(AppTheme.authTextMuted)
                                         .frame(width: 20)
 
                                     SecureField(L.passwordPlaceholder, text: $authVM.loginPassword)
                                         .font(.system(size: 14))
-                                        .foregroundColor(AppTheme.navy)
+                                        .foregroundColor(AppTheme.authTextPrimary)
                                         .textContentType(.password)
+                                        .tint(AppTheme.navy)
                                         .focused($focusedField, equals: .password)
                                 }
                                 .padding(.horizontal, 16)
                                 .frame(height: 56)
-                                .background(AppTheme.bg)
+                                .background(AppTheme.authField)
                                 .cornerRadius(12)
                                 .contentShape(Rectangle())
                                 .onTapGesture { focusedField = .password }
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .stroke(focusedField == .password ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .password ? 1.5 : 1)
+                                        .stroke(focusedField == .password ? AppTheme.navy : AppTheme.authBorder, lineWidth: focusedField == .password ? 1.5 : 1)
                                 )
                             }
                             .padding(.bottom, 12)
@@ -211,10 +201,10 @@ struct LoginView: View {
                                     HStack(spacing: 6) {
                                         Image(systemName: authVM.rememberMe ? "checkmark.square.fill" : "square")
                                             .font(.system(size: 16))
-                                            .foregroundColor(authVM.rememberMe ? AppTheme.navy : AppTheme.textMuted)
+                                            .foregroundColor(authVM.rememberMe ? AppTheme.navy : AppTheme.authTextMuted)
                                         Text(L.rememberMe)
                                             .font(.system(size: 12, weight: .medium))
-                                            .foregroundColor(AppTheme.textSecondary)
+                                            .foregroundColor(AppTheme.authTextSecondary)
                                     }
                                 }
 
@@ -223,8 +213,9 @@ struct LoginView: View {
                                 NavigationLink(destination: ForgotPasswordView()) {
                                     Text(L.forgotPassword)
                                         .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(AppTheme.indigo)
+                                        .foregroundColor(AppTheme.authAccent)
                                 }
+                                .buttonStyle(.plain)
                             }
                             .padding(.bottom, 24)
 
@@ -251,7 +242,7 @@ struct LoginView: View {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(L.phoneLabel)
                                         .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(AppTheme.textSecondary)
+                                        .foregroundColor(AppTheme.authTextSecondary)
 
                                     HStack(spacing: 0) {
                                         // Country code picker button
@@ -261,18 +252,18 @@ struct LoginView: View {
                                                     .font(.system(size: 18))
                                                 Text(selectedCountry.dialCode)
                                                     .font(.system(size: 13, weight: .semibold))
-                                                    .foregroundColor(AppTheme.navy)
+                                                    .foregroundColor(AppTheme.authTextPrimary)
                                                 Image(systemName: "chevron.down")
                                                     .font(.system(size: 8, weight: .bold))
-                                                    .foregroundColor(AppTheme.textMuted)
+                                                    .foregroundColor(AppTheme.authTextMuted)
                                             }
                                             .padding(.horizontal, 12)
-                                            .frame(height: 50)
-                                            .background(AppTheme.bg)
+                                            .frame(height: 56)
+                                            .background(AppTheme.authField)
                                             .cornerRadius(12, corners: [.topLeft, .bottomLeft])
                                             .overlay(
                                                 RoundedCorner(radius: 12, corners: [.topLeft, .bottomLeft])
-                                                    .stroke(focusedField == .phone ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .phone ? 1.5 : 1)
+                                                    .stroke(focusedField == .phone ? AppTheme.navy : AppTheme.authBorder, lineWidth: focusedField == .phone ? 1.5 : 1)
                                             )
                                         }
 
@@ -286,16 +277,17 @@ struct LoginView: View {
                                             }
                                         ))
                                             .font(.system(size: 14))
-                                            .foregroundColor(AppTheme.navy)
+                                            .foregroundColor(AppTheme.authTextPrimary)
                                             .keyboardType(.numberPad)
+                                            .tint(AppTheme.navy)
                                             .focused($focusedField, equals: .phone)
                                             .padding(.horizontal, 12)
-                                            .frame(height: 50)
-                                            .background(AppTheme.bg)
+                                            .frame(height: 56)
+                                            .background(AppTheme.authField)
                                             .cornerRadius(12, corners: [.topRight, .bottomRight])
                                             .overlay(
                                                 RoundedCorner(radius: 12, corners: [.topRight, .bottomRight])
-                                                    .stroke(focusedField == .phone ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .phone ? 1.5 : 1)
+                                                    .stroke(focusedField == .phone ? AppTheme.navy : AppTheme.authBorder, lineWidth: focusedField == .phone ? 1.5 : 1)
                                             )
                                     }
 
@@ -303,7 +295,7 @@ struct LoginView: View {
                                     if !phone.isEmpty {
                                         Text(formattedPhoneDisplay)
                                             .font(.system(size: 11))
-                                            .foregroundColor(AppTheme.textMuted)
+                                            .foregroundColor(AppTheme.authTextMuted)
                                             .padding(.leading, 4)
                                             .padding(.top, 2)
                                     }
@@ -345,24 +337,24 @@ struct LoginView: View {
                                 VStack(spacing: 4) {
                                     Image(systemName: "envelope.badge.shield.half.filled")
                                         .font(.system(size: 28))
-                                        .foregroundColor(AppTheme.navy)
+                                        .foregroundColor(AppTheme.authTextPrimary)
                                         .frame(width: 48, height: 48)
                                         .background(AppTheme.navy.opacity(0.1))
                                         .cornerRadius(14)
 
                                     Text(L.otpStep2Title)
                                         .font(.system(size: 18, weight: .bold))
-                                        .foregroundColor(AppTheme.navy)
+                                        .foregroundColor(AppTheme.authTextPrimary)
                                         .padding(.top, 6)
 
                                     Text(L.otpStep2Subtitle)
                                         .font(.system(size: 12))
-                                        .foregroundColor(AppTheme.textMuted)
+                                        .foregroundColor(AppTheme.authTextMuted)
                                         .multilineTextAlignment(.center)
 
                                     Text("\(selectedCountry.flag) \(selectedCountry.dialCode) \(formattedPhoneDisplay)")
                                         .font(.system(size: 13, weight: .semibold))
-                                        .foregroundColor(AppTheme.indigo)
+                                        .foregroundColor(AppTheme.authAccent)
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.bottom, 16)
@@ -385,18 +377,19 @@ struct LoginView: View {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(L.otpLabel)
                                         .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(AppTheme.textSecondary)
+                                        .foregroundColor(AppTheme.authTextSecondary)
 
                                     HStack(spacing: 12) {
                                         Image(systemName: "lock.shield")
                                             .font(.system(size: 15))
-                                            .foregroundColor(AppTheme.textMuted)
+                                            .foregroundColor(AppTheme.authTextMuted)
                                             .frame(width: 20)
 
                                         TextField(L.otpPlaceholder, text: $otpCode)
                                             .font(.system(size: 18, weight: .bold))
-                                            .foregroundColor(AppTheme.navy)
+                                            .foregroundColor(AppTheme.authTextPrimary)
                                             .keyboardType(.numberPad)
+                                            .tint(AppTheme.navy)
                                             .multilineTextAlignment(.center)
                                             .focused($focusedField, equals: .otp)
                                             .onChange(of: otpCode) {
@@ -406,12 +399,12 @@ struct LoginView: View {
                                             }
                                     }
                                     .padding(.horizontal, 16)
-                                    .frame(height: 50)
-                                    .background(AppTheme.bg)
+                                    .frame(height: 56)
+                                    .background(AppTheme.authField)
                                     .cornerRadius(12)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 12)
-                                            .stroke(focusedField == .otp ? AppTheme.navy : AppTheme.borderSoft, lineWidth: focusedField == .otp ? 1.5 : 1)
+                                            .stroke(focusedField == .otp ? AppTheme.navy : AppTheme.authBorder, lineWidth: focusedField == .otp ? 1.5 : 1)
                                     )
                                 }
                                 .padding(.bottom, 16)
@@ -421,10 +414,10 @@ struct LoginView: View {
                                     HStack(spacing: 6) {
                                         Image(systemName: authVM.rememberMe ? "checkmark.square.fill" : "square")
                                             .font(.system(size: 16))
-                                            .foregroundColor(authVM.rememberMe ? AppTheme.navy : AppTheme.textMuted)
+                                            .foregroundColor(authVM.rememberMe ? AppTheme.navy : AppTheme.authTextMuted)
                                         Text(L.rememberMe)
                                             .font(.system(size: 12, weight: .medium))
-                                            .foregroundColor(AppTheme.textSecondary)
+                                            .foregroundColor(AppTheme.authTextSecondary)
                                     }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -460,7 +453,7 @@ struct LoginView: View {
                                 if resendCooldown > 0 {
                                     Text("\(L.resendCooldown) (\(resendCooldown)s)")
                                         .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(AppTheme.textFaint)
+                                        .foregroundColor(AppTheme.authTextMuted)
                                         .frame(maxWidth: .infinity)
                                 } else {
                                     Button(action: {
@@ -473,7 +466,7 @@ struct LoginView: View {
                                     }) {
                                         Text(L.resendCode)
                                             .font(.system(size: 12, weight: .medium))
-                                            .foregroundColor(AppTheme.indigo)
+                                            .foregroundColor(AppTheme.authAccent)
                                     }
                                     .frame(maxWidth: .infinity)
                                 }
@@ -487,7 +480,7 @@ struct LoginView: View {
                                 }) {
                                     Text(L.currentLang == "TR" ? "Numarayı Değiştir" : "Change Number")
                                         .font(.system(size: 11, weight: .medium))
-                                        .foregroundColor(AppTheme.textMuted)
+                                        .foregroundColor(AppTheme.authTextMuted)
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.top, 4)
@@ -499,13 +492,13 @@ struct LoginView: View {
                         // Divider
                         HStack {
                             Rectangle()
-                                .fill(AppTheme.borderSoft)
+                                .fill(AppTheme.authBorder)
                                 .frame(height: 1)
                             Text(L.orDivider)
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(AppTheme.textFaint)
+                                .foregroundColor(AppTheme.authTextMuted)
                             Rectangle()
-                                .fill(AppTheme.borderSoft)
+                                .fill(AppTheme.authBorder)
                                 .frame(height: 1)
                         }
                         .padding(.bottom, 20)
@@ -515,33 +508,39 @@ struct LoginView: View {
                             HStack(spacing: 4) {
                                 Text(L.noAccount)
                                     .font(.system(size: 13))
-                                    .foregroundColor(AppTheme.textMuted)
+                                    .foregroundColor(AppTheme.authTextMuted)
                                 Text(L.register)
                                     .font(.system(size: 13, weight: .semibold))
-                                    .foregroundColor(AppTheme.navy)
+                                    .foregroundColor(AppTheme.authTextPrimary)
                             }
                         }
+                        .buttonStyle(.plain)
                     }
                     .padding(22)
-                    .background(AppTheme.surface)
-                    .cornerRadius(16)
-                    .shadow(color: AppTheme.navy.opacity(0.06), radius: 16, y: 6)
+                    .background(AppTheme.authSurface)
+                    .cornerRadius(20)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(AppTheme.authBorder, lineWidth: 1)
+                    )
+                    .shadow(color: AppTheme.authShadow, radius: 20, x: 0, y: 12)
                     .padding(.horizontal, 16)
 
                     // Footer
                     VStack(spacing: 4) {
                         Text(L.copyright)
                             .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textFaint)
+                            .foregroundColor(Color.white.opacity(0.72))
                         Text(L.version)
                             .font(.system(size: 9))
-                            .foregroundColor(AppTheme.textFaint.opacity(0.6))
+                            .foregroundColor(Color.white.opacity(0.52))
                     }
                     .padding(.top, 16)
                     .padding(.bottom, 20)
                 }
             }
         }
+        .tint(AppTheme.navy)
         .navigationBarHidden(true)
         .onTapGesture { focusedField = nil }
         .onAppear { authVM.clearLoginFields() }
@@ -581,7 +580,7 @@ struct LoginView: View {
 
 #Preview {
     NavigationStack {
-        LoginView()
+        LoginViewBackup()
             .environmentObject(AuthViewModel())
     }
 }

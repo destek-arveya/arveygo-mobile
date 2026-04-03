@@ -14,7 +14,6 @@
 		AA000004 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000004 /* LoginView.swift */; };
 		AA000005 /* RegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000005 /* RegisterView.swift */; };
 		AA000006 /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000006 /* ForgotPasswordView.swift */; };
-		AA000007 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000007 /* DashboardView.swift */; };
 		AA000008 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000008 /* AuthViewModel.swift */; };
 		AA000009 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000009 /* DashboardViewModel.swift */; };
 		AA000010 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000010 /* Models.swift */; };
@@ -48,6 +47,12 @@
 		AA000040 /* HubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000040 /* HubView.swift */; };
 		AA000041 /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000041 /* ThemeManager.swift */; };
 		AA000042 /* SkeletonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000042 /* SkeletonView.swift */; };
+		AA000043 /* AuthNeoComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000043 /* AuthNeoComponents.swift */; };
+		AA000044 /* LoginViewModern.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000044 /* LoginViewModern.swift */; };
+		AA000045 /* RegisterViewModern.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000045 /* RegisterViewModern.swift */; };
+		AA000046 /* DashboardAlternativeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000046 /* DashboardAlternativeView.swift */; };
+		AA000047 /* VehicleSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000047 /* VehicleSettingsView.swift */; };
+		AA000048 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000048 /* DesignSystem.swift */; };
 		B9BF20D15700854FD1D28B7A /* BlockageSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEAF509C527A6487C59998D0 /* BlockageSheet.swift */; };
 /* End PBXBuildFile section */
 
@@ -60,7 +65,6 @@
 		BB000004 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		BB000005 /* RegisterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegisterView.swift; sourceTree = "<group>"; };
 		BB000006 /* ForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgotPasswordView.swift; sourceTree = "<group>"; };
-		BB000007 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		BB000008 /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 		BB000009 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		BB000010 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
@@ -95,6 +99,12 @@
 		BB000040 /* HubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HubView.swift; sourceTree = "<group>"; };
 		BB000041 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
 		BB000042 /* SkeletonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkeletonView.swift; sourceTree = "<group>"; };
+		BB000043 /* AuthNeoComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthNeoComponents.swift; sourceTree = "<group>"; };
+		BB000044 /* LoginViewModern.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginViewModern.swift; sourceTree = "<group>"; };
+		BB000045 /* RegisterViewModern.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegisterViewModern.swift; sourceTree = "<group>"; };
+		BB000046 /* DashboardAlternativeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardAlternativeView.swift; sourceTree = "<group>"; };
+		BB000047 /* VehicleSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleSettingsView.swift; sourceTree = "<group>"; };
+		BB000048 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		EEAF509C527A6487C59998D0 /* BlockageSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BlockageSheet.swift; path = ArveyGo/Views/Fleet/BlockageSheet.swift; sourceTree = "<group>"; };
 		F523685C2F7879A7006D9B54 /* ArveyGoDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ArveyGoDebug.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -178,6 +188,7 @@
 			children = (
 				BB000011 /* Theme.swift */,
 				BB000041 /* ThemeManager.swift */,
+				BB000048 /* DesignSystem.swift */,
 			);
 			path = Theme;
 			sourceTree = "<group>";
@@ -219,8 +230,11 @@
 			isa = PBXGroup;
 			children = (
 				BB000004 /* LoginView.swift */,
+				BB000044 /* LoginViewModern.swift */,
 				BB000005 /* RegisterView.swift */,
+				BB000045 /* RegisterViewModern.swift */,
 				BB000006 /* ForgotPasswordView.swift */,
+				BB000043 /* AuthNeoComponents.swift */,
 				BB000027 /* CountryPickerSheet.swift */,
 			);
 			path = Auth;
@@ -229,7 +243,7 @@
 		DD000012 /* Dashboard */ = {
 			isa = PBXGroup;
 			children = (
-				BB000007 /* DashboardView.swift */,
+				BB000046 /* DashboardAlternativeView.swift */,
 				BB000014 /* VehicleDetailView.swift */,
 			);
 			path = Dashboard;
@@ -250,6 +264,7 @@
 				BB000020 /* RouteHistoryView.swift */,
 				BB000032 /* AlarmsView.swift */,
 				BB000033 /* MotorcycleSettingsView.swift */,
+				BB000047 /* VehicleSettingsView.swift */,
 				BB000034 /* GeofencesView.swift */,
 				BB000035 /* DriversView.swift */,
 				BB000036 /* FleetManagementView.swift */,
@@ -379,14 +394,18 @@
 				AA000001 /* ArveyGoApp.swift in Sources */,
 				AA000002 /* ContentView.swift in Sources */,
 				AA000004 /* LoginView.swift in Sources */,
+				AA000044 /* LoginViewModern.swift in Sources */,
 				AA000005 /* RegisterView.swift in Sources */,
+				AA000045 /* RegisterViewModern.swift in Sources */,
 				AA000006 /* ForgotPasswordView.swift in Sources */,
-				AA000007 /* DashboardView.swift in Sources */,
+				AA000046 /* DashboardAlternativeView.swift in Sources */,
 				AA000008 /* AuthViewModel.swift in Sources */,
 				AA000009 /* DashboardViewModel.swift in Sources */,
 				AA000010 /* Models.swift in Sources */,
 				AA000011 /* Theme.swift in Sources */,
+				AA000048 /* DesignSystem.swift in Sources */,
 				AA000012 /* Components.swift in Sources */,
+				AA000043 /* AuthNeoComponents.swift in Sources */,
 				AA000014 /* VehicleDetailView.swift in Sources */,
 				AA000015 /* SideMenuView.swift in Sources */,
 				AA000018 /* LiveMapView.swift in Sources */,
@@ -394,6 +413,7 @@
 				AA000020 /* RouteHistoryView.swift in Sources */,
 				AA000032 /* AlarmsView.swift in Sources */,
 				AA000033 /* MotorcycleSettingsView.swift in Sources */,
+				AA000047 /* VehicleSettingsView.swift in Sources */,
 				AA000034 /* GeofencesView.swift in Sources */,
 				AA000035 /* DriversView.swift in Sources */,
 				AA000036 /* FleetManagementView.swift in Sources */,

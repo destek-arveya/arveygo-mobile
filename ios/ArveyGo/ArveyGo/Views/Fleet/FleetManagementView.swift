@@ -5,6 +5,10 @@ struct FleetManagementView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @Binding var showSideMenu: Bool
     @State private var selectedTab: FleetTab = .maintenance
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var ds: DS { DS(isDark: colorScheme == .dark) }
+    private var isDark: Bool { colorScheme == .dark }
 
     // Data
     @State private var maintenanceList: [FleetMaintenance] = []
@@ -105,14 +109,14 @@ struct FleetManagementView: View {
                     }
                 }
             }
-            .background(AppTheme.bg)
+            .background(ds.pageBg)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
 
                 ToolbarItem(placement: .principal) {
                     Text("Filo Yönetimi")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(AppTheme.navy)
+                        .foregroundColor(ds.text1)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
@@ -229,22 +233,22 @@ struct FleetManagementView: View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 14))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(ds.text3)
                 TextField("Plaka ara...", text: $searchText)
                     .font(.system(size: 13))
-                    .foregroundColor(AppTheme.navy)
+                    .foregroundColor(ds.text1)
                 if !searchText.isEmpty {
                     Button(action: { searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 14))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(ds.text3)
                     }
                 }
             }
             .padding(10)
-            .background(Color.white)
+            .background(ds.cardBg)
             .cornerRadius(10)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(ds.divider, lineWidth: 1))
 
             // Vehicle filter
             HStack(spacing: 8) {
@@ -267,12 +271,12 @@ struct FleetManagementView: View {
                         Image(systemName: "chevron.down")
                             .font(.system(size: 8))
                     }
-                    .foregroundColor(selectedVehicleFilter != nil ? AppTheme.indigo : AppTheme.textMuted)
+                    .foregroundColor(selectedVehicleFilter != nil ? AppTheme.indigo : ds.text3)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(selectedVehicleFilter != nil ? AppTheme.indigo.opacity(0.1) : Color.white)
+                    .background(selectedVehicleFilter != nil ? AppTheme.indigo.opacity(isDark ? 0.15 : 0.1) : ds.cardBg)
                     .cornerRadius(8)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.borderSoft, lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(ds.divider, lineWidth: 1))
                 }
 
                 if selectedVehicleFilter != nil {
@@ -296,7 +300,7 @@ struct FleetManagementView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(Color.white)
+        .background(ds.cardBg)
     }
 
     // MARK: - Reminders Banner
@@ -350,16 +354,16 @@ struct FleetManagementView: View {
                         Text(tab.rawValue)
                             .font(.system(size: 12, weight: isActive ? .bold : .medium))
                     }
-                    .foregroundColor(isActive ? AppTheme.indigo : AppTheme.textMuted)
+                    .foregroundColor(isActive ? AppTheme.indigo : ds.text3)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
-                    .background(isActive ? Color.white : Color.clear)
+                    .background(isActive ? ds.cardBg : Color.clear)
                     .cornerRadius(8)
                 }
             }
         }
         .padding(4)
-        .background(AppTheme.navy.opacity(0.04))
+        .background(isDark ? Color.white.opacity(0.04) : AppTheme.navy.opacity(0.04))
         .cornerRadius(10)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -513,7 +517,7 @@ struct FleetManagementView: View {
                     .foregroundColor(AppTheme.indigo)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(AppTheme.indigo.opacity(0.08))
+                    .background(AppTheme.indigo.opacity(isDark ? 0.15 : 0.08))
                     .cornerRadius(6)
                 Spacer()
                 Text(badge)
@@ -528,11 +532,11 @@ struct FleetManagementView: View {
             // Title
             Text(title)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(AppTheme.navy)
+                .foregroundColor(ds.text1)
             if let sub = subtitle, !sub.isEmpty {
                 Text(sub)
                     .font(.system(size: 12))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(ds.text3)
                     .lineLimit(1)
             }
 
@@ -566,20 +570,20 @@ struct FleetManagementView: View {
             }
         }
         .padding(14)
-        .background(Color.white)
+        .background(ds.cardBg)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppTheme.borderSoft, lineWidth: 1))
-        .shadow(color: .black.opacity(0.03), radius: 2, y: 1)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ds.divider, lineWidth: 1))
+        .shadow(color: isDark ? Color.clear : .black.opacity(0.03), radius: 2, y: 1)
     }
 
     func infoChip(icon: String, text: String) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.system(size: 9))
-                .foregroundColor(AppTheme.textMuted)
+                .foregroundColor(ds.text3)
             Text(text)
                 .font(.system(size: 11))
-                .foregroundColor(AppTheme.textSecondary)
+                .foregroundColor(ds.text2)
         }
     }
 
@@ -591,14 +595,14 @@ struct FleetManagementView: View {
             Spacer()
             ZStack {
                 Circle()
-                    .fill(AppTheme.indigo.opacity(0.08))
+                    .fill(AppTheme.indigo.opacity(isDark ? 0.15 : 0.08))
                     .frame(width: 64, height: 64)
                 Image(systemName: icon)
                     .font(.system(size: 24))
                     .foregroundColor(AppTheme.indigo.opacity(0.5))
             }
-            Text(title).font(.system(size: 16, weight: .semibold)).foregroundColor(AppTheme.navy)
-            Text(subtitle).font(.system(size: 13)).foregroundColor(AppTheme.textMuted).multilineTextAlignment(.center)
+            Text(title).font(.system(size: 16, weight: .semibold)).foregroundColor(ds.text1)
+            Text(subtitle).font(.system(size: 13)).foregroundColor(ds.text3).multilineTextAlignment(.center)
             Spacer()
         }
         .padding(32)
@@ -608,7 +612,7 @@ struct FleetManagementView: View {
         VStack(spacing: 12) {
             Spacer()
             Image(systemName: "exclamationmark.circle").font(.system(size: 36)).foregroundColor(.red)
-            Text(message).font(.system(size: 13)).foregroundColor(AppTheme.textMuted).multilineTextAlignment(.center)
+            Text(message).font(.system(size: 13)).foregroundColor(ds.text3).multilineTextAlignment(.center)
             Button("Tekrar Dene") { loadData() }.foregroundColor(AppTheme.indigo).fontWeight(.semibold)
             Spacer()
         }
@@ -649,6 +653,9 @@ struct MaintenanceFormSheet: View {
     @State private var maintenanceType: String
     @State private var serviceDate: String
     @State private var nextServiceDate: String
+    @State private var serviceDateValue: Date
+    @State private var nextServiceDateValue: Date
+    @State private var hasNextServiceDate: Bool
     @State private var kmAtService: String
     @State private var nextServiceKm: String
     @State private var cost: String
@@ -657,13 +664,19 @@ struct MaintenanceFormSheet: View {
     @State private var status: String
 
     private let statuses: [(String, String)] = [("done", "Tamamlandı"), ("scheduled", "Planlandı"), ("overdue", "Gecikmiş")]
+    private let quickTypes = ["Periyodik Bakım", "Yağ Değişimi", "Fren Bakımı", "Filtre Değişimi", "Lastik Kontrolü"]
 
     init(catalog: FleetCatalog?, editing: FleetMaintenance?, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
         self.catalog = catalog; self.editing = editing; self.onSaved = onSaved; self.onCancel = onCancel
+        let initialServiceDate = Self.parseDate(editing?.serviceDate) ?? Date()
+        let initialNextServiceDate = Self.parseDate(editing?.nextServiceDate) ?? Date()
         _selectedImei = State(initialValue: editing?.imei ?? "")
         _maintenanceType = State(initialValue: editing?.maintenanceType ?? "")
         _serviceDate = State(initialValue: editing?.serviceDate ?? Self.todayStr())
         _nextServiceDate = State(initialValue: editing?.nextServiceDate ?? "")
+        _serviceDateValue = State(initialValue: initialServiceDate)
+        _nextServiceDateValue = State(initialValue: initialNextServiceDate)
+        _hasNextServiceDate = State(initialValue: !(editing?.nextServiceDate ?? "").isEmpty)
         _kmAtService = State(initialValue: editing?.kmAtService.map { "\($0)" } ?? "")
         _nextServiceKm = State(initialValue: editing?.nextServiceKm.map { "\($0)" } ?? "")
         _cost = State(initialValue: editing?.cost.map { String(format: "%.0f", $0) } ?? "")
@@ -679,16 +692,28 @@ struct MaintenanceFormSheet: View {
                     sectionHeader("Araç Bilgileri", icon: "car")
                     formLabel("Araç *")
                     vehiclePicker(catalog: catalog, selected: $selectedImei)
+                    vehicleSummaryCard(catalog: catalog, selectedImei: selectedImei)
 
                     sectionHeader("Bakım Detayları", icon: "wrench")
                     formLabel("Bakım Türü *")
                     formTextField(text: $maintenanceType, placeholder: "Yağ değişimi, fren bakımı...")
+                    selectionChipGrid(options: quickTypes.map { ($0, $0) }, selected: $maintenanceType)
                     formLabel("Durum")
-                    dropdownPicker(options: statuses, selected: $status)
+                    selectionChipGrid(options: statuses, selected: $status)
                     formLabel("Servis Tarihi *")
-                    formTextField(text: $serviceDate, placeholder: "2025-01-15")
-                    formLabel("Sonraki Servis Tarihi")
-                    formTextField(text: $nextServiceDate, placeholder: "2025-07-15")
+                    datePickerField("Servis Tarihi", selection: $serviceDateValue)
+                        .onChange(of: serviceDateValue) { _, newValue in
+                            serviceDate = Self.formatDate(newValue)
+                        }
+                    Toggle("Sonraki servis tarihi ekle", isOn: $hasNextServiceDate)
+                        .font(.system(size: 13, weight: .medium))
+                        .tint(AppTheme.indigo)
+                    if hasNextServiceDate {
+                        datePickerField("Sonraki Servis Tarihi", selection: $nextServiceDateValue)
+                            .onChange(of: nextServiceDateValue) { _, newValue in
+                                nextServiceDate = Self.formatDate(newValue)
+                            }
+                    }
 
                     sectionHeader("Kilometre & Maliyet", icon: "speedometer")
                     HStack(spacing: 12) {
@@ -721,7 +746,7 @@ struct MaintenanceFormSheet: View {
         Task {
             do {
                 var body: [String: Any] = ["device_imei": selectedImei, "maintenance_type": maintenanceType, "service_date": serviceDate, "status": status]
-                if !nextServiceDate.isEmpty { body["next_service_date"] = nextServiceDate }
+                if hasNextServiceDate, !nextServiceDate.isEmpty { body["next_service_date"] = nextServiceDate }
                 if let v = Int(kmAtService) { body["km_at_service"] = v }
                 if let v = Int(nextServiceKm) { body["next_service_km"] = v }
                 if let v = Double(cost.replacingOccurrences(of: ",", with: ".")) { body["cost"] = v }
@@ -735,6 +760,17 @@ struct MaintenanceFormSheet: View {
         }
     }
     static func todayStr() -> String { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: Date()) }
+    static func parseDate(_ value: String?) -> Date? {
+        guard let value, !value.isEmpty else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: value)
+    }
+    static func formatDate(_ value: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: value)
+    }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -752,6 +788,7 @@ struct CostFormSheet: View {
     @State private var category: String
     @State private var amount: String
     @State private var costDate: String
+    @State private var costDateValue: Date
     @State private var description: String
     @State private var referenceNo: String
 
@@ -762,10 +799,12 @@ struct CostFormSheet: View {
 
     init(catalog: FleetCatalog?, editing: FleetCost?, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
         self.catalog = catalog; self.editing = editing; self.onSaved = onSaved; self.onCancel = onCancel
+        let initialCostDate = MaintenanceFormSheet.parseDate(editing?.costDate) ?? Date()
         _selectedImei = State(initialValue: editing?.imei ?? "")
         _category = State(initialValue: editing?.category ?? "")
         _amount = State(initialValue: (editing != nil && editing!.amount > 0) ? String(format: "%.0f", editing!.amount) : "")
         _costDate = State(initialValue: editing?.costDate ?? MaintenanceFormSheet.todayStr())
+        _costDateValue = State(initialValue: initialCostDate)
         _description = State(initialValue: editing?.description ?? "")
         _referenceNo = State(initialValue: editing?.referenceNo ?? "")
     }
@@ -777,12 +816,16 @@ struct CostFormSheet: View {
                     sectionHeader("Araç Bilgileri", icon: "car")
                     formLabel("Araç *")
                     vehiclePicker(catalog: catalog, selected: $selectedImei)
+                    vehicleSummaryCard(catalog: catalog, selectedImei: selectedImei)
 
                     sectionHeader("Masraf Detayları", icon: "turkishlirasign.circle")
                     formLabel("Kategori *")
-                    dropdownPicker(options: categories, selected: $category)
+                    selectionChipGrid(options: categories, selected: $category)
                     formLabel("Tarih *")
-                    formTextField(text: $costDate, placeholder: "2025-01-15")
+                    datePickerField("Masraf Tarihi", selection: $costDateValue)
+                        .onChange(of: costDateValue) { _, newValue in
+                            costDate = MaintenanceFormSheet.formatDate(newValue)
+                        }
 
                     sectionHeader("Tutar", icon: "banknote")
                     formLabel("Tutar (₺) *")
@@ -1036,7 +1079,7 @@ private func sectionHeader(_ title: String, icon: String) -> some View {
             .foregroundColor(AppTheme.indigo)
         Text(title.uppercased())
             .font(.system(size: 11, weight: .bold))
-            .foregroundColor(AppTheme.textMuted)
+            .foregroundColor(.secondary)
             .tracking(0.5)
     }
     .padding(.top, 12)
@@ -1045,17 +1088,17 @@ private func sectionHeader(_ title: String, icon: String) -> some View {
 private func formLabel(_ text: String) -> some View {
     Text(text)
         .font(.system(size: 12, weight: .semibold))
-        .foregroundColor(AppTheme.navy)
+        .foregroundColor(.primary)
 }
 
 private func formTextField(text: Binding<String>, placeholder: String, keyboard: UIKeyboardType = .default, axis: Axis = .horizontal) -> some View {
     TextField(placeholder, text: text, axis: axis == .vertical ? .vertical : .horizontal)
         .font(.system(size: 13))
-        .foregroundColor(AppTheme.navy)
+        .foregroundColor(.primary)
         .padding(10)
-        .background(Color(red: 250/255, green: 251/255, blue: 254/255))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(10)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.separator).opacity(0.5), lineWidth: 1))
         .keyboardType(keyboard)
         .frame(minHeight: axis == .vertical ? 60 : nil, alignment: .top)
 }
@@ -1074,14 +1117,14 @@ private func vehiclePicker(catalog: FleetCatalog?, selected: Binding<String>) ->
             Image(systemName: "car").font(.system(size: 12)).foregroundColor(AppTheme.indigo)
             Text(label)
                 .font(.system(size: 13))
-                .foregroundColor(sel != nil ? AppTheme.navy : AppTheme.textMuted)
+                .foregroundColor(sel != nil ? .primary : .secondary)
             Spacer()
-            Image(systemName: "chevron.down").font(.system(size: 11)).foregroundColor(AppTheme.textMuted)
+            Image(systemName: "chevron.down").font(.system(size: 11)).foregroundColor(.secondary)
         }
         .padding(10)
-        .background(Color(red: 250/255, green: 251/255, blue: 254/255))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(10)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.separator).opacity(0.5), lineWidth: 1))
     }
 }
 
@@ -1095,14 +1138,94 @@ private func dropdownPicker(options: [(String, String)], selected: Binding<Strin
         HStack {
             Text(label)
                 .font(.system(size: 13))
-                .foregroundColor(selected.wrappedValue.isEmpty ? AppTheme.textMuted : AppTheme.navy)
+                .foregroundColor(selected.wrappedValue.isEmpty ? .secondary : .primary)
             Spacer()
-            Image(systemName: "chevron.down").font(.system(size: 11)).foregroundColor(AppTheme.textMuted)
+            Image(systemName: "chevron.down").font(.system(size: 11)).foregroundColor(.secondary)
         }
         .padding(10)
-        .background(Color(red: 250/255, green: 251/255, blue: 254/255))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(10)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.borderSoft, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.separator).opacity(0.5), lineWidth: 1))
+    }
+}
+
+private func vehicleSummaryCard(catalog: FleetCatalog?, selectedImei: String) -> some View {
+    guard let vehicle = catalog?.vehicles.first(where: { $0.imei == selectedImei }) else { return AnyView(EmptyView()) }
+
+    return AnyView(
+        HStack(spacing: 12) {
+            Circle()
+                .fill(AppTheme.indigo.opacity(0.12))
+                .frame(width: 40, height: 40)
+                .overlay(
+                    Image(systemName: "car.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(AppTheme.indigo)
+                )
+            VStack(alignment: .leading, spacing: 4) {
+                Text(vehicle.plate.isEmpty ? vehicle.name : vehicle.plate)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.primary)
+                Text(vehicle.name.isEmpty ? vehicle.imei : vehicle.name)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(.separator).opacity(0.5), lineWidth: 1)
+        )
+    )
+}
+
+private func datePickerField(_ title: String, selection: Binding<Date>) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+        Text(title)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundColor(.primary)
+        DatePicker(
+            "",
+            selection: selection,
+            displayedComponents: .date
+        )
+        .datePickerStyle(.compact)
+        .labelsHidden()
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(.separator).opacity(0.5), lineWidth: 1)
+        )
+    }
+}
+
+private func selectionChipGrid(options: [(String, String)], selected: Binding<String>) -> some View {
+    let columns = [GridItem(.adaptive(minimum: 110), spacing: 8)]
+    return LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+        ForEach(options, id: \.0) { key, label in
+            let active = selected.wrappedValue == key
+            Button(action: { selected.wrappedValue = key }) {
+                Text(label)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(active ? .white : .primary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 10)
+                    .background(active ? AppTheme.indigo : Color(.secondarySystemBackground))
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(active ? AppTheme.indigo : Color(.separator).opacity(0.4), lineWidth: 1)
+                    )
+            }
+            .buttonStyle(.plain)
+        }
     }
 }
 

@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
@@ -28,9 +29,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.arveya.arveygo.LocalAuthViewModel
+import com.arveya.arveygo.models.AlarmEvent
 import com.arveya.arveygo.services.APIService
-import com.arveya.arveygo.ui.components.AvatarCircle
+import com.arveya.arveygo.ui.components.AlarmEventsSkeletonList
+import com.arveya.arveygo.ui.components.AlarmRulesSkeletonList
 import com.arveya.arveygo.ui.theme.AppColors
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -40,128 +42,7 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 
-// MARK: - AlarmEvent Model
-data class AlarmEvent(
-    val id: String,
-    val imei: String,
-    val plate: String,
-    val vehicleName: String,
-    val type: String,
-    val code: String,
-    val description: String,
-    val lat: Double,
-    val lng: Double,
-    val speed: Int,
-    val createdAt: String,
-    val isActive: Boolean = true
-) {
-    val statusLabel: String get() = if (isActive) "Aktif" else "Kapandı"
-    val statusColor: Color get() = if (isActive) Color(0xFFEF4444) else Color(0xFF22C55E)
-    // Use code + type + description to determine icon/color/label (type can be device brand like "teltonika")
-    val alarmKey: String get() = "${code.lowercase()} ${type.lowercase()} ${description.lowercase()}"
-
-    val icon: ImageVector get() = when {
-        alarmKey.contains("overspeed") || alarmKey.contains("hız") -> Icons.Default.Speed
-        alarmKey.contains("brake") || alarmKey.contains("fren") -> Icons.Default.Warning
-        alarmKey.contains("idle") || alarmKey.contains("rölanti") -> Icons.Default.HourglassBottom
-        alarmKey.contains("geofence") || alarmKey.contains("gf_") || alarmKey.contains("bölge") -> Icons.Default.LocationOn
-        alarmKey.contains("disconnect") || alarmKey.contains("bağlantı") -> Icons.Default.WifiOff
-        alarmKey.contains("sos") || alarmKey.contains("panik") -> Icons.Default.Emergency
-        alarmKey.contains("tow") || alarmKey.contains("çek") || alarmKey.contains("taşı") -> Icons.Default.CarCrash
-        alarmKey.contains("power") || alarmKey.contains("güç") -> Icons.Default.PowerOff
-        alarmKey.contains("battery") || alarmKey.contains("batarya") -> Icons.Default.BatteryAlert
-        alarmKey.contains("movement") || alarmKey.contains("hareket") -> Icons.Default.DirectionsCar
-        else -> Icons.Default.Notifications
-    }
-
-    val color: Color get() = when {
-        alarmKey.contains("overspeed") || alarmKey.contains("sos") -> Color(0xFFEF4444)
-        alarmKey.contains("tow") || alarmKey.contains("çek") || alarmKey.contains("taşı") -> Color(0xFFEF4444)
-        alarmKey.contains("brake") || alarmKey.contains("disconnect") -> Color(0xFFF97316)
-        alarmKey.contains("idle") || alarmKey.contains("rölanti") -> Color(0xFFF59E0B)
-        alarmKey.contains("geofence") || alarmKey.contains("gf_") -> Color(0xFF22C55E)
-        alarmKey.contains("movement") || alarmKey.contains("hareket") -> AppColors.Indigo
-        else -> AppColors.Indigo
-    }
-
-    val typeLabel: String get() {
-        // If we have a Turkish description from API, use it directly
-        if (description.isNotEmpty() && !description.equals(code, true)) return description
-        // Map known codes to Turkish labels
-        return when (code.lowercase()) {
-            "t_movement" -> "Hareket Algılandı"
-            "t_towing" -> "Çekme/Taşıma Alarmı"
-            "t_idle" -> "Rölanti"
-            "t_overspeed" -> "Hız Aşımı"
-            "t_harsh_brake", "t_brake" -> "Sert Fren"
-            "t_harsh_acceleration" -> "Sert Hızlanma"
-            "t_power_cut" -> "Güç Kesilmesi"
-            "t_sos" -> "SOS / Panik"
-            "t_jamming" -> "Sinyal Karıştırma"
-            "gf_enter", "geofence_enter" -> "Bölgeye Giriş"
-            "gf_exit", "geofence_exit" -> "Bölgeden Çıkış"
-            "overspeed" -> "Hız Aşımı"
-            "harsh_brake" -> "Sert Fren"
-            "harsh_acceleration" -> "Sert Hızlanma"
-            "idle" -> "Rölanti"
-            "disconnect" -> "Bağlantı Koptu"
-            "sos" -> "SOS / Panik"
-            "tow" -> "Çekici Algılandı"
-            "power_cut" -> "Güç Kesildi"
-            "low_battery" -> "Düşük Batarya"
-            "tampering" -> "Cihaz Müdahalesi"
-            else -> description.ifEmpty { code.replace("_", " ").replaceFirstChar { it.uppercase() } }
-        }
-    }
-
-    val formattedDate: String get() {
-        if (createdAt.length < 16) return createdAt
-        return try {
-            val parts = createdAt.split(" ")
-            val dateParts = parts[0].split("-")
-            val months = arrayOf("", "Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara")
-            val month = dateParts[1].toIntOrNull() ?: 0
-            val day = dateParts[2]
-            val time = parts[1].take(5)
-            "$day ${months[month.coerceIn(0, 12)]} $time"
-        } catch (_: Exception) { createdAt }
-    }
-
-    val formattedFullDate: String get() {
-        if (createdAt.length < 16) return createdAt
-        return try {
-            val parts = createdAt.split(" ")
-            val dateParts = parts[0].split("-")
-            val monthsFull = arrayOf("", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık")
-            val year = dateParts[0]
-            val month = dateParts[1].toIntOrNull() ?: 0
-            val day = dateParts[2]
-            val time = parts[1].take(5)
-            "$day ${monthsFull[month.coerceIn(0, 12)]} $year, $time"
-        } catch (_: Exception) { createdAt }
-    }
-
-    companion object {
-        fun from(json: JSONObject, index: Int = 0): AlarmEvent = try {
-            AlarmEvent(
-                id = json.optString("id", "alarm_$index"),
-                imei = json.optString("imei", ""),
-                plate = json.optString("plate", ""),
-                vehicleName = json.optString("vehicle_name", ""),
-                type = json.optString("type", ""),
-                code = json.optString("code", ""),
-                description = json.optString("description", ""),
-                lat = json.optString("lat", "0").toDoubleOrNull() ?: 0.0,
-                lng = json.optString("lng", "0").toDoubleOrNull() ?: 0.0,
-                speed = json.optInt("speed", 0),
-                createdAt = json.optString("created_at", ""),
-                isActive = json.optBoolean("is_active", true)
-            )
-        } catch (e: Exception) {
-            AlarmEvent("fallback_$index", "", "", "", "unknown", "", "", 0.0, 0.0, 0, "")
-        }
-    }
-}
+private const val MOBILE_PRIVATE_IGNITION_ALARM_PREFIX = "__mobile_private_ign__"
 
 // MARK: - Alarm Set Model (API: /api/mobile/alarm-sets/)
 data class AlarmSet(
@@ -187,6 +68,8 @@ data class AlarmSet(
         "idle_alarm" -> Icons.Default.HourglassBottom
         "movement_detection" -> Icons.Default.DirectionsCar
         "off_hours_usage" -> Icons.Default.Schedule
+        "ignition_on" -> Icons.Default.VpnKey
+        "ignition_off" -> Icons.Default.PowerOff
         else -> Icons.Default.Notifications
     }
 
@@ -196,6 +79,8 @@ data class AlarmSet(
         "idle_alarm" -> Color(0xFFF59E0B)
         "movement_detection" -> Color(0xFFF97316)
         "off_hours_usage" -> AppColors.Indigo
+        "ignition_on" -> Color(0xFF22C55E)
+        "ignition_off" -> Color(0xFFEF4444)
         else -> AppColors.Indigo
     }
 
@@ -205,6 +90,8 @@ data class AlarmSet(
         "movement_detection" -> "Hareket Algılama"
         "off_hours_usage" -> "Mesai Dışı Kullanım"
         "geofence_alarm" -> "Bölge Alarmı"
+        "ignition_on" -> "Kontak Açılma"
+        "ignition_off" -> "Kontak Kapanma"
         else -> alarmType.replace("_", " ").replaceFirstChar { it.uppercase() }
     }
 
@@ -260,6 +147,9 @@ data class AlarmSet(
             AlarmSet(0, "", null, "", "draft", "live", "derived", 300, false, "", "", 0, 0, 0, "")
         }
     }
+
+    val isHiddenMobileIgnitionRule: Boolean
+        get() = name.startsWith(MOBILE_PRIVATE_IGNITION_ALARM_PREFIX)
 }
 
 // MARK: - Catalog models
@@ -337,9 +227,12 @@ private val ALARM_TYPES = listOf(
 // MARK: - Alarms Screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AlarmsScreen(initialSearchText: String = "", autoOpenCreate: Boolean = false, preSelectedPlate: String = "") {
-    val authVM = LocalAuthViewModel.current
-    val user by authVM.currentUser.collectAsState()
+fun AlarmsScreen(
+    initialSearchText: String = "",
+    autoOpenCreate: Boolean = false,
+    preSelectedPlate: String = "",
+    initialAlarmEvent: AlarmEvent? = null
+) {
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
@@ -354,6 +247,7 @@ fun AlarmsScreen(initialSearchText: String = "", autoOpenCreate: Boolean = false
     var selectedRule by remember { mutableStateOf<AlarmSet?>(null) }
     var showCreateSheet by remember { mutableStateOf(autoOpenCreate) }
     var createPrePlate by remember { mutableStateOf(preSelectedPlate) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
     // State
     var alarms by remember { mutableStateOf(listOf<AlarmEvent>()) }
@@ -446,6 +340,17 @@ fun AlarmsScreen(initialSearchText: String = "", autoOpenCreate: Boolean = false
         } catch (_: Exception) { }
     }
 
+    suspend fun refreshCurrentTab() {
+        isRefreshing = true
+        if (selectedTab == 0) {
+            fetchAlarms()
+        } else {
+            fetchAlarmSets()
+            fetchCatalog()
+        }
+        isRefreshing = false
+    }
+
     // Activate / Pause / Archive actions
     suspend fun toggleAlarmSet(set: AlarmSet) {
         actionLoading = set.id
@@ -471,6 +376,17 @@ fun AlarmsScreen(initialSearchText: String = "", autoOpenCreate: Boolean = false
         fetchAlarms()
         fetchAlarmSets()
         fetchCatalog()
+        if (initialAlarmEvent != null && !autoOpenCreate) {
+            selectedTab = 0
+            selectedAlarm = initialAlarmEvent
+        }
+    }
+
+    LaunchedEffect(initialAlarmEvent, alarms) {
+        if (initialAlarmEvent != null && !autoOpenCreate && selectedAlarm == null) {
+            selectedTab = 0
+            selectedAlarm = alarms.firstOrNull { it.id == initialAlarmEvent.id } ?: initialAlarmEvent
+        }
     }
 
     Scaffold(
@@ -478,8 +394,8 @@ fun AlarmsScreen(initialSearchText: String = "", autoOpenCreate: Boolean = false
             TopAppBar(
                 title = {
                     Column {
-                        Text("Alarmlar", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-                        Text("İzleme / Alarmlar", fontSize = 10.sp, color = AppColors.TextMuted)
+                        Text("Alarmlar", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Text("İzleme / Alarmlar", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                     }
                 },
                 actions = {
@@ -489,17 +405,15 @@ fun AlarmsScreen(initialSearchText: String = "", autoOpenCreate: Boolean = false
                             Icon(
                                 if (hasActiveFilters) Icons.Default.FilterAlt else Icons.Default.FilterList,
                                 "Filtreler",
-                                tint = if (hasActiveFilters) AppColors.Indigo else AppColors.TextMuted
+                                tint = if (hasActiveFilters) AppColors.Indigo else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                             )
                         }
                     }
-                    AvatarCircle(initials = user?.avatar ?: "A", size = 30.dp)
-                    Spacer(Modifier.width(8.dp))
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.Surface)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
-        containerColor = AppColors.Bg
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         // Filtered lists
         val filteredAlarms = if (searchText.isBlank()) alarms else {
@@ -512,132 +426,135 @@ fun AlarmsScreen(initialSearchText: String = "", autoOpenCreate: Boolean = false
             }
         }
 
-        val filteredRules = if (searchText.isBlank()) alarmSets else {
+        val visibleRules = alarmSets.filterNot { it.isHiddenMobileIgnitionRule }
+        val filteredRules = if (searchText.isBlank()) visibleRules else {
             val q = searchText.lowercase()
-            alarmSets.filter {
+            visibleRules.filter {
                 it.name.lowercase().contains(q) ||
                 it.typeLabel.lowercase().contains(q) ||
                 it.conditionSummary.lowercase().contains(q)
             }
         }
 
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            // Tab Selector
-            TabSelector(selectedTab = selectedTab, onTabSelected = {
-                selectedTab = it
-                searchText = ""
-            })
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { scope.launch { refreshCurrentTab() } },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Tab Selector
+                TabSelector(selectedTab = selectedTab, onTabSelected = {
+                    selectedTab = it
+                    searchText = ""
+                })
 
-            // Search Bar
-            SearchBar(
-                text = searchText,
-                onTextChange = { searchText = it },
-                placeholder = if (selectedTab == 0) "Alarm ara (plaka, tür, açıklama...)" else "Kural ara (isim, tür, araç...)"
-            )
+                // Search Bar
+                SearchBar(
+                    text = searchText,
+                    onTextChange = { searchText = it },
+                    placeholder = if (selectedTab == 0) "Alarm ara (plaka, tür, açıklama...)" else "Kural ara (isim, tür, araç...)"
+                )
 
-            if (selectedTab == 0) {
-                // MARK: Gelen Alarmlar Tab
-                // Aktif filtre bar
-                if (hasActiveFilters) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(AppColors.Surface)
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        selectedType?.let { type ->
-                            FilterChip(label = ALARM_TYPES.firstOrNull { it.first == type }?.second ?: type) {
-                                selectedType = null
-                                scope.launch { fetchAlarms() }
-                            }
-                        }
-                        TextButton(
-                            onClick = {
-                                selectedType = null
-                                scope.launch { fetchAlarms() }
-                            },
-                            contentPadding = PaddingValues(horizontal = 8.dp)
-                        ) {
-                            Text("Temizle", fontSize = 11.sp, color = Color.Red)
-                        }
-                    }
-                }
-
-                // İçerik
-                when {
-                    isLoading && alarms.isEmpty() -> LoadingContent()
-                    errorMessage != null && alarms.isEmpty() -> ErrorContent(errorMessage!!) {
-                        scope.launch { fetchAlarms() }
-                    }
-                    alarms.isEmpty() -> EmptyContent(hasActiveFilters) {
-                        selectedType = null
-                        scope.launch { fetchAlarms() }
-                    }
-                    else -> {
-                        // Sonuç sayısı
+                if (selectedTab == 0) {
+                    if (hasActiveFilters) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface)
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                "${filteredAlarms.size} alarm",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = AppColors.TextMuted
-                            )
-                            Spacer(Modifier.weight(1f))
-                            if (isLoading && searchText.isBlank()) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(14.dp),
-                                    strokeWidth = 2.dp,
-                                    color = AppColors.Indigo
-                                )
+                            selectedType?.let { type ->
+                                FilterChip(label = ALARM_TYPES.firstOrNull { it.first == type }?.second ?: type) {
+                                    selectedType = null
+                                    scope.launch { fetchAlarms() }
+                                }
+                            }
+                            TextButton(
+                                onClick = {
+                                    selectedType = null
+                                    scope.launch { fetchAlarms() }
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp)
+                            ) {
+                                Text("Temizle", fontSize = 11.sp, color = Color.Red)
                             }
                         }
+                    }
 
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = 20.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(filteredAlarms, key = { it.id }) { alarm ->
-                                AlarmCard(alarm, onClick = { selectedAlarm = alarm })
+                    when {
+                        isLoading && alarms.isEmpty() -> AlarmEventsSkeletonList()
+                        errorMessage != null && alarms.isEmpty() -> ErrorContent(errorMessage!!) {
+                            scope.launch { refreshCurrentTab() }
+                        }
+                        alarms.isEmpty() -> EmptyContent(hasActiveFilters) {
+                            selectedType = null
+                            scope.launch { fetchAlarms() }
+                        }
+                        else -> {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "${filteredAlarms.size} alarm",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                )
+                                Spacer(Modifier.weight(1f))
+                                if (isLoading && searchText.isBlank()) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp,
+                                        color = AppColors.Indigo
+                                    )
+                                }
                             }
 
-                            // Pagination — only when NOT searching
-                            if (currentPage < lastPage && searchText.isBlank()) {
-                                item {
-                                    LaunchedEffect(Unit) {
-                                        fetchAlarms(currentPage + 1, append = true)
-                                    }
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                        horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                        Spacer(Modifier.width(8.dp))
-                                        Text("Yükleniyor...", fontSize = 12.sp, color = AppColors.TextMuted)
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(bottom = 20.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(filteredAlarms, key = { it.id }) { alarm ->
+                                    AlarmCard(alarm, onClick = { selectedAlarm = alarm })
+                                }
+
+                                if (currentPage < lastPage && searchText.isBlank()) {
+                                    item {
+                                        LaunchedEffect(Unit) {
+                                            fetchAlarms(currentPage + 1, append = true)
+                                        }
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                            Spacer(Modifier.width(8.dp))
+                                            Text("Yükleniyor...", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                } else {
+                    AlarmRulesTab(
+                        filteredRules = filteredRules,
+                        isLoading = isLoadingSets,
+                        error = setsError,
+                        onRuleClick = { selectedRule = it },
+                        onNewRule = { showCreateSheet = true },
+                        onRetry = { scope.launch { refreshCurrentTab() } }
+                    )
                 }
-            } else {
-                // MARK: Alarm Kuralları Tab
-                AlarmRulesTab(
-                    filteredRules = filteredRules,
-                    isLoading = isLoadingSets,
-                    error = setsError,
-                    onRuleClick = { selectedRule = it },
-                    onNewRule = { showCreateSheet = true },
-                    onRetry = { scope.launch { fetchAlarmSets() } }
-                )
             }
         }
     }
@@ -676,7 +593,7 @@ fun AlarmsScreen(initialSearchText: String = "", autoOpenCreate: Boolean = false
     if (showFilterSheet) {
         ModalBottomSheet(
             onDismissRequest = { showFilterSheet = false },
-            containerColor = AppColors.Surface
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
             Column(
                 modifier = Modifier
@@ -684,7 +601,7 @@ fun AlarmsScreen(initialSearchText: String = "", autoOpenCreate: Boolean = false
                     .padding(horizontal = 16.dp)
                     .padding(bottom = 32.dp)
             ) {
-                Text("Alarm Türü", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+                Text("Alarm Türü", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(12.dp))
 
                 // Tümü
@@ -706,7 +623,7 @@ fun AlarmsScreen(initialSearchText: String = "", autoOpenCreate: Boolean = false
                         scope.launch { fetchAlarms() }
                     },
                     modifier = Modifier.fillMaxWidth().height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Navy),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text("Uygula", fontWeight = FontWeight.SemiBold)
@@ -726,11 +643,11 @@ private fun SearchBar(text: String, onTextChange: (String) -> Unit, placeholder:
             .padding(horizontal = 16.dp)
             .padding(bottom = 4.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(AppColors.Surface)
-            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp))
             .padding(horizontal = 12.dp, vertical = 4.dp)
     ) {
-        Icon(Icons.Default.Search, null, tint = AppColors.TextMuted, modifier = Modifier.size(16.dp))
+        Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(8.dp))
         BasicTextField(
             value = text,
@@ -738,12 +655,12 @@ private fun SearchBar(text: String, onTextChange: (String) -> Unit, placeholder:
             singleLine = true,
             textStyle = androidx.compose.ui.text.TextStyle(
                 fontSize = 13.sp,
-                color = AppColors.TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             ),
             decorationBox = { innerTextField ->
                 Box(modifier = Modifier.weight(1f).padding(vertical = 6.dp)) {
                     if (text.isEmpty()) {
-                        Text(placeholder, fontSize = 13.sp, color = AppColors.TextMuted)
+                        Text(placeholder, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                     }
                     innerTextField()
                 }
@@ -752,7 +669,7 @@ private fun SearchBar(text: String, onTextChange: (String) -> Unit, placeholder:
         )
         if (text.isNotEmpty()) {
             IconButton(onClick = { onTextChange("") }, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.Close, null, tint = AppColors.TextMuted, modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
             }
         }
     }
@@ -766,8 +683,8 @@ private fun TabSelector(selectedTab: Int, onTabSelected: (Int) -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(AppColors.Surface)
-            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
             .padding(4.dp)
     ) {
         // Tab 0: Gelen Alarmlar
@@ -776,13 +693,13 @@ private fun TabSelector(selectedTab: Int, onTabSelected: (Int) -> Unit) {
             modifier = Modifier
                 .weight(1f)
                 .clip(RoundedCornerShape(10.dp))
-                .background(if (selectedTab == 0) AppColors.Navy else Color.Transparent)
+                .background(if (selectedTab == 0) MaterialTheme.colorScheme.onSurface else Color.Transparent)
                 .clickable { onTabSelected(0) }
                 .padding(vertical = 10.dp)
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.NotificationsActive, null, tint = if (selectedTab == 0) Color.White else AppColors.TextMuted, modifier = Modifier.size(14.dp))
-                Text("Gelen Alarmlar", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (selectedTab == 0) Color.White else AppColors.TextMuted)
+                Icon(Icons.Default.NotificationsActive, null, tint = if (selectedTab == 0) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                Text("Gelen Alarmlar", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (selectedTab == 0) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
             }
         }
 
@@ -792,13 +709,13 @@ private fun TabSelector(selectedTab: Int, onTabSelected: (Int) -> Unit) {
             modifier = Modifier
                 .weight(1f)
                 .clip(RoundedCornerShape(10.dp))
-                .background(if (selectedTab == 1) AppColors.Navy else Color.Transparent)
+                .background(if (selectedTab == 1) MaterialTheme.colorScheme.onSurface else Color.Transparent)
                 .clickable { onTabSelected(1) }
                 .padding(vertical = 10.dp)
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Settings, null, tint = if (selectedTab == 1) Color.White else AppColors.TextMuted, modifier = Modifier.size(14.dp))
-                Text("Alarm Kuralları", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (selectedTab == 1) Color.White else AppColors.TextMuted)
+                Icon(Icons.Default.Settings, null, tint = if (selectedTab == 1) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                Text("Alarm Kuralları", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (selectedTab == 1) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
             }
         }
     }
@@ -815,7 +732,7 @@ private fun AlarmRulesTab(
     onRetry: () -> Unit
 ) {
     when {
-        isLoading && filteredRules.isEmpty() -> LoadingContent()
+        isLoading && filteredRules.isEmpty() -> AlarmRulesSkeletonList()
         error != null && filteredRules.isEmpty() -> ErrorContent(error) { onRetry() }
         else -> {
             LazyColumn(
@@ -838,7 +755,7 @@ private fun AlarmRulesTab(
                             "${filteredRules.size} kural tanımlı",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            color = AppColors.TextMuted
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
                     }
                 }
@@ -850,10 +767,10 @@ private fun AlarmRulesTab(
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.Settings, null, tint = AppColors.TextFaint, modifier = Modifier.size(40.dp))
+                                Icon(Icons.Default.Settings, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f), modifier = Modifier.size(40.dp))
                                 Spacer(Modifier.height(8.dp))
-                                Text("Henüz alarm kuralı yok", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted)
-                                Text("Yukarıdaki butona tıklayarak yeni kural ekleyin", fontSize = 12.sp, color = AppColors.TextFaint)
+                                Text("Henüz alarm kuralı yok", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                                Text("Yukarıdaki butona tıklayarak yeni kural ekleyin", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f))
                             }
                         }
                     }
@@ -896,7 +813,7 @@ private fun NewRuleButton(onClick: () -> Unit = {}) {
 
         Column(modifier = Modifier.weight(1f)) {
             Text("Yeni Alarm Kuralı Ekle", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Indigo)
-            Text("Araçlarınız için özel alarm kuralı tanımlayın", fontSize = 10.sp, color = AppColors.TextMuted)
+            Text("Araçlarınız için özel alarm kuralı tanımlayın", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
         }
 
         Icon(Icons.Default.ChevronRight, null, tint = AppColors.Indigo.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
@@ -911,7 +828,7 @@ private fun AlarmSetCard(rule: AlarmSet, onClick: () -> Unit = {}) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(AppColors.Surface)
+            .background(MaterialTheme.colorScheme.surface)
             .clickable { onClick() }
             .padding(12.dp)
     ) {
@@ -932,8 +849,8 @@ private fun AlarmSetCard(rule: AlarmSet, onClick: () -> Unit = {}) {
 
             // İsim ve tür
             Column(modifier = Modifier.weight(1f)) {
-                Text(rule.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
-                Text(rule.typeLabel, fontSize = 11.sp, color = AppColors.TextMuted)
+                Text(rule.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                Text(rule.typeLabel, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
             }
 
             // Status badge
@@ -968,12 +885,12 @@ private fun AlarmSetCard(rule: AlarmSet, onClick: () -> Unit = {}) {
             modifier = Modifier.padding(start = 48.dp)
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Warning, null, tint = AppColors.TextFaint, modifier = Modifier.size(12.dp))
-                Text("Koşul: ${rule.conditionSummary}", fontSize = 11.sp, color = AppColors.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f), modifier = Modifier.size(12.dp))
+                Text("Koşul: ${rule.conditionSummary}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.DirectionsCar, null, tint = AppColors.TextFaint, modifier = Modifier.size(12.dp))
-                Text("${rule.targetCount} araç", fontSize = 11.sp, color = AppColors.TextSecondary)
+                Icon(Icons.Default.DirectionsCar, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f), modifier = Modifier.size(12.dp))
+                Text("${rule.targetCount} araç", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                 Spacer(Modifier.width(8.dp))
                 // Channels
                 rule.channelList.forEach { ch ->
@@ -983,7 +900,7 @@ private fun AlarmSetCard(rule: AlarmSet, onClick: () -> Unit = {}) {
                         "push" -> Icons.Default.Notifications
                         else -> Icons.Default.Notifications
                     }
-                    Icon(chIcon, null, tint = AppColors.TextFaint, modifier = Modifier.size(12.dp))
+                    Icon(chIcon, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f), modifier = Modifier.size(12.dp))
                 }
             }
         }
@@ -998,7 +915,7 @@ private fun AlarmCard(alarm: AlarmEvent, onClick: () -> Unit = {}) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(AppColors.Surface)
+            .background(MaterialTheme.colorScheme.surface)
             .clickable { onClick() }
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1022,13 +939,13 @@ private fun AlarmCard(alarm: AlarmEvent, onClick: () -> Unit = {}) {
                     alarm.typeLabel,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = AppColors.TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
                 )
                 Text(
                     alarm.formattedDate,
                     fontSize = 10.sp,
-                    color = AppColors.TextFaint
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                 )
             }
 
@@ -1052,8 +969,8 @@ private fun AlarmCard(alarm: AlarmEvent, onClick: () -> Unit = {}) {
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Speed, null, tint = AppColors.TextMuted, modifier = Modifier.size(11.dp))
-                        Text("${alarm.speed} km/s", fontSize = 10.sp, color = AppColors.TextMuted)
+                        Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(11.dp))
+                        Text("${alarm.speed} km/s", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                     }
                 }
             }
@@ -1077,7 +994,7 @@ private fun AlarmCard(alarm: AlarmEvent, onClick: () -> Unit = {}) {
                     Text(
                         displayText,
                         fontSize = 10.sp,
-                        color = AppColors.TextMuted,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
@@ -1089,7 +1006,7 @@ private fun AlarmCard(alarm: AlarmEvent, onClick: () -> Unit = {}) {
         // Ok
         Icon(
             Icons.Default.ChevronRight, null,
-            tint = AppColors.TextFaint,
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
             modifier = Modifier.size(16.dp)
         )
     }
@@ -1109,7 +1026,7 @@ private fun FilterChip(label: String, onRemove: () -> Unit) {
         Spacer(Modifier.width(4.dp))
         Icon(
             Icons.Default.Close, null,
-            tint = AppColors.TextMuted,
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
             modifier = Modifier.size(14.dp).clickable { onRemove() }
         )
     }
@@ -1129,7 +1046,7 @@ private fun FilterRow(label: String, isSelected: Boolean, onClick: () -> Unit) {
         Text(
             label,
             fontSize = 14.sp,
-            color = if (isSelected) AppColors.Indigo else AppColors.TextSecondary,
+            color = if (isSelected) AppColors.Indigo else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
             modifier = Modifier.weight(1f)
         )
@@ -1146,7 +1063,7 @@ private fun LoadingContent() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator(color = AppColors.Indigo)
             Spacer(Modifier.height(16.dp))
-            Text("Alarmlar yükleniyor...", fontSize = 13.sp, color = AppColors.TextMuted)
+            Text("Alarmlar yükleniyor...", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
         }
     }
 }
@@ -1158,9 +1075,9 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Default.Warning, null, tint = Color(0xFFF97316), modifier = Modifier.size(44.dp))
             Spacer(Modifier.height(12.dp))
-            Text("Bir hata oluştu", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+            Text("Bir hata oluştu", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(4.dp))
-            Text(message, fontSize = 12.sp, color = AppColors.TextMuted, modifier = Modifier.padding(horizontal = 40.dp))
+            Text(message, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.padding(horizontal = 40.dp))
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = onRetry,
@@ -1178,14 +1095,14 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
 private fun EmptyContent(hasFilters: Boolean, onClearFilters: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.NotificationsOff, null, tint = AppColors.TextFaint, modifier = Modifier.size(48.dp))
+            Icon(Icons.Default.NotificationsOff, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f), modifier = Modifier.size(48.dp))
             Spacer(Modifier.height(12.dp))
-            Text("Alarm Bulunamadı", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+            Text("Alarm Bulunamadı", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(4.dp))
             Text(
                 "Seçili filtrelere uygun alarm kaydı yok.\nFiltrelerinizi değiştirerek tekrar deneyebilirsiniz.",
                 fontSize = 12.sp,
-                color = AppColors.TextMuted,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                 modifier = Modifier.padding(horizontal = 40.dp),
                 lineHeight = 18.sp
             )
@@ -1205,7 +1122,7 @@ private fun EmptyContent(hasFilters: Boolean, onClearFilters: () -> Unit) {
 private fun AlarmDetailSheet(alarm: AlarmEvent, onDismiss: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = AppColors.Bg
+        containerColor = MaterialTheme.colorScheme.background
     ) {
         Column(
             modifier = Modifier
@@ -1228,26 +1145,26 @@ private fun AlarmDetailSheet(alarm: AlarmEvent, onDismiss: () -> Unit) {
                     Icon(alarm.icon, null, tint = alarm.color, modifier = Modifier.size(28.dp))
                 }
                 Spacer(Modifier.height(12.dp))
-                Text(alarm.typeLabel, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
+                Text(alarm.typeLabel, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(4.dp))
-                Text(alarm.formattedFullDate, fontSize = 12.sp, color = AppColors.TextMuted)
+                Text(alarm.formattedFullDate, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
             }
 
             Spacer(Modifier.height(8.dp))
 
             // Details
             DetailRow(icon = Icons.Default.DirectionsCar, title = "Araç", value = if (alarm.plate.isNotEmpty()) "${alarm.plate} — ${alarm.vehicleName}" else alarm.vehicleName)
-            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.Tag, title = "IMEI", value = alarm.imei)
-            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.Speed, title = "Hız", value = if (alarm.speed > 0) "${alarm.speed} km/s" else "—")
-            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.Description, title = "Açıklama", value = alarm.description.ifEmpty { alarm.code }.ifEmpty { "—" })
-            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.Circle, title = "Durum", value = alarm.statusLabel)
-            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.LocationOn, title = "Konum", value = String.format("%.4f, %.4f", alarm.lat, alarm.lng))
-            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.CalendarMonth, title = "Tarih", value = alarm.formattedFullDate)
 
             // Map - Alarm konumu
@@ -1261,7 +1178,7 @@ private fun AlarmDetailSheet(alarm: AlarmEvent, onDismiss: () -> Unit) {
                         modifier = Modifier.padding(bottom = 8.dp)
                     ) {
                         Icon(Icons.Default.Map, null, tint = AppColors.Indigo, modifier = Modifier.size(16.dp))
-                        Text("Alarm Konumu", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text("Alarm Konumu", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     }
 
                     val context = LocalContext.current
@@ -1366,7 +1283,7 @@ private fun RuleDetailSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = AppColors.Bg
+        containerColor = MaterialTheme.colorScheme.background
     ) {
         Column(
             modifier = Modifier
@@ -1389,10 +1306,10 @@ private fun RuleDetailSheet(
                     Icon(rule.icon, null, tint = rule.color, modifier = Modifier.size(28.dp))
                 }
                 Spacer(Modifier.height(12.dp))
-                Text(rule.name, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
+                Text(rule.name, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 if (rule.description != null) {
                     Spacer(Modifier.height(4.dp))
-                    Text(rule.description, fontSize = 12.sp, color = AppColors.TextMuted)
+                    Text(rule.description, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                 }
                 Spacer(Modifier.height(8.dp))
                 // Status badge
@@ -1418,23 +1335,23 @@ private fun RuleDetailSheet(
 
             // Details
             DetailRow(icon = Icons.Default.Sell, title = "Alarm Türü", value = rule.typeLabel)
-            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.Warning, title = "Koşul", value = rule.conditionSummary.ifEmpty { "—" })
-            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.DirectionsCar, title = "Hedef Araçlar", value = "${rule.targetCount} araç")
-            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.Notifications, title = "Bildirim Kanalları", value = rule.channelList.joinToString(", ") {
                 when (it) { "email" -> "E-posta"; "sms" -> "SMS"; "push" -> "Mobil Bildirim"; else -> it }
             }.ifEmpty { "—" })
-            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.People, title = "Alıcılar", value = "${rule.recipientCount} kişi")
-            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.Timer, title = "Bekleme Süresi", value = "${rule.cooldownSec / 60} dk")
-            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.Visibility, title = "Değerlendirme", value = when(rule.evaluationMode) {
                 "live" -> "Canlı Alarm"; "shadow" -> "İzleme Modu"; else -> rule.evaluationMode
             })
-            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = AppColors.BorderSoft.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             DetailRow(icon = Icons.Default.CalendarMonth, title = "Oluşturulma", value = rule.formattedDate)
 
             // Actions
@@ -1592,14 +1509,16 @@ private fun CreateAlarmSetSheet(
         AlarmTypeOption("idle_alarm", "Rölanti", "Araç belirli süreden fazla rölantide kaldığında uyar"),
         AlarmTypeOption("movement_detection", "Hareket Algılama", "Park halindeki aracın hareket etmesinde uyar"),
         AlarmTypeOption("off_hours_usage", "Mesai Dışı Kullanım", "Mesai saatleri dışında kullanımda uyar"),
-        AlarmTypeOption("geofence_alarm", "Bölge Alarmı", "Bölgeye giriş/çıkışta bildirim alın")
+        AlarmTypeOption("geofence_alarm", "Bölge Alarmı", "Bölgeye giriş/çıkışta bildirim alın"),
+        AlarmTypeOption("ignition_on", "Kontak Açılma", "Araç kontağı açıldığında bildirim alın"),
+        AlarmTypeOption("ignition_off", "Kontak Kapanma", "Araç kontağı kapandığında bildirim alın")
     )
 
     val stepLabels = listOf("İsim & Tür", "Araçlar", "Koşullar", "Bildirim")
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = AppColors.Bg,
+        containerColor = MaterialTheme.colorScheme.background,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ) {
         Column(
@@ -1611,7 +1530,7 @@ private fun CreateAlarmSetSheet(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(AppColors.Navy)
+                    .background(MaterialTheme.colorScheme.onSurface)
                     .padding(horizontal = 20.dp, vertical = 16.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1671,7 +1590,7 @@ private fun CreateAlarmSetSheet(
                                         "$stepNum",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isActive) AppColors.Navy else Color.White.copy(alpha = 0.5f)
+                                        color = if (isActive) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.5f)
                                     )
                                 }
                             }
@@ -1701,7 +1620,7 @@ private fun CreateAlarmSetSheet(
                     // ═══ STEP 1: İsim & Tür ═══
                     1 -> {
                         // Kural Adı
-                        Text("Alarm Adı", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text("Alarm Adı", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
@@ -1714,7 +1633,7 @@ private fun CreateAlarmSetSheet(
                         Spacer(Modifier.height(4.dp))
 
                         // Alarm Türü
-                        Text("Alarm Türü Seçin", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text("Alarm Türü Seçin", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
 
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             typeOptions.forEach { type ->
@@ -1725,6 +1644,8 @@ private fun CreateAlarmSetSheet(
                                     "movement_detection" -> Icons.Default.DirectionsCar
                                     "off_hours_usage" -> Icons.Default.Schedule
                                     "geofence_alarm" -> Icons.Default.LocationOn
+                                    "ignition_on" -> Icons.Default.VpnKey
+                                    "ignition_off" -> Icons.Default.PowerOff
                                     else -> Icons.Default.Notifications
                                 }
                                 val typeColor = when (type.value) {
@@ -1733,6 +1654,8 @@ private fun CreateAlarmSetSheet(
                                     "movement_detection" -> Color(0xFF22C55E)
                                     "off_hours_usage" -> Color(0xFFA855F7)
                                     "geofence_alarm" -> AppColors.Indigo
+                                    "ignition_on" -> Color(0xFF22C55E)
+                                    "ignition_off" -> Color(0xFFEF4444)
                                     else -> AppColors.Indigo
                                 }
 
@@ -1741,10 +1664,10 @@ private fun CreateAlarmSetSheet(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(if (isSelected) typeColor.copy(alpha = 0.06f) else AppColors.Surface)
+                                        .background(if (isSelected) typeColor.copy(alpha = 0.06f) else MaterialTheme.colorScheme.surface)
                                         .border(
                                             1.5.dp,
-                                            if (isSelected) typeColor.copy(alpha = 0.3f) else AppColors.BorderSoft,
+                                            if (isSelected) typeColor.copy(alpha = 0.3f) else MaterialTheme.colorScheme.outline,
                                             RoundedCornerShape(12.dp)
                                         )
                                         .clickable { selectedType = type.value }
@@ -1761,9 +1684,9 @@ private fun CreateAlarmSetSheet(
                                     }
                                     Spacer(Modifier.width(12.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(type.label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                                        Text(type.label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                                         if (type.description.isNotEmpty()) {
-                                            Text(type.description, fontSize = 11.sp, color = AppColors.TextMuted, maxLines = 2)
+                                            Text(type.description, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), maxLines = 2)
                                         }
                                     }
                                     if (isSelected) {
@@ -1781,7 +1704,7 @@ private fun CreateAlarmSetSheet(
 
                     // ═══ STEP 2: Araçlar ═══
                     2 -> {
-                        Text("Hangi araçlar için geçerli olsun?", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text("Hangi araçlar için geçerli olsun?", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
 
                         // Search
                         Row(
@@ -1789,20 +1712,20 @@ private fun CreateAlarmSetSheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(AppColors.Surface)
-                                .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp))
                                 .padding(horizontal = 12.dp, vertical = 4.dp)
                         ) {
-                            Icon(Icons.Default.Search, null, tint = AppColors.TextMuted, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(8.dp))
                             BasicTextField(
                                 value = vehicleSearch,
                                 onValueChange = { vehicleSearch = it },
                                 singleLine = true,
-                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = AppColors.TextPrimary),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface),
                                 decorationBox = { innerTextField ->
                                     Box(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
-                                        if (vehicleSearch.isEmpty()) Text("Plaka veya araç ara...", fontSize = 13.sp, color = AppColors.TextMuted)
+                                        if (vehicleSearch.isEmpty()) Text("Plaka veya araç ara...", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                                         innerTextField()
                                     }
                                 },
@@ -1843,8 +1766,8 @@ private fun CreateAlarmSetSheet(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isSelected) AppColors.Indigo.copy(alpha = 0.06f) else AppColors.Surface)
-                                        .border(1.dp, if (isSelected) AppColors.Indigo.copy(alpha = 0.2f) else AppColors.BorderSoft, RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) AppColors.Indigo.copy(alpha = 0.06f) else MaterialTheme.colorScheme.surface)
+                                        .border(1.dp, if (isSelected) AppColors.Indigo.copy(alpha = 0.2f) else MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp))
                                         .clickable {
                                             selectedVehicles = if (isSelected) selectedVehicles - v.assignmentId else selectedVehicles + v.assignmentId
                                         }
@@ -1856,15 +1779,15 @@ private fun CreateAlarmSetSheet(
                                             .size(20.dp)
                                             .clip(RoundedCornerShape(4.dp))
                                             .background(if (isSelected) AppColors.Indigo else Color.Transparent)
-                                            .border(1.5.dp, if (isSelected) AppColors.Indigo else AppColors.TextMuted, RoundedCornerShape(4.dp))
+                                            .border(1.5.dp, if (isSelected) AppColors.Indigo else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
                                     ) {
                                         if (isSelected) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
                                     }
                                     Spacer(Modifier.width(10.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(v.label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                                        Text(v.label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
                                         if (v.plate.isNotEmpty() && v.plate != v.label) {
-                                            Text(v.plate, fontSize = 11.sp, color = AppColors.TextMuted)
+                                            Text(v.plate, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                                         }
                                     }
                                     if (isSelected) {
@@ -1882,7 +1805,7 @@ private fun CreateAlarmSetSheet(
                             ) {
                                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = AppColors.Indigo)
                                 Spacer(Modifier.width(8.dp))
-                                Text("Araçlar yükleniyor...", fontSize = 12.sp, color = AppColors.TextMuted)
+                                Text("Araçlar yükleniyor...", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                             }
                         }
                     }
@@ -1890,11 +1813,11 @@ private fun CreateAlarmSetSheet(
                     // ═══ STEP 3: Koşullar ═══
                     3 -> {
                         val typeLabel = typeOptions.firstOrNull { it.value == selectedType }?.label ?: selectedType
-                        Text("$typeLabel Koşulları", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text("$typeLabel Koşulları", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
 
                         when (selectedType) {
                             "speed_violation" -> {
-                                Text("Araçlarınızın aşmaması gereken hız limitini belirleyin.", fontSize = 12.sp, color = AppColors.TextMuted)
+                                Text("Araçlarınızın aşmaması gereken hız limitini belirleyin.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                                 Spacer(Modifier.height(4.dp))
                                 OutlinedTextField(
                                     value = speedLimit,
@@ -1906,7 +1829,7 @@ private fun CreateAlarmSetSheet(
                                     shape = RoundedCornerShape(10.dp)
                                 )
                                 // Common presets
-                                Text("Hızlı Seçim", fontSize = 11.sp, color = AppColors.TextMuted)
+                                Text("Hızlı Seçim", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     listOf("50", "80", "100", "120").forEach { preset ->
                                         val isSel = speedLimit == preset
@@ -1914,18 +1837,18 @@ private fun CreateAlarmSetSheet(
                                             contentAlignment = Alignment.Center,
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .background(if (isSel) AppColors.Indigo else AppColors.Surface)
-                                                .border(1.dp, if (isSel) AppColors.Indigo else AppColors.BorderSoft, RoundedCornerShape(8.dp))
+                                                .background(if (isSel) AppColors.Indigo else MaterialTheme.colorScheme.surface)
+                                                .border(1.dp, if (isSel) AppColors.Indigo else MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
                                                 .clickable { speedLimit = preset }
                                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                                         ) {
-                                            Text("$preset km/s", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (isSel) Color.White else AppColors.TextPrimary)
+                                            Text("$preset km/s", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (isSel) Color.White else MaterialTheme.colorScheme.onSurface)
                                         }
                                     }
                                 }
                             }
                             "idle_alarm" -> {
-                                Text("Araçlarınızın rölantide kalabileceği maksimum süreyi belirleyin.", fontSize = 12.sp, color = AppColors.TextMuted)
+                                Text("Araçlarınızın rölantide kalabileceği maksimum süreyi belirleyin.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                                 Spacer(Modifier.height(4.dp))
                                 OutlinedTextField(
                                     value = idleAfterSec,
@@ -1936,7 +1859,7 @@ private fun CreateAlarmSetSheet(
                                     singleLine = true,
                                     shape = RoundedCornerShape(10.dp)
                                 )
-                                Text("Hızlı Seçim", fontSize = 11.sp, color = AppColors.TextMuted)
+                                Text("Hızlı Seçim", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     listOf("180" to "3 dk", "300" to "5 dk", "600" to "10 dk", "900" to "15 dk").forEach { (sec, label) ->
                                         val isSel = idleAfterSec == sec
@@ -1944,18 +1867,18 @@ private fun CreateAlarmSetSheet(
                                             contentAlignment = Alignment.Center,
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .background(if (isSel) AppColors.Indigo else AppColors.Surface)
-                                                .border(1.dp, if (isSel) AppColors.Indigo else AppColors.BorderSoft, RoundedCornerShape(8.dp))
+                                                .background(if (isSel) AppColors.Indigo else MaterialTheme.colorScheme.surface)
+                                                .border(1.dp, if (isSel) AppColors.Indigo else MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
                                                 .clickable { idleAfterSec = sec }
                                                 .padding(horizontal = 14.dp, vertical = 8.dp)
                                         ) {
-                                            Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (isSel) Color.White else AppColors.TextPrimary)
+                                            Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (isSel) Color.White else MaterialTheme.colorScheme.onSurface)
                                         }
                                     }
                                 }
                             }
                             "geofence_alarm" -> {
-                                Text("Alarm tetiklenecek bölgeyi seçin.", fontSize = 12.sp, color = AppColors.TextMuted)
+                                Text("Alarm tetiklenecek bölgeyi seçin.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                                 Spacer(Modifier.height(4.dp))
                                 catalog?.geofences?.forEach { gf ->
                                     val isSel = selectedGeofence == gf.id
@@ -1964,17 +1887,17 @@ private fun CreateAlarmSetSheet(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(10.dp))
-                                            .background(if (isSel) AppColors.Indigo.copy(alpha = 0.06f) else AppColors.Surface)
-                                            .border(1.dp, if (isSel) AppColors.Indigo.copy(alpha = 0.2f) else AppColors.BorderSoft, RoundedCornerShape(10.dp))
+                                            .background(if (isSel) AppColors.Indigo.copy(alpha = 0.06f) else MaterialTheme.colorScheme.surface)
+                                            .border(1.dp, if (isSel) AppColors.Indigo.copy(alpha = 0.2f) else MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp))
                                             .clickable { selectedGeofence = gf.id }
                                             .padding(12.dp)
                                     ) {
-                                        Icon(Icons.Default.LocationOn, null, tint = if (isSel) AppColors.Indigo else AppColors.TextMuted, modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Default.LocationOn, null, tint = if (isSel) AppColors.Indigo else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
                                         Spacer(Modifier.width(10.dp))
-                                        Text(gf.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
+                                        Text(gf.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
                                         if (isSel) Icon(Icons.Default.CheckCircle, null, tint = AppColors.Indigo, modifier = Modifier.size(18.dp))
                                     }
-                                } ?: Text("Bölge bulunamadı", fontSize = 12.sp, color = AppColors.TextMuted)
+                                } ?: Text("Bölge bulunamadı", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                             }
                             "movement_detection" -> {
                                 Column(
@@ -1986,9 +1909,39 @@ private fun CreateAlarmSetSheet(
                                 ) {
                                     Icon(Icons.Default.DirectionsCar, null, tint = Color(0xFF22C55E), modifier = Modifier.size(28.dp))
                                     Spacer(Modifier.height(8.dp))
-                                    Text("Hareket Algılama", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                                    Text("Hareket Algılama", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                                     Spacer(Modifier.height(4.dp))
-                                    Text("Park halindeki araç sallanma, çekilme veya hareket etme durumunda otomatik uyarı alacaksınız. Ek koşul gerekmez.", fontSize = 12.sp, color = AppColors.TextMuted, lineHeight = 18.sp)
+                                    Text("Park halindeki araç sallanma, çekilme veya hareket etme durumunda otomatik uyarı alacaksınız. Ek koşul gerekmez.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), lineHeight = 18.sp)
+                                }
+                            }
+                            "ignition_on" -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF22C55E).copy(alpha = 0.06f))
+                                        .padding(16.dp)
+                                ) {
+                                    Icon(Icons.Default.VpnKey, null, tint = Color(0xFF22C55E), modifier = Modifier.size(28.dp))
+                                    Spacer(Modifier.height(8.dp))
+                                    Text("Kontak Açılma", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text("Araç kontağı açıldığı anda otomatik bildirim alırsınız. Bu alarm tipi için ek koşul tanımlamanıza gerek yoktur.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), lineHeight = 18.sp)
+                                }
+                            }
+                            "ignition_off" -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFFEF4444).copy(alpha = 0.06f))
+                                        .padding(16.dp)
+                                ) {
+                                    Icon(Icons.Default.PowerOff, null, tint = Color(0xFFEF4444), modifier = Modifier.size(28.dp))
+                                    Spacer(Modifier.height(8.dp))
+                                    Text("Kontak Kapanma", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text("Araç kontağı kapandığı anda otomatik bildirim alırsınız. Bu alarm tipi için ek koşul tanımlamanıza gerek yoktur.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), lineHeight = 18.sp)
                                 }
                             }
                             "off_hours_usage" -> {
@@ -2001,9 +1954,9 @@ private fun CreateAlarmSetSheet(
                                 ) {
                                     Icon(Icons.Default.Schedule, null, tint = Color(0xFFA855F7), modifier = Modifier.size(28.dp))
                                     Spacer(Modifier.height(8.dp))
-                                    Text("Mesai Dışı Kullanım", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                                    Text("Mesai Dışı Kullanım", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                                     Spacer(Modifier.height(4.dp))
-                                    Text("Varsayılan ayarlar: Hafta içi 08:00 - 18:00 arası mesai. Bu saat aralığı dışında araç kullanıldığında bildirim alırsınız.", fontSize = 12.sp, color = AppColors.TextMuted, lineHeight = 18.sp)
+                                    Text("Varsayılan ayarlar: Hafta içi 08:00 - 18:00 arası mesai. Bu saat aralığı dışında araç kullanıldığında bildirim alırsınız.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), lineHeight = 18.sp)
                                     Spacer(Modifier.height(8.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         listOf("Pzt", "Sal", "Çar", "Per", "Cum").forEach { day ->
@@ -2026,8 +1979,8 @@ private fun CreateAlarmSetSheet(
                     // ═══ STEP 4: Bildirim ═══
                     4 -> {
                         // Channels
-                        Text("Bildirim Kanalları", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
-                        Text("Alarm tetiklendiğinde hangi kanallardan bildirim almak istiyorsunuz?", fontSize = 12.sp, color = AppColors.TextMuted)
+                        Text("Bildirim Kanalları", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Alarm tetiklendiğinde hangi kanallardan bildirim almak istiyorsunuz?", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
 
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             data class ChannelOption(val key: String, val label: String, val desc: String, val icon: ImageVector, val color: Color)
@@ -2043,8 +1996,8 @@ private fun CreateAlarmSetSheet(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(if (isSel) ch.color.copy(alpha = 0.06f) else AppColors.Surface)
-                                        .border(1.5.dp, if (isSel) ch.color.copy(alpha = 0.3f) else AppColors.BorderSoft, RoundedCornerShape(12.dp))
+                                        .background(if (isSel) ch.color.copy(alpha = 0.06f) else MaterialTheme.colorScheme.surface)
+                                        .border(1.5.dp, if (isSel) ch.color.copy(alpha = 0.3f) else MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
                                         .clickable {
                                             selectedChannels = if (isSel) selectedChannels - ch.key else selectedChannels + ch.key
                                         }
@@ -2058,8 +2011,8 @@ private fun CreateAlarmSetSheet(
                                     }
                                     Spacer(Modifier.width(12.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(ch.label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
-                                        Text(ch.desc, fontSize = 11.sp, color = AppColors.TextMuted)
+                                        Text(ch.label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                                        Text(ch.desc, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                                     }
                                     Box(
                                         contentAlignment = Alignment.Center,
@@ -2067,7 +2020,7 @@ private fun CreateAlarmSetSheet(
                                             .size(22.dp)
                                             .clip(RoundedCornerShape(4.dp))
                                             .background(if (isSel) ch.color else Color.Transparent)
-                                            .border(1.5.dp, if (isSel) ch.color else AppColors.TextMuted, RoundedCornerShape(4.dp))
+                                            .border(1.5.dp, if (isSel) ch.color else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
                                     ) {
                                         if (isSel) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
                                     }
@@ -2078,8 +2031,8 @@ private fun CreateAlarmSetSheet(
                         Spacer(Modifier.height(8.dp))
 
                         // Recipients
-                        Text("Alıcılar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
-                        Text("Alarm bildirimlerini kimler alsın?", fontSize = 12.sp, color = AppColors.TextMuted)
+                        Text("Alıcılar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Alarm bildirimlerini kimler alsın?", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
 
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             catalog?.recipients?.forEach { r ->
@@ -2089,8 +2042,8 @@ private fun CreateAlarmSetSheet(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isSel) AppColors.Indigo.copy(alpha = 0.06f) else AppColors.Surface)
-                                        .border(1.dp, if (isSel) AppColors.Indigo.copy(alpha = 0.2f) else AppColors.BorderSoft, RoundedCornerShape(10.dp))
+                                        .background(if (isSel) AppColors.Indigo.copy(alpha = 0.06f) else MaterialTheme.colorScheme.surface)
+                                        .border(1.dp, if (isSel) AppColors.Indigo.copy(alpha = 0.2f) else MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp))
                                         .clickable {
                                             selectedRecipients = if (isSel) selectedRecipients - r.id else selectedRecipients + r.id
                                         }
@@ -2109,8 +2062,8 @@ private fun CreateAlarmSetSheet(
                                     }
                                     Spacer(Modifier.width(10.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(r.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
-                                        Text(r.email, fontSize = 11.sp, color = AppColors.TextMuted)
+                                        Text(r.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                                        Text(r.email, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                                     }
                                     Box(
                                         contentAlignment = Alignment.Center,
@@ -2118,7 +2071,7 @@ private fun CreateAlarmSetSheet(
                                             .size(20.dp)
                                             .clip(RoundedCornerShape(4.dp))
                                             .background(if (isSel) AppColors.Indigo else Color.Transparent)
-                                            .border(1.5.dp, if (isSel) AppColors.Indigo else AppColors.TextMuted, RoundedCornerShape(4.dp))
+                                            .border(1.5.dp, if (isSel) AppColors.Indigo else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
                                     ) {
                                         if (isSel) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
                                     }
@@ -2130,7 +2083,7 @@ private fun CreateAlarmSetSheet(
                             ) {
                                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = AppColors.Indigo)
                                 Spacer(Modifier.width(8.dp))
-                                Text("Alıcılar yükleniyor...", fontSize = 12.sp, color = AppColors.TextMuted)
+                                Text("Alıcılar yükleniyor...", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                             }
                         }
 
@@ -2140,23 +2093,23 @@ private fun CreateAlarmSetSheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(AppColors.Navy.copy(alpha = 0.04f))
-                                .border(1.dp, AppColors.Navy.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f))
+                                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
                                 .padding(14.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text("Özet", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                            Text("Özet", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Icon(Icons.Default.Sell, null, tint = AppColors.TextMuted, modifier = Modifier.size(14.dp))
-                                Text("Tür: ${typeOptions.firstOrNull { it.value == selectedType }?.label ?: selectedType}", fontSize = 11.sp, color = AppColors.TextSecondary)
+                                Icon(Icons.Default.Sell, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                                Text("Tür: ${typeOptions.firstOrNull { it.value == selectedType }?.label ?: selectedType}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Icon(Icons.Default.DirectionsCar, null, tint = AppColors.TextMuted, modifier = Modifier.size(14.dp))
-                                Text("${selectedVehicles.size} araç seçildi", fontSize = 11.sp, color = AppColors.TextSecondary)
+                                Icon(Icons.Default.DirectionsCar, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                                Text("${selectedVehicles.size} araç seçildi", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Icon(Icons.Default.Notifications, null, tint = AppColors.TextMuted, modifier = Modifier.size(14.dp))
-                                Text("${selectedChannels.size} kanal, ${selectedRecipients.size} alıcı", fontSize = 11.sp, color = AppColors.TextSecondary)
+                                Icon(Icons.Default.Notifications, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                                Text("${selectedChannels.size} kanal, ${selectedRecipients.size} alıcı", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                             }
                         }
                     }
@@ -2179,7 +2132,7 @@ private fun CreateAlarmSetSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(AppColors.Surface)
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(horizontal = 20.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -2189,11 +2142,11 @@ private fun CreateAlarmSetSheet(
                         onClick = { currentStep--; errorMsg = null },
                         modifier = Modifier.weight(1f).height(48.dp),
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, AppColors.BorderSoft)
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                     ) {
-                        Icon(Icons.Default.ArrowBack, null, modifier = Modifier.size(16.dp), tint = AppColors.TextPrimary)
+                        Icon(Icons.Default.ArrowBack, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
                         Spacer(Modifier.width(6.dp))
-                        Text("Geri", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text("Geri", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
 
@@ -2216,7 +2169,7 @@ private fun CreateAlarmSetSheet(
                     },
                     enabled = !isSaving,
                     modifier = Modifier.weight(if (currentStep > 1) 1.5f else 1f).height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (currentStep == 4) Color(0xFF22C55E) else AppColors.Navy),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (currentStep == 4) Color(0xFF22C55E) else MaterialTheme.colorScheme.onSurface),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     if (isSaving) {
@@ -2248,11 +2201,11 @@ private fun DetailRow(icon: ImageVector, title: String, value: String) {
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Icon(icon, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp))
+        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
         Column {
-            Text(title, fontSize = 11.sp, color = AppColors.TextFaint)
+            Text(title, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f))
             Spacer(Modifier.height(2.dp))
-            Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+            Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }

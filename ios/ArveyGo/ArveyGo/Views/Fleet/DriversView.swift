@@ -947,6 +947,9 @@ struct VehicleDriverAssignSheet: View {
     let currentDriverName: String
     var onAssigned: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var ds: DS { DS(isDark: colorScheme == .dark) }
 
     @State private var drivers: [Driver] = []
     @State private var isLoading = true
@@ -964,23 +967,24 @@ struct VehicleDriverAssignSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                AppTheme.bg.ignoresSafeArea()
+                ds.pageBg.ignoresSafeArea()
                 if isLoading {
-                    ProgressView()
+                    driverAssignSkeletonView
                 } else {
                     VStack(spacing: 0) {
                         HStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass").font(.system(size: 14)).foregroundColor(AppTheme.textMuted)
-                            TextField("Sürücü ara...", text: $searchText).font(.system(size: 13))
+                            Image(systemName: "magnifyingglass").font(.system(size: 14)).foregroundColor(ds.text3)
+                            TextField("Sürücü ara...", text: $searchText).font(.system(size: 13)).foregroundColor(ds.text1)
                         }
                         .padding(.horizontal, 12).padding(.vertical, 10)
-                        .background(AppTheme.surface).cornerRadius(10)
+                        .background(ds.cardBg).cornerRadius(10)
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(ds.divider, lineWidth: 1))
                         .padding(.horizontal, 16).padding(.top, 8)
 
                         if !currentDriverName.isEmpty {
                             HStack(spacing: 8) {
                                 Image(systemName: "person.fill.checkmark").font(.system(size: 12)).foregroundColor(AppTheme.online)
-                                Text("Mevcut: \(currentDriverName)").font(.system(size: 12, weight: .medium)).foregroundColor(AppTheme.navy)
+                                Text("Mevcut: \(currentDriverName)").font(.system(size: 12, weight: .medium)).foregroundColor(ds.text1)
                                 Spacer()
                                 Button(action: { clearDriver() }) {
                                     Text("Kaldır").font(.system(size: 11, weight: .semibold)).foregroundColor(.red)
@@ -1002,24 +1006,24 @@ struct VehicleDriverAssignSheet: View {
                                                 Text(driver.initials).font(.system(size: 13, weight: .bold)).foregroundColor(driver.avatarColor)
                                             }
                                             VStack(alignment: .leading, spacing: 2) {
-                                                Text(driver.name).font(.system(size: 13, weight: .semibold)).foregroundColor(AppTheme.navy)
+                                                Text(driver.name).font(.system(size: 13, weight: .semibold)).foregroundColor(ds.text1)
                                                 HStack(spacing: 8) {
                                                     if !driver.driverCode.isEmpty {
-                                                        Text(driver.driverCode).font(.system(size: 10)).foregroundColor(AppTheme.textFaint)
+                                                        Text(driver.driverCode).font(.system(size: 10)).foregroundColor(ds.text3)
                                                     }
                                                     if !driver.phone.isEmpty {
-                                                        Text(driver.phone).font(.system(size: 10)).foregroundColor(AppTheme.textMuted)
+                                                        Text(driver.phone).font(.system(size: 10)).foregroundColor(ds.text3)
                                                     }
                                                 }
                                             }
                                             Spacer()
                                             if !driver.vehicle.isEmpty {
-                                                Text(driver.vehicle).font(.system(size: 10)).foregroundColor(AppTheme.textFaint)
+                                                Text(driver.vehicle).font(.system(size: 10)).foregroundColor(ds.text3)
                                             }
-                                            Image(systemName: "chevron.right").font(.system(size: 10)).foregroundColor(AppTheme.textFaint)
+                                            Image(systemName: "chevron.right").font(.system(size: 10)).foregroundColor(ds.text3)
                                         }
                                         .padding(.horizontal, 16).padding(.vertical, 10)
-                                        .background(AppTheme.surface).cornerRadius(10)
+                                        .background(ds.cardBg).cornerRadius(10)
                                     }
                                     .buttonStyle(.plain).disabled(isAssigning)
                                 }
@@ -1035,13 +1039,51 @@ struct VehicleDriverAssignSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Kapat") { dismiss() }.font(.system(size: 14, weight: .medium)).foregroundColor(AppTheme.indigo)
+                    Button("Kapat") { dismiss() }.font(.system(size: 14, weight: .medium)).foregroundColor(ds.text1)
                 }
                 ToolbarItem(placement: .principal) {
-                    Text("Sürücü Ata").font(.system(size: 15, weight: .semibold)).foregroundColor(AppTheme.navy)
+                    Text("Sürücü Ata").font(.system(size: 15, weight: .semibold)).foregroundColor(ds.text1)
                 }
             }
             .onAppear { loadDrivers() }
+        }
+    }
+
+    // MARK: - Skeleton View
+    private var driverAssignSkeletonView: some View {
+        VStack(spacing: 0) {
+            // Search skeleton
+            RoundedRectangle(cornerRadius: 10)
+                .fill(ds.cardBg)
+                .frame(height: 40)
+                .padding(.horizontal, 16).padding(.top, 8)
+                .shimmer()
+
+            // Driver row skeletons
+            VStack(spacing: 6) {
+                ForEach(0..<6, id: \.self) { _ in
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(ds.divider)
+                            .frame(width: 40, height: 40)
+                        VStack(alignment: .leading, spacing: 4) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(ds.divider)
+                                .frame(width: 120, height: 12)
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(ds.divider)
+                                .frame(width: 80, height: 10)
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .background(ds.cardBg).cornerRadius(10)
+                }
+            }
+            .padding(.horizontal, 16).padding(.top, 8)
+            .shimmer()
+
+            Spacer()
         }
     }
 
@@ -1087,65 +1129,37 @@ struct VehicleDriverAssignSheet: View {
 
 // MARK: - Drivers Skeleton View
 struct DriversSkeletonView: View {
-    @State private var phase: CGFloat = 0
+    private let skBase = Color(.systemGray5)
 
     var body: some View {
-        let shimmer = LinearGradient(
-            gradient: Gradient(stops: [
-                .init(color: Color(.systemGray5), location: max(0, phase - 0.3)),
-                .init(color: Color(.systemGray4).opacity(0.6), location: phase),
-                .init(color: Color(.systemGray5), location: min(1, phase + 0.3))
-            ]),
-            startPoint: .leading, endPoint: .trailing
-        )
-
         ScrollView(showsIndicators: false) {
             VStack(spacing: 12) {
                 // Stats strip skeleton
-                HStack(spacing: 8) {
-                    ForEach(0..<5, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 20).fill(shimmer).frame(width: 80, height: 34)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(0..<5, id: \.self) { _ in
+                            RoundedRectangle(cornerRadius: 20).fill(skBase)
+                                .frame(width: 80, height: 34).shimmer()
+                        }
                     }
-                }
+                }.allowsHitTesting(false)
 
                 // Search bar skeleton
-                RoundedRectangle(cornerRadius: 10).fill(shimmer).frame(height: 40)
+                RoundedRectangle(cornerRadius: 10).fill(skBase)
+                    .frame(height: 40).shimmer()
 
                 // Filter chips skeleton
                 HStack(spacing: 6) {
-                    ForEach(0..<4, id: \.self) { i in
-                        RoundedRectangle(cornerRadius: 20).fill(shimmer).frame(width: i == 0 ? 50 : 80, height: 30)
+                    ForEach([50, 80, 72, 90] as [CGFloat], id: \.self) { w in
+                        RoundedRectangle(cornerRadius: 20).fill(skBase)
+                            .frame(width: w, height: 30).shimmer()
                     }
                     Spacer()
                 }
 
                 // Driver card skeletons
-                ForEach(0..<6, id: \.self) { _ in
-                    VStack(spacing: 0) {
-                        HStack(spacing: 12) {
-                            // Avatar
-                            Circle().fill(shimmer).frame(width: 44, height: 44)
-                            // Name & info
-                            VStack(alignment: .leading, spacing: 6) {
-                                RoundedRectangle(cornerRadius: 4).fill(shimmer).frame(width: 130, height: 13)
-                                RoundedRectangle(cornerRadius: 4).fill(shimmer).frame(width: 90, height: 11)
-                                RoundedRectangle(cornerRadius: 4).fill(shimmer).frame(width: 70, height: 10)
-                            }
-                            Spacer()
-                            // Score circle
-                            Circle().fill(shimmer).frame(width: 42, height: 42)
-                        }.padding(14)
-
-                        // Mini stats row
-                        HStack(spacing: 0) {
-                            ForEach(0..<4, id: \.self) { _ in
-                                RoundedRectangle(cornerRadius: 4).fill(shimmer).frame(height: 10).frame(maxWidth: .infinity).padding(.horizontal, 4)
-                            }
-                        }.padding(.horizontal, 14).padding(.bottom, 10)
-                    }
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.systemGray5), lineWidth: 1))
+                ForEach(0..<5, id: \.self) { _ in
+                    driverCardSkeleton()
                 }
 
                 Spacer().frame(height: 16)
@@ -1153,11 +1167,32 @@ struct DriversSkeletonView: View {
             .padding(.horizontal, 16)
             .padding(.top, 6)
         }
-        .onAppear {
-            withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) {
-                phase = 1.3
-            }
+    }
+
+    @ViewBuilder
+    private func driverCardSkeleton() -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Circle().fill(skBase).frame(width: 44, height: 44).shimmer()
+                VStack(alignment: .leading, spacing: 6) {
+                    RoundedRectangle(cornerRadius: 4).fill(skBase).frame(width: 130, height: 13).shimmer()
+                    RoundedRectangle(cornerRadius: 4).fill(skBase).frame(width: 90, height: 11).shimmer()
+                    RoundedRectangle(cornerRadius: 4).fill(skBase).frame(width: 70, height: 10).shimmer()
+                }
+                Spacer()
+                Circle().fill(skBase).frame(width: 42, height: 42).shimmer()
+            }.padding(14)
+
+            HStack(spacing: 6) {
+                ForEach(0..<4, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 4).fill(skBase).frame(height: 10)
+                        .frame(maxWidth: .infinity).shimmer()
+                }
+            }.padding(.horizontal, 14).padding(.bottom, 10)
         }
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.systemGray5), lineWidth: 1))
     }
 }
 

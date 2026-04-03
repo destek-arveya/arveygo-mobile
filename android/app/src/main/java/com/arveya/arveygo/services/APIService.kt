@@ -332,6 +332,13 @@ object APIService {
         (0 until arr.length()).map { arr.getJSONObject(it) }
     }
 
+    /** GET /api/mobile/vehicles — fleet vehicle list with dailyKm */
+    suspend fun fetchVehicles(): List<com.arveya.arveygo.models.Vehicle> = withContext(Dispatchers.IO) {
+        val json = get("/api/mobile/vehicles")
+        val arr = json.optJSONArray("data") ?: return@withContext emptyList()
+        (0 until arr.length()).mapNotNull { com.arveya.arveygo.models.Vehicle.fromWSPayload(arr.getJSONObject(it)) }
+    }
+
     suspend fun fetchVehicleDetail(deviceId: Int): org.json.JSONObject = withContext(Dispatchers.IO) {
         val json = get("/api/mobile/vehicles/$deviceId")
         json.optJSONObject("data") ?: json

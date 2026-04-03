@@ -1,8 +1,13 @@
 package com.arveya.arveygo.ui.theme
 
+import android.content.Context
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -59,6 +64,37 @@ object AppColors {
     )
 }
 
+enum class ThemeMode(val storageValue: String, val title: String) {
+    LIGHT("light", "Açık"),
+    DARK("dark", "Koyu"),
+    SYSTEM("system", "Sistem");
+
+    companion object {
+        fun from(value: String?): ThemeMode = entries.firstOrNull { it.storageValue == value } ?: SYSTEM
+    }
+}
+
+object ThemeManager {
+    private const val PREFS_NAME = "arveygo_prefs"
+    private const val KEY_THEME = "arveygo_theme"
+
+    var mode by mutableStateOf(ThemeMode.SYSTEM)
+        private set
+
+    fun initialize(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        mode = ThemeMode.from(prefs.getString(KEY_THEME, ThemeMode.SYSTEM.storageValue))
+    }
+
+    fun setMode(context: Context, newMode: ThemeMode) {
+        mode = newMode
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_THEME, newMode.storageValue)
+            .apply()
+    }
+}
+
 // Material 3 color scheme
 private val LightColorScheme = lightColorScheme(
     primary = AppColors.Navy,
@@ -75,10 +111,34 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant = AppColors.BgAlt,
 )
 
+private val DarkColorScheme = darkColorScheme(
+    primary = AppColors.Lavender,
+    onPrimary = Color.White,
+    secondary = AppColors.Indigo,
+    onSecondary = Color.White,
+    background = AppColors.DarkBg,
+    onBackground = AppColors.DarkText,
+    surface = AppColors.DarkSurface,
+    onSurface = AppColors.DarkText,
+    error = AppColors.Offline,
+    onError = Color.White,
+    outline = AppColors.DarkBorder,
+    surfaceVariant = AppColors.DarkCard,
+)
+
 @Composable
-fun ArveyGoTheme(content: @Composable () -> Unit) {
+fun ArveyGoTheme(
+    themeMode: ThemeMode = ThemeManager.mode,
+    content: @Composable () -> Unit
+) {
+    val darkTheme = when (themeMode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    }
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
     MaterialTheme(
-        colorScheme = LightColorScheme,
+        colorScheme = colorScheme,
         shapes = MaterialTheme.shapes.copy(
             small = RoundedCornerShape(8.dp),
             medium = RoundedCornerShape(12.dp),

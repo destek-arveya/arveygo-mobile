@@ -1,6 +1,10 @@
 import SwiftUI
 import UIKit
 
+extension Notification.Name {
+    static let arveygoSwitchMainTab = Notification.Name("arveygoSwitchMainTab")
+}
+
 // MARK: - Tab Enum (Bottom Navigation)
 enum AppTab: String, CaseIterable {
     case dashboard = "Dashboard"
@@ -31,15 +35,17 @@ enum AppPage: String, CaseIterable {
 struct ContentView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @Environment(\.colorScheme) private var colorScheme
-    @State private var selectedTab: AppTab = .dashboard
+    @State private var selectedTab: AppTab = .liveMap
     @State private var showSupportRequest = false
+    @StateObject private var dashboardVM = DashboardViewModel()
 
     // Legacy states kept for child views that still use them
-    @State private var selectedPage: AppPage = .dashboard
+    @State private var selectedPage: AppPage = .liveMap
     @State private var showSideMenu = false
     @State private var alarmsSearchText = ""
     @State private var alarmsAutoOpenCreate = false
     @State private var alarmsPrePlate = ""
+    @State private var alarmsInitialEvent: AlarmEvent? = nil
 
     // Alarm glow effect
     @State private var alarmGlowing = false
@@ -70,19 +76,23 @@ struct ContentView: View {
             Group {
                 switch selectedTab {
                 case .dashboard:
-                    DashboardView(
-                        showSideMenu: $showSideMenu,
-                        selectedPage: $selectedPage,
-                        alarmsSearchText: $alarmsSearchText,
-                        alarmsAutoOpenCreate: $alarmsAutoOpenCreate,
-                        alarmsPrePlate: $alarmsPrePlate
-                    )
+                    NavigationStack {
+                        DashboardAlternativeView(
+                            vm: dashboardVM,
+                            selectedPage: $selectedPage,
+                            alarmsSearchText: $alarmsSearchText,
+                            alarmsAutoOpenCreate: $alarmsAutoOpenCreate,
+                            alarmsPrePlate: $alarmsPrePlate,
+                            alarmsInitialEvent: $alarmsInitialEvent
+                        )
+                    }
                 case .alarms:
                     AlarmsView(
                         showSideMenu: $showSideMenu,
                         initialSearchText: alarmsSearchText,
                         autoOpenCreate: alarmsAutoOpenCreate,
-                        preSelectedPlate: alarmsPrePlate
+                        preSelectedPlate: alarmsPrePlate,
+                        initialAlarmEvent: alarmsInitialEvent
                     )
                 case .liveMap:
                     LiveMapView(
@@ -95,7 +105,12 @@ struct ContentView: View {
                 case .fleet:
                     FleetManagementView(showSideMenu: $showSideMenu)
                 case .hub:
-                    HubView(selectedTab: $selectedTab)
+                    HubView(
+                        selectedTab: $selectedTab,
+                        alarmsSearchText: $alarmsSearchText,
+                        alarmsAutoOpenCreate: $alarmsAutoOpenCreate,
+                        alarmsPrePlate: $alarmsPrePlate
+                    )
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -109,6 +124,7 @@ struct ContentView: View {
                 alarmsSearchText = ""
                 alarmsAutoOpenCreate = false
                 alarmsPrePlate = ""
+                alarmsInitialEvent = nil
             }
         }
         .onChange(of: selectedPage) { _, newPage in
@@ -123,13 +139,19 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             print("[ContentView] App returning to foreground")
         }
+        .onReceive(NotificationCenter.default.publisher(for: .arveygoSwitchMainTab)) { note in
+            guard let tab = note.object as? AppTab else { return }
+            selectedTab = tab
+        }
         .onChange(of: WebSocketManager.shared.consecutiveFailures) { _, failures in
             if failures >= WebSocketManager.maxConsecutiveFailures {
                 showSupportRequest = true
             }
         }
         .fullScreenCover(isPresented: $showSupportRequest) {
-            SupportRequestView()
+            NavigationStack {
+                SupportRequestView(presentationMode: .modal)
+            }
         }
     }
 

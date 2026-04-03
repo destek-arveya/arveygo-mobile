@@ -6,6 +6,9 @@ struct VehicleEditSheet: View {
     var onSaved: ((Vehicle) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var ds: DS { DS(isDark: colorScheme == .dark) }
 
     // Form fields
     @State private var plate: String = ""
@@ -23,69 +26,81 @@ struct VehicleEditSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                // ── Temel Bilgiler ──
-                Section {
-                    formRow(label: "Plaka") {
-                        TextField("34 ABC 123", text: $plate)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.characters)
-                    }
-                    formRow(label: "Araç Adı") {
-                        TextField("İsteğe bağlı", text: $name)
-                            .autocorrectionDisabled()
-                    }
-                } header: {
-                    sectionHeader("TEMEL BİLGİLER", icon: "car.fill")
-                }
+            ZStack {
+                ds.pageBg.ignoresSafeArea()
 
-                // ── Araç Detayları ──
-                Section {
-                    formRow(label: "Marka") {
-                        TextField("Ford, Mercedes…", text: $brand)
-                            .autocorrectionDisabled()
-                    }
-                    formRow(label: "Model") {
-                        TextField("Transit, Sprinter…", text: $vehicleModel)
-                            .autocorrectionDisabled()
-                    }
-                    formRow(label: "Yıl") {
-                        TextField("2022", text: $year)
-                            .keyboardType(.numberPad)
-                    }
-                    formRow(label: "Tip") {
-                        TextField("car, motorcycle, truck…", text: $type)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                    }
-                } header: {
-                    sectionHeader("ARAÇ DETAYLARI", icon: "info.circle.fill")
-                }
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 16) {
+                        vehicleHeaderCard
 
-                // ── Kilometre ──
-                Section {
-                    formRow(label: "Odometer (km)") {
-                        TextField("48320", text: $odometer)
-                            .keyboardType(.numberPad)
-                    }
-                } header: {
-                    sectionHeader("SAYAÇ", icon: "gauge.open.with.lines.needle.33percent")
-                } footer: {
-                    Text("Araç odometer değerini metre cinsinden kayıt eder.")
-                        .font(.caption)
-                }
+                        editSection(title: "Temel Bilgiler", icon: "car.fill") {
+                            editField(label: "Plaka") {
+                                TextField("34 ABC 123", text: $plate)
+                                    .autocorrectionDisabled()
+                                    .textInputAutocapitalization(.characters)
+                            }
 
-                // ── Hata mesajı ──
-                if let errorMessage {
-                    Section {
-                        HStack(spacing: 10) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.red)
-                            Text(errorMessage)
-                                .font(.subheadline)
-                                .foregroundStyle(.red)
+                            editField(label: "Araç Adı") {
+                                TextField("İsteğe bağlı", text: $name)
+                                    .autocorrectionDisabled()
+                            }
+                        }
+
+                        editSection(title: "Araç Detayları", icon: "info.circle.fill") {
+                            editField(label: "Marka") {
+                                TextField("Ford, Mercedes…", text: $brand)
+                                    .autocorrectionDisabled()
+                            }
+
+                            editField(label: "Model") {
+                                TextField("Transit, Sprinter…", text: $vehicleModel)
+                                    .autocorrectionDisabled()
+                            }
+
+                            editField(label: "Yıl") {
+                                TextField("2022", text: $year)
+                                    .keyboardType(.numberPad)
+                            }
+
+                            editField(label: "Tip") {
+                                TextField("car, motorcycle, truck…", text: $type)
+                                    .autocorrectionDisabled()
+                                    .textInputAutocapitalization(.never)
+                            }
+                        }
+
+                        editSection(title: "Sayaç", icon: "gauge.open.with.lines.needle.33percent") {
+                            editField(label: "Odometer (km)") {
+                                TextField("48320", text: $odometer)
+                                    .keyboardType(.numberPad)
+                            }
+
+                            Text("Araç odometer değerini metre cinsinden kayıt eder.")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(ds.text3)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        if let errorMessage {
+                            HStack(spacing: 10) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.red)
+                                Text(errorMessage)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(.red)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(14)
+                            .background(Color.red.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .stroke(Color.red.opacity(0.20), lineWidth: 1)
+                            )
                         }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 120)
                 }
             }
             .navigationTitle("Araç Düzenle")
@@ -93,7 +108,7 @@ struct VehicleEditSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("İptal") { dismiss() }
-                        .foregroundColor(Color(AppTheme.navy))
+                        .foregroundColor(ds.text1)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if isSaving {
@@ -104,6 +119,9 @@ struct VehicleEditSheet: View {
                             .foregroundColor(Color(AppTheme.indigo))
                     }
                 }
+            }
+            .safeAreaInset(edge: .bottom) {
+                bottomSaveBar
             }
             .onAppear { populateFields() }
             .overlay {
@@ -125,6 +143,124 @@ struct VehicleEditSheet: View {
 
     // MARK: - UI Helpers
 
+    private var vehicleHeaderCard: some View {
+        HStack(spacing: 14) {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(vehicle.status.color.opacity(0.15))
+                .frame(width: 58, height: 58)
+                .overlay(
+                    Image(systemName: vehicle.mapIcon)
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(vehicle.status.color)
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(vehicle.plate)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(ds.text1)
+                Text(vehicle.model.isEmpty ? "Araç bilgilerini güncelleyin" : vehicle.model)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(ds.text2)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 8)
+
+            StatusBadge(status: vehicle.status)
+        }
+        .padding(18)
+        .background(ds.cardBg, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(ds.divider, lineWidth: 1)
+        )
+    }
+
+    private func editSection<Content: View>(title: String, icon: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color(AppTheme.indigo))
+                Text(title)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(ds.text2)
+            }
+
+            content()
+        }
+        .padding(16)
+        .background(ds.cardBg, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(ds.divider, lineWidth: 1)
+        )
+    }
+
+    private func editField<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(label)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(ds.text2)
+
+            content()
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(ds.text1)
+                .padding(.horizontal, 14)
+                .frame(height: 48)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(ds.isDark ? Color.white.opacity(0.04) : Color.black.opacity(0.025))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(ds.divider, lineWidth: 1)
+                )
+        }
+    }
+
+    private var bottomSaveBar: some View {
+        VStack(spacing: 0) {
+            Divider().opacity(ds.isDark ? 0.15 : 0.08)
+
+            HStack(spacing: 12) {
+                Button("İptal") { dismiss() }
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(ds.text1)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(ds.cardBg, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(ds.divider, lineWidth: 1)
+                    )
+
+                Button(action: { Task { await save() } }) {
+                    HStack(spacing: 8) {
+                        if isSaving {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Kaydet")
+                                .font(.system(size: 15, weight: .semibold))
+                        }
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(Color(AppTheme.indigo), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .disabled(isSaving)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 12)
+            .background(ds.pageBg)
+        }
+    }
+
     private func sectionHeader(_ title: String, icon: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
@@ -132,7 +268,7 @@ struct VehicleEditSheet: View {
                 .foregroundColor(Color(AppTheme.indigo))
             Text(title)
                 .font(.system(size: 11, weight: .bold))
-                .foregroundColor(Color(AppTheme.textMuted))
+                .foregroundColor(ds.text3)
                 .tracking(0.5)
         }
     }
@@ -141,7 +277,7 @@ struct VehicleEditSheet: View {
         HStack {
             Text(label)
                 .font(.system(size: 14))
-                .foregroundColor(Color(AppTheme.navy))
+                .foregroundColor(ds.text1)
                 .frame(width: 110, alignment: .leading)
             content()
                 .font(.system(size: 14))
@@ -192,4 +328,3 @@ struct VehicleEditSheet: View {
         isSaving = false
     }
 }
-

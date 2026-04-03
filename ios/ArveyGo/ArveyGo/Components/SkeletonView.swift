@@ -257,6 +257,140 @@ struct DashboardSkeletonView: View {
     }
 }
 
+struct AlarmEventsSkeletonView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    private var isDark: Bool { colorScheme == .dark }
+    private var ds: DS { DS(isDark: isDark) }
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 10) {
+                ForEach(0..<5, id: \.self) { _ in
+                    HStack(spacing: 12) {
+                        SkeletonBlock(width: 40, height: 40, cornerRadius: 20, isDark: isDark)
+                        VStack(alignment: .leading, spacing: 6) {
+                            SkeletonBlock(width: 120, height: 13, isDark: isDark)
+                            SkeletonBlock(width: 78, height: 10, isDark: isDark)
+                            SkeletonBlock(width: 150, height: 10, isDark: isDark)
+                        }
+                        Spacer()
+                        SkeletonBlock(width: 42, height: 10, isDark: isDark)
+                    }
+                    .padding(12)
+                    .background(ds.cardBg)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(ds.divider, lineWidth: 1)
+                    )
+                    .padding(.horizontal, 16)
+                }
+            }
+            .padding(.top, 8)
+            .padding(.bottom, 20)
+        }
+    }
+}
+
+struct AlarmRulesSkeletonView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    private var isDark: Bool { colorScheme == .dark }
+    private var ds: DS { DS(isDark: isDark) }
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 10) {
+                SkeletonBlock(height: 44, cornerRadius: 10, isDark: isDark)
+                    .padding(.horizontal, 16)
+
+                SkeletonBlock(height: 56, cornerRadius: 12, isDark: isDark)
+                    .padding(.horizontal, 16)
+
+                ForEach(0..<4, id: \.self) { _ in
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 10) {
+                            SkeletonBlock(width: 38, height: 38, cornerRadius: 19, isDark: isDark)
+                            VStack(alignment: .leading, spacing: 5) {
+                                SkeletonBlock(width: 120, height: 13, isDark: isDark)
+                                SkeletonBlock(width: 86, height: 10, isDark: isDark)
+                            }
+                            Spacer()
+                            SkeletonBlock(width: 56, height: 18, cornerRadius: 9, isDark: isDark)
+                        }
+
+                        SkeletonBlock(width: 170, height: 10, isDark: isDark)
+                        SkeletonBlock(width: 130, height: 10, isDark: isDark)
+                    }
+                    .padding(12)
+                    .background(ds.cardBg)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(ds.divider, lineWidth: 1)
+                    )
+                    .padding(.horizontal, 16)
+                }
+            }
+            .padding(.top, 8)
+            .padding(.bottom, 20)
+        }
+    }
+}
+
+struct VehiclesListSkeletonView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    private var isDark: Bool { colorScheme == .dark }
+    private var ds: DS { DS(isDark: isDark) }
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 10) {
+                SkeletonBlock(height: 44, cornerRadius: 20, isDark: isDark)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 6)
+
+                SkeletonBlock(height: 76, cornerRadius: 16, isDark: isDark)
+                    .padding(.horizontal, 16)
+
+                ForEach(0..<5, id: \.self) { _ in
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 12) {
+                            SkeletonBlock(width: 40, height: 40, cornerRadius: 12, isDark: isDark)
+                            VStack(alignment: .leading, spacing: 5) {
+                                SkeletonBlock(width: 88, height: 14, isDark: isDark)
+                                SkeletonBlock(width: 110, height: 10, isDark: isDark)
+                            }
+                            Spacer()
+                            SkeletonBlock(width: 50, height: 18, cornerRadius: 9, isDark: isDark)
+                        }
+
+                        HStack(spacing: 8) {
+                            SkeletonBlock(height: 48, cornerRadius: 10, isDark: isDark)
+                            SkeletonBlock(height: 48, cornerRadius: 10, isDark: isDark)
+                            SkeletonBlock(height: 48, cornerRadius: 10, isDark: isDark)
+                        }
+
+                        HStack {
+                            SkeletonBlock(width: 86, height: 10, isDark: isDark)
+                            Spacer()
+                            SkeletonBlock(width: 64, height: 10, isDark: isDark)
+                        }
+                    }
+                    .padding(12)
+                    .background(ds.cardBg)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(ds.divider, lineWidth: 1)
+                    )
+                    .padding(.horizontal, 16)
+                }
+            }
+            .padding(.bottom, 20)
+        }
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MARK: - Preview
 // ═══════════════════════════════════════════════════════════════════════════

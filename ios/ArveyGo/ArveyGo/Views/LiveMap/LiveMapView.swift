@@ -4,6 +4,7 @@ import Combine
 
 struct LiveMapView: View {
     @EnvironmentObject var authVM: AuthViewModel
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var vm = LiveMapViewModel()
     @Binding var showSideMenu: Bool
     @Binding var selectedPage: AppPage
@@ -15,12 +16,50 @@ struct LiveMapView: View {
     @State private var detailVehicle: Vehicle?
     @State private var hasFittedBounds = false
     @State private var trackingVehicleId: String?
+    @State private var showVehicleSearch = false
+    @State private var vehicleSearchText = ""
     @State private var mapCameraPosition: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 39.9, longitude: 32.8),
             span: MKCoordinateSpan(latitudeDelta: 6, longitudeDelta: 6)
         )
     )
+
+    private var isDark: Bool { colorScheme == .dark }
+    private var overlaySurface: Color {
+        isDark ? Color(red: 18/255, green: 24/255, blue: 47/255).opacity(0.96) : Color.white.opacity(0.96)
+    }
+    private var overlayElevatedSurface: Color {
+        isDark ? Color(red: 24/255, green: 33/255, blue: 60/255) : Color(red: 246/255, green: 248/255, blue: 252/255)
+    }
+    private var overlayBorder: Color {
+        isDark ? Color.white.opacity(0.08) : Color.black.opacity(0.08)
+    }
+    private var overlayPrimaryText: Color {
+        isDark ? AppTheme.darkText : AppTheme.textPrimary
+    }
+    private var overlaySecondaryText: Color {
+        isDark ? AppTheme.darkTextSub : AppTheme.textSecondary
+    }
+    private var overlayMutedText: Color {
+        isDark ? AppTheme.darkTextMuted : AppTheme.textMuted
+    }
+    private var vehicleSearchResults: [Vehicle] {
+        let query = vehicleSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let base = vm.vehicles.sorted { lhs, rhs in
+            if lhs.status != rhs.status {
+                return lhs.status.sortOrder < rhs.status.sortOrder
+            }
+            return lhs.plate < rhs.plate
+        }
+        guard !query.isEmpty else { return base }
+        return base.filter { vehicle in
+            vehicle.plate.lowercased().contains(query) ||
+            vehicle.model.lowercased().contains(query) ||
+            vehicle.driver.lowercased().contains(query) ||
+            vehicle.city.lowercased().contains(query)
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -34,13 +73,26 @@ struct LiveMapView: View {
                         Spacer()
                     }
 
+                    if let selected = selectedVehicle {
+                        VStack {
+                            Spacer()
+                            EnrichedPopupWrapper(initialVehicle: selected, liveVehicles: vm.vehicles) { enriched in
+                                vehiclePopupSheet(enriched)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 12)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+                        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: selectedVehicle?.id)
+                    }
+
                     // Bottom tracking badge
                     if let trackId = trackingVehicleId {
                         VStack {
                             Spacer()
                             trackingBadge(vehicleId: trackId)
                                 .padding(.horizontal, 16)
-                                .padding(.bottom, selectedVehicle != nil ? 260 : 16)
+                                .padding(.bottom, selectedVehicle != nil ? 292 : 16)
                         }
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .animation(.spring(response: 0.3), value: trackingVehicleId)
@@ -49,93 +101,56 @@ struct LiveMapView: View {
                     // (filter bar moved to top overlay)
                 }
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbarBackground(AppTheme.darkBg, for: .navigationBar)
-                .toolbarColorScheme(.dark, for: .navigationBar)
+                .toolbarBackground(colorScheme == .dark ? AppTheme.darkBg : Color.white, for: .navigationBar)
+                .toolbarColorScheme(colorScheme == .dark ? .dark : .light, for: .navigationBar)
                 .toolbar {
 
                     ToolbarItem(placement: .principal) {
-                        HStack(spacing: 8) {
-                            VStack(spacing: 1) {
-                                Text("Canlı Harita")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundColor(AppTheme.darkText)
-                                Text("Araç Takip / Canlı Harita")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(AppTheme.darkTextMuted)
-                            }
-                            // WS canlı bağlantı durumu
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(wsStatusColor)
-                                    .frame(width: 6, height: 6)
-                                Text(vm.wsStatus.label)
-                                    .font(.system(size: 8, weight: .semibold))
-                                    .foregroundColor(wsStatusColor)
-                            }
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(wsStatusColor.opacity(0.15))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(wsStatusColor.opacity(0.35), lineWidth: 1)
-                            )
-                            .onTapGesture {
-                                if vm.wsStatus == .disconnected || vm.wsStatus == .idle {
-                                    authVM.connectWebSocket()
-                                }
-                            }
+                        VStack(spacing: 1) {
+                            Text("Canlı Harita")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(colorScheme == .dark ? AppTheme.darkText : AppTheme.navy)
+                            Text("Araç Takip / Canlı Harita")
+                                .font(.system(size: 10))
+                                .foregroundColor(colorScheme == .dark ? AppTheme.darkTextMuted : AppTheme.textMuted)
                         }
                     }
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        AvatarCircle(
-                            initials: authVM.currentUser?.avatar ?? "A",
-                            size: 30
-                        )
-                    }
                 }
-                .sheet(item: $selectedVehicle) { selected in
-                    // Look up latest vehicle data from ViewModel for real-time updates
-                    let liveVehicle = vm.vehicles.first(where: { $0.id == selected.id }) ?? selected
-                    EnrichedPopupWrapper(initialVehicle: liveVehicle, liveVehicles: vm.vehicles) { enriched in
-                        vehiclePopupSheet(enriched)
-                            .ignoresSafeArea(edges: .bottom)
+                .sheet(isPresented: $showVehicleSearch) {
+                    NavigationStack {
+                        vehicleSearchSheet
                     }
-                        .presentationDetents([.fraction(0.50), .large])
-                        .presentationDragIndicator(.hidden)
-                        .presentationBackground(AppTheme.darkBg)
-                        .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.50)))
-                        .presentationCornerRadius(24)
-                        .colorScheme(.dark)
+                    .presentationDetents([.medium, .large])
                 }
                 .fullScreenCover(item: $detailVehicle) { vehicle in
-                    VehicleDetailView(
-                        vehicle: vehicle,
-                        onNavigateToRouteHistory: { v in
-                            detailVehicle = nil
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                selectedPage = .routeHistory
+                    NavigationStack {
+                        VehicleDetailFifthView(
+                            vehicle: vehicle,
+                            presentationMode: .modal,
+                            onNavigateToRouteHistory: { v in
+                                detailVehicle = nil
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                    selectedPage = .routeHistory
+                                }
+                            },
+                            onNavigateToAlarms: { plateText in
+                                detailVehicle = nil
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                    alarmsSearchText = plateText
+                                    selectedPage = .alarms
+                                }
+                            },
+                            onNavigateToAddAlarm: { plate in
+                                detailVehicle = nil
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                    alarmsSearchText = ""
+                                    alarmsAutoOpenCreate = true
+                                    alarmsPrePlate = plate
+                                    selectedPage = .alarms
+                                }
                             }
-                        },
-                        onNavigateToAlarms: { plateText in
-                            detailVehicle = nil
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                alarmsSearchText = plateText
-                                selectedPage = .alarms
-                            }
-                        },
-                        onNavigateToAddAlarm: { plate in
-                            detailVehicle = nil
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                alarmsSearchText = ""
-                                alarmsAutoOpenCreate = true
-                                alarmsPrePlate = plate
-                                selectedPage = .alarms
-                            }
-                        }
-                    )
+                        )
+                    }
                 }
                 .onAppear {
                     // Connect WebSocket when map appears
@@ -156,7 +171,7 @@ struct LiveMapView: View {
                     fitBoundsIfNeeded(vehicles: vehicles)
                     // If tracking a vehicle, follow it
                     if let trackId = trackingVehicleId,
-                       let tracked = vehicles.first(where: { $0.id == trackId }) {
+                       let tracked = vehicles.first(where: { $0.id == trackId && $0.hasValidCoordinates }) {
                         withAnimation(.easeInOut(duration: 0.6)) {
                             mapCameraPosition = .region(MKCoordinateRegion(
                                 center: CLLocationCoordinate2D(latitude: tracked.lat, longitude: tracked.lng),
@@ -173,21 +188,45 @@ struct LiveMapView: View {
         guard !hasFittedBounds, !vehicles.isEmpty else { return }
         hasFittedBounds = true
 
-        let lats = vehicles.map { $0.lat }
-        let lngs = vehicles.map { $0.lng }
+        fitMapToVehicles(vehicles, animated: true, zoomOutFactor: 1.3)
+    }
+
+    private func fitMapToVehicles(_ vehicles: [Vehicle], animated: Bool, zoomOutFactor: Double = 1.15) {
+        let validVehicles = vehicles.filter(\.hasValidCoordinates)
+        guard !validVehicles.isEmpty else { return }
+
+        let lats = validVehicles.map { $0.lat }
+        let lngs = validVehicles.map { $0.lng }
 
         guard let minLat = lats.min(), let maxLat = lats.max(),
               let minLng = lngs.min(), let maxLng = lngs.max() else { return }
 
         let centerLat = (minLat + maxLat) / 2.0
         let centerLng = (minLng + maxLng) / 2.0
-        let spanLat = max((maxLat - minLat) * 1.3, 0.05)
-        let spanLng = max((maxLng - minLng) * 1.3, 0.05)
+        let spanLat = max((maxLat - minLat) * zoomOutFactor, validVehicles.count == 1 ? 0.05 : 0.08)
+        let spanLng = max((maxLng - minLng) * zoomOutFactor, validVehicles.count == 1 ? 0.05 : 0.08)
 
-        withAnimation(.easeInOut(duration: 0.8)) {
+        let update = {
             mapCameraPosition = .region(MKCoordinateRegion(
                 center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLng),
                 span: MKCoordinateSpan(latitudeDelta: spanLat, longitudeDelta: spanLng)
+            ))
+        }
+
+        if animated {
+            withAnimation(.easeInOut(duration: 0.8)) { update() }
+        } else {
+            update()
+        }
+    }
+
+    private func focusVehicle(_ vehicle: Vehicle, liftForCard: Bool = true) {
+        guard vehicle.hasValidCoordinates else { return }
+        let offsetLat = liftForCard ? vehicle.lat + 0.012 : vehicle.lat
+        withAnimation(.easeInOut(duration: 0.55)) {
+            mapCameraPosition = .region(MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: offsetLat, longitude: vehicle.lng),
+                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
             ))
         }
     }
@@ -196,27 +235,20 @@ struct LiveMapView: View {
     var mapContent: some View {
         Map(position: $mapCameraPosition) {
             // Trail polylines for online + idle vehicles (keep trail visible during rölanti)
-            ForEach(vm.filteredVehicles.filter { $0.status == .ignitionOn }) { vehicle in
+            ForEach(vm.mappableVehicles.filter { $0.status == .ignitionOn }) { vehicle in
                 if let trail = vm.trailHistory[vehicle.id], trail.count >= 2 {
                     MapPolyline(coordinates: trail)
                         .stroke(vehicle.status.color.opacity(0.6), lineWidth: 3)
                 }
             }
 
-            ForEach(vm.filteredVehicles) { vehicle in
+            ForEach(vm.mappableVehicles) { vehicle in
                 // Use animated coordinates for smooth movement
                 let coord = vm.animatedCoordinate(for: vehicle)
                 Annotation("", coordinate: coord) {
                     Button(action: {
                         selectedVehicle = vehicle
-                        // Aracı haritanın üst %25'lik kısmına taşı (modal alt yarıyı kaplayacağı için)
-                        let offsetLat = vehicle.lat + 0.012 // ~%25 yukarı kaydırma
-                        withAnimation {
-                            mapCameraPosition = .region(MKCoordinateRegion(
-                                center: CLLocationCoordinate2D(latitude: offsetLat, longitude: vehicle.lng),
-                                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                            ))
-                        }
+                        focusVehicle(vehicle)
                     }) {
                         VehicleMapPin(vehicle: vehicle, isSelected: selectedVehicle?.id == vehicle.id, animatedDirection: vm.animatedDirection(for: vehicle))
                     }
@@ -244,18 +276,62 @@ struct LiveMapView: View {
         .ignoresSafeArea(edges: .bottom)
     }
 
-    // MARK: - Top Overlay (filter chips only — WS status taşındı toolbar'a)
+    // MARK: - Top Overlay
     var topOverlay: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                statusChip(label: "Tümü", count: vm.vehicles.count, filter: nil, color: AppTheme.navy)
-                statusChip(label: "Kontak Açık", count: vm.onlineCount, filter: .ignitionOn, color: AppTheme.online)
-                statusChip(label: "Kontak Kapalı", count: vm.offlineCount, filter: .ignitionOff, color: AppTheme.offline)
-                statusChip(label: "Bilgi Yok", count: vm.idleCount, filter: .noData, color: Color(red: 148/255, green: 163/255, blue: 184/255))
+        HStack(spacing: 10) {
+            Button {
+                showVehicleSearch = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("Araç Ara")
+                        .font(.system(size: 14, weight: .semibold))
+                    Spacer(minLength: 0)
+                    Text("\(vm.vehicles.count)")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .frame(height: 22)
+                        .background(AppTheme.indigo, in: Capsule())
+                }
+                .foregroundStyle(overlayPrimaryText)
+                .padding(.horizontal, 14)
+                .frame(height: 48)
+                .background(overlaySurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(overlayBorder, lineWidth: 1)
+                )
             }
-            .padding(.horizontal, 12)
+            .buttonStyle(.plain)
+
+            Button {
+                fitMapToVehicles(vm.filteredVehicles.isEmpty ? vm.vehicles : vm.filteredVehicles, animated: true)
+                selectedVehicle = nil
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "scope")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("Filoyu Ortala")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .frame(height: 48)
+                .background(
+                    LinearGradient(
+                        colors: [AppTheme.indigo, AppTheme.navy],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                )
+            }
+            .buttonStyle(.plain)
         }
-        .padding(.top, 4)
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
     }
 
     // MARK: - Tracking Badge (bottom, wider, readable)
@@ -302,25 +378,6 @@ struct LiveMapView: View {
         .buttonStyle(.plain)
     }
     
-    func statusChip(label: String, count: Int, filter: VehicleStatus?, color: Color) -> some View {
-        let isActive = vm.statusFilter == filter
-        return Button(action: { vm.statusFilter = filter }) {
-            Text("\(label) (\(count))")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(isActive ? color : AppTheme.darkTextSub)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(isActive ? color.opacity(0.15) : AppTheme.darkSurface.opacity(0.92))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(isActive ? color : AppTheme.darkBorder, lineWidth: 1)
-        )
-    }
-
     private var wsStatusColor: Color {
         switch vm.wsStatus {
         case .connected:    return .green
@@ -334,9 +391,9 @@ struct LiveMapView: View {
     func vehiclePopupSheet(_ vehicle: Vehicle) -> some View {
         VStack(spacing: 0) {
             // ── Header: Plate + Status (name ve kontak durumu kaldırıldı) ──
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: 12)
                         .fill(
                             RadialGradient(
                                 colors: [vehicle.status.color.opacity(0.2), vehicle.status.color.opacity(0.05)],
@@ -345,28 +402,48 @@ struct LiveMapView: View {
                                 endRadius: 30
                             )
                         )
-                        .frame(width: 48, height: 48)
+                        .frame(width: 42, height: 42)
                     Image(systemName: vehicle.isMotorcycle ? "bicycle" : "car.fill")
-                        .font(.system(size: 22))
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(vehicle.status.color)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         Text(vehicle.plate)
-                            .font(.system(size: 20, weight: .heavy))
-                            .foregroundColor(AppTheme.darkText)
+                            .font(.system(size: 17, weight: .heavy))
+                            .foregroundColor(overlayPrimaryText)
                             .tracking(0.5)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                         StatusBadge(status: vehicle.status)
                     }
                     // name yorum satırına alındı
                     // Text(vehicle.model)
                 }
                 Spacer()
+
+                Button {
+                    selectedVehicle = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(overlaySecondaryText)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(overlayElevatedSurface)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(overlayBorder, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 14)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
 
             // ── Compact Info Grid (2-column rows) ──
             VStack(spacing: 0) {
@@ -379,7 +456,7 @@ struct LiveMapView: View {
                         valueColor: vehicle.kontakOn ? AppTheme.online : AppTheme.offline,
                         iconColor: vehicle.kontakOn ? AppTheme.online : AppTheme.offline
                     )
-                    Divider().frame(height: 36)
+                    Divider().frame(height: 30)
                     compactInfoTile(
                         icon: "gauge.open.with.lines.needle.33percent",
                         label: "Hız",
@@ -398,7 +475,7 @@ struct LiveMapView: View {
                         value: vehicle.formattedTodayKm,
                         iconColor: AppTheme.lavender
                     )
-                    Divider().frame(height: 36)
+                    Divider().frame(height: 30)
                     compactInfoTile(
                         icon: "speedometer",
                         label: "Toplam",
@@ -418,7 +495,7 @@ struct LiveMapView: View {
                             valueColor: vehicle.temperatureC.map { $0 < 0 ? .blue : ($0 < 30 ? AppTheme.online : .red) },
                             iconColor: Color(red: 1.0, green: 0.42, blue: 0.21)
                         )
-                        Divider().frame(height: 36)
+                        Divider().frame(height: 30)
                         compactInfoTile(
                             icon: "humidity.fill",
                             label: "Nem",
@@ -436,19 +513,19 @@ struct LiveMapView: View {
                     Divider().padding(.horizontal, 12)
                     HStack(spacing: 6) {
                         Image(systemName: "clock.fill")
-                            .font(.system(size: 10))
-                            .foregroundColor(AppTheme.darkTextMuted.opacity(0.6))
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(overlayMutedText.opacity(0.7))
                         Text("Son Güncelleme: \(vehicle.formattedDeviceTime)")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(AppTheme.darkTextMuted)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(overlayMutedText)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 7)
                 }
             }
-            .background(AppTheme.darkSurface)
-            .cornerRadius(16)
-            .padding(.horizontal, 16)
+            .background(overlayElevatedSurface)
+            .cornerRadius(14)
+            .padding(.horizontal, 12)
 
             // ── Quick Actions ──
             HStack(spacing: 8) {
@@ -473,12 +550,12 @@ struct LiveMapView: View {
                 }
                 popupActionBtn(icon: "lock.fill", label: "Blokaj", color: .red) {}
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 10)
+            .background(overlayElevatedSurface)
+            .cornerRadius(14)
             .padding(.horizontal, 12)
-            .padding(.vertical, 14)
-            .background(AppTheme.darkSurface)
-            .cornerRadius(16)
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
+            .padding(.top, 8)
 
             // ── Action Buttons (yan yana) ──
             HStack(spacing: 10) {
@@ -494,15 +571,15 @@ struct LiveMapView: View {
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "location.circle.fill")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 13, weight: .semibold))
                         Text("Canlı İzle")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                     }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 46)
+                    .frame(height: 42)
                     .background(AppTheme.online)
-                    .cornerRadius(14)
+                    .cornerRadius(12)
                 }
 
                 Button(action: {
@@ -514,48 +591,54 @@ struct LiveMapView: View {
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 11, weight: .semibold))
                         Text("Detay Gör")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                     }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 46)
-                    .background(AppTheme.darkCard)
-                    .cornerRadius(14)
+                    .frame(height: 42)
+                    .background(isDark ? AppTheme.darkCard : AppTheme.navy)
+                    .cornerRadius(12)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 20)
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 14)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(overlaySurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(overlayBorder, lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(isDark ? 0.28 : 0.10), radius: 14, x: 0, y: 8)
     }
 
     // MARK: - Compact Info Tile
     func compactInfoTile(icon: String, label: String, value: String, valueColor: Color? = nil, iconColor: Color = AppTheme.lavender) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 7) {
             ZStack {
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 7)
                     .fill(iconColor.opacity(0.15))
-                    .frame(width: 30, height: 30)
+                    .frame(width: 26, height: 26)
                 Image(systemName: icon)
-                    .font(.system(size: 12))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(iconColor)
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(label)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(AppTheme.darkTextMuted)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(overlayMutedText)
                 Text(value)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(valueColor ?? AppTheme.darkText)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(valueColor ?? overlayPrimaryText)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
     }
 
     func popupRow(icon: String, label: String, value: String, valueColor: Color? = nil) -> some View {
@@ -566,11 +649,11 @@ struct LiveMapView: View {
                 .frame(width: 18)
             Text(label)
                 .font(.system(size: 13))
-                .foregroundColor(AppTheme.darkTextSub)
+                .foregroundColor(overlaySecondaryText)
             Spacer()
             Text(value)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(valueColor ?? AppTheme.darkText)
+                .foregroundColor(valueColor ?? overlayPrimaryText)
                 .lineLimit(1)
                 .frame(maxWidth: 170, alignment: .trailing)
         }
@@ -586,21 +669,110 @@ struct LiveMapView: View {
 
     func popupActionBtn(icon: String, label: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 4) {
+            VStack(spacing: 3) {
                 Image(systemName: icon)
-                    .font(.system(size: 16))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(color)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 34, height: 34)
                     .background(color.opacity(0.15))
-                    .cornerRadius(11)
+                    .cornerRadius(10)
                 Text(label)
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(AppTheme.darkTextMuted)
+                    .foregroundColor(overlayMutedText)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.75)
             }
             .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
         }
+    }
+
+    private var vehicleSearchSheet: some View {
+        VStack(spacing: 0) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Araç Ara")
+                        .font(.system(size: 20, weight: .bold))
+                    Text("Seçtiğin araç haritada odaklanır ve bilgi kartı açılır.")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 14)
+
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                TextField("Plaka, araç veya sürücü ara", text: $vehicleSearchText)
+                    .textInputAutocapitalization(.never)
+                    .disableAutocorrection(true)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 48)
+            .background(overlayElevatedSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(.horizontal, 20)
+            .padding(.bottom, 14)
+
+            ScrollView {
+                VStack(spacing: 10) {
+                    ForEach(vehicleSearchResults) { vehicle in
+                        Button {
+                            showVehicleSearch = false
+                            vehicleSearchText = ""
+                            trackingVehicleId = nil
+                            selectedVehicle = vehicle
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                focusVehicle(vehicle)
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Circle()
+                                    .fill(vehicle.status.color)
+                                    .frame(width: 12, height: 12)
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(vehicle.plate)
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(overlayPrimaryText)
+                                    Text(vehicle.model)
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(overlaySecondaryText)
+                                        .lineLimit(1)
+                                }
+
+                                Spacer(minLength: 12)
+
+                                VStack(alignment: .trailing, spacing: 4) {
+                                    Text(vehicle.formattedSpeed)
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(overlayPrimaryText)
+                                    Text(vehicle.city.isEmpty ? vehicle.status.label : vehicle.city)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(overlayMutedText)
+                                        .lineLimit(1)
+                                }
+                            }
+                            .padding(14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(overlaySurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(overlayBorder, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
+            }
+        }
+        .background(isDark ? AppTheme.darkBg : Color(red: 244/255, green: 246/255, blue: 251/255))
+        .presentationDragIndicator(.visible)
     }
 
     // MARK: - Open Maps Directions
@@ -736,9 +908,13 @@ class LiveMapViewModel: ObservableObject {
         return result
     }
 
+    var mappableVehicles: [Vehicle] {
+        filteredVehicles.filter(\.hasValidCoordinates)
+    }
+
     /// Get the animated coordinate for a vehicle (falls back to raw lat/lng)
     func animatedCoordinate(for vehicle: Vehicle) -> CLLocationCoordinate2D {
-        return animatedPositions[vehicle.id] ?? CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng)
+        animatedPositions[vehicle.id] ?? CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng)
     }
 
     /// Get the animated direction for a vehicle
@@ -765,6 +941,13 @@ class LiveMapViewModel: ObservableObject {
     // MARK: - Smooth Animation
     /// Smoothly interpolate a vehicle marker from its current animated position to the new target over ~1 second.
     private func animateVehicle(_ vehicle: Vehicle) {
+        guard vehicle.hasValidCoordinates else {
+            animationTimers[vehicle.id]?.invalidate()
+            animationTimers[vehicle.id] = nil
+            animatedPositions[vehicle.id] = nil
+            trailHistory[vehicle.id] = nil
+            return
+        }
         let vehicleId = vehicle.id
         let targetLat = vehicle.lat
         let targetLng = vehicle.lng
@@ -963,4 +1146,15 @@ struct EnrichedPopupWrapper<Content: View>: View {
 #Preview {
     LiveMapView(showSideMenu: .constant(false), selectedPage: .constant(.liveMap), alarmsSearchText: .constant(""), alarmsAutoOpenCreate: .constant(false), alarmsPrePlate: .constant(""))
         .environmentObject(AuthViewModel())
+}
+
+private extension VehicleStatus {
+    var sortOrder: Int {
+        switch self {
+        case .ignitionOn: return 0
+        case .sleeping: return 1
+        case .ignitionOff: return 2
+        case .noData: return 3
+        }
+    }
 }

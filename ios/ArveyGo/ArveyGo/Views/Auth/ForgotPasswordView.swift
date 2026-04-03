@@ -7,16 +7,16 @@ struct ForgotPasswordView: View {
 
     var body: some View {
         ZStack {
-            AppTheme.bg.ignoresSafeArea()
+            AppTheme.panelGradient.ignoresSafeArea()
 
             // Decorative
             GeometryReader { _ in
                 Circle()
-                    .fill(AppTheme.navy.opacity(0.03))
+                    .fill(Color.white.opacity(0.08))
                     .frame(width: 400, height: 400)
                     .offset(x: -120, y: -180)
                 Circle()
-                    .fill(AppTheme.indigo.opacity(0.04))
+                    .fill(Color.white.opacity(0.05))
                     .frame(width: 300, height: 300)
                     .offset(x: 200, y: 500)
             }
@@ -31,7 +31,7 @@ struct ForgotPasswordView: View {
                             Text("Giriş Yap")
                                 .font(.system(size: 13))
                         }
-                        .foregroundColor(AppTheme.textMuted)
+                        .foregroundColor(Color.white.opacity(0.86))
                     }
                     Spacer()
                     LanguageSwitcher()
@@ -46,11 +46,11 @@ struct ForgotPasswordView: View {
                     // Icon
                     ZStack {
                         Circle()
-                            .fill(AppTheme.navy.opacity(0.06))
+                            .fill(Color.white.opacity(0.14))
                             .frame(width: 64, height: 64)
                         Image(systemName: "key.fill")
                             .font(.system(size: 24))
-                            .foregroundColor(AppTheme.navy)
+                            .foregroundColor(.white)
                     }
                     .padding(.bottom, 20)
 
@@ -68,18 +68,18 @@ struct ForgotPasswordView: View {
 
                             Text("Bağlantı Gönderildi!")
                                 .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(AppTheme.navy)
+                                .foregroundColor(AppTheme.authTextPrimary)
 
                             Text("Şifre sıfırlama bağlantısı **\(authVM.forgotEmail)** adresine gönderildi.")
                                 .font(.system(size: 13))
-                                .foregroundColor(AppTheme.textMuted)
+                                .foregroundColor(AppTheme.authTextMuted)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 8)
 
                             Button(action: { dismiss() }) {
                                 Text("Giriş Sayfasına Dön")
                                     .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(AppTheme.indigo)
+                                    .foregroundColor(AppTheme.authAccent)
                             }
                             .padding(.top, 8)
                         }
@@ -88,12 +88,12 @@ struct ForgotPasswordView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Şifremi Unuttum")
                                 .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(AppTheme.navy)
+                                .foregroundColor(AppTheme.authTextPrimary)
                                 .frame(maxWidth: .infinity, alignment: .center)
 
                             Text("E-posta adresinize şifre sıfırlama bağlantısı göndereceğiz")
                                 .font(.system(size: 13))
-                                .foregroundColor(AppTheme.textMuted)
+                                .foregroundColor(AppTheme.authTextMuted)
                                 .multilineTextAlignment(.center)
                                 .frame(maxWidth: .infinity)
                         }
@@ -117,28 +117,30 @@ struct ForgotPasswordView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("E-posta")
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(AppTheme.textSecondary)
+                                .foregroundColor(AppTheme.authTextSecondary)
 
                             HStack(spacing: 12) {
                                 Image(systemName: "envelope")
                                     .font(.system(size: 15))
-                                    .foregroundColor(AppTheme.textMuted)
+                                    .foregroundColor(AppTheme.authTextMuted)
                                     .frame(width: 20)
                                 TextField("ornek@email.com", text: $authVM.forgotEmail)
                                     .font(.system(size: 14))
+                                    .foregroundColor(AppTheme.authTextPrimary)
                                     .textContentType(.emailAddress)
                                     .keyboardType(.emailAddress)
+                                    .tint(AppTheme.navy)
                                     .autocapitalization(.none)
                                     .disableAutocorrection(true)
                                     .focused($emailFocused)
                             }
                             .padding(.horizontal, 16)
-                            .frame(height: 50)
-                            .background(AppTheme.bg)
+                            .frame(height: 56)
+                            .background(AppTheme.authField)
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(emailFocused ? AppTheme.navy : AppTheme.borderSoft, lineWidth: emailFocused ? 1.5 : 1)
+                                    .stroke(emailFocused ? AppTheme.navy : AppTheme.authBorder, lineWidth: emailFocused ? 1.5 : 1)
                             )
                         }
                         .padding(.bottom, 24)
@@ -159,9 +161,13 @@ struct ForgotPasswordView: View {
                     }
                 }
                 .padding(22)
-                .background(AppTheme.surface)
-                .cornerRadius(16)
-                .shadow(color: AppTheme.navy.opacity(0.06), radius: 16, y: 6)
+                .background(AppTheme.authSurface)
+                .cornerRadius(20)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(AppTheme.authBorder, lineWidth: 1)
+                )
+                .shadow(color: AppTheme.authShadow, radius: 20, x: 0, y: 12)
                 .padding(.horizontal, 16)
 
                 Spacer()
@@ -170,11 +176,12 @@ struct ForgotPasswordView: View {
                 VStack(spacing: 4) {
                     Text("© 2026 Arveya Teknoloji")
                         .font(.system(size: 10))
-                        .foregroundColor(AppTheme.textFaint)
+                        .foregroundColor(Color.white.opacity(0.68))
                 }
                 .padding(.bottom, 30)
             }
         }
+        .tint(AppTheme.navy)
         .navigationBarHidden(true)
         .onTapGesture { emailFocused = false }
         .onAppear { authVM.clearForgotFields() }

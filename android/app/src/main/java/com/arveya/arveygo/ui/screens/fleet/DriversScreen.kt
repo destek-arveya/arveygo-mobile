@@ -953,82 +953,72 @@ fun VehicleDriverAssignDialog(vehicleId: Int, currentDriverName: String, onDismi
 // MARK: - Drivers Skeleton Screen
 @Composable
 private fun DriversSkeletonScreen() {
-    val infiniteTransition = rememberInfiniteTransition(label = "drivers_shimmer")
-    val shimmerX by infiniteTransition.animateFloat(
-        initialValue = -1f, targetValue = 2f,
-        animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart),
-        label = "shimmer_x"
+    // Tek bir transition — Scaffold dışında, sadece bu composable için
+    val transition = rememberInfiniteTransition(label = "drv_sk")
+    val offset by transition.animateFloat(
+        initialValue = -600f, targetValue = 1400f,
+        animationSpec = infiniteRepeatable(tween(1200, easing = LinearEasing), RepeatMode.Restart),
+        label = "drv_sk_x"
+    )
+    val brush = Brush.linearGradient(
+        colors = listOf(Color(0xFFE8E8E8), Color(0xFFF5F5F5), Color(0xFFE8E8E8)),
+        start = androidx.compose.ui.geometry.Offset(offset, 0f),
+        end = androidx.compose.ui.geometry.Offset(offset + 600f, 0f)
     )
 
-    fun shimmerBrush(): Brush {
-        val base = Color(0xFFE8E8E8)
-        val highlight = Color(0xFFF5F5F5)
-        return Brush.linearGradient(
-            colors = listOf(base, highlight, base),
-            start = androidx.compose.ui.geometry.Offset(shimmerX * 1000f, 0f),
-            end = androidx.compose.ui.geometry.Offset((shimmerX + 1f) * 1000f, 0f)
-        )
-    }
-
-    @Composable
-    fun SkeletonBox(modifier: Modifier = Modifier, radius: Float = 8f) {
-        Box(modifier = modifier.clip(RoundedCornerShape(radius.dp)).background(shimmerBrush()))
-    }
-
-    LazyColumn(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Stats chips row
-        item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(5) {
-                    SkeletonBox(Modifier.width(80.dp).height(34.dp), radius = 20f)
-                }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(5) {
+                Box(Modifier.width(78.dp).height(34.dp).clip(RoundedCornerShape(20.dp)).background(brush))
             }
         }
         // Search bar
-        item { SkeletonBox(Modifier.fillMaxWidth().height(52.dp), radius = 10f) }
+        Box(Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(10.dp)).background(brush))
         // Filter chips
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(50, 80, 70, 90).forEach { w ->
-                    SkeletonBox(Modifier.width(w.dp).height(30.dp), radius = 20f)
-                }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(50, 82, 72, 92).forEach { w ->
+                Box(Modifier.width(w.dp).height(30.dp).clip(RoundedCornerShape(20.dp)).background(brush))
             }
         }
         // Driver card skeletons
-        items(6) {
+        repeat(5) {
             Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                    .background(AppColors.Surface).border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AppColors.Surface)
+                    .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(14.dp)
                 ) {
-                    // Avatar
-                    Box(Modifier.size(44.dp).clip(CircleShape).background(shimmerBrush()))
+                    Box(Modifier.size(44.dp).clip(CircleShape).background(brush))
                     Spacer(Modifier.width(12.dp))
-                    // Name & info
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SkeletonBox(Modifier.width(130.dp).height(13.dp))
-                        SkeletonBox(Modifier.width(90.dp).height(11.dp))
-                        SkeletonBox(Modifier.width(70.dp).height(10.dp))
+                        Box(Modifier.width(130.dp).height(13.dp).clip(RoundedCornerShape(4.dp)).background(brush))
+                        Box(Modifier.width(90.dp).height(11.dp).clip(RoundedCornerShape(4.dp)).background(brush))
+                        Box(Modifier.width(70.dp).height(10.dp).clip(RoundedCornerShape(4.dp)).background(brush))
                     }
-                    // Score circle
-                    Box(Modifier.size(44.dp).clip(CircleShape).background(shimmerBrush()))
+                    Box(Modifier.size(44.dp).clip(CircleShape).background(brush))
                 }
-                // Mini stats row
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     repeat(4) {
-                        SkeletonBox(Modifier.weight(1f).height(10.dp))
+                        Box(Modifier.weight(1f).height(10.dp).clip(RoundedCornerShape(4.dp)).background(brush))
                     }
                 }
             }
         }
+        Spacer(Modifier.height(16.dp))
     }
 }

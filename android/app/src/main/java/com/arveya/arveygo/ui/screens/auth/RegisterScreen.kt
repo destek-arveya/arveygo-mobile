@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -23,9 +24,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arveya.arveygo.LocalAuthViewModel
+import com.arveya.arveygo.R
 import com.arveya.arveygo.ui.components.GradientButton
 import com.arveya.arveygo.ui.components.LanguageSwitcher
 import com.arveya.arveygo.ui.theme.AppColors
+import androidx.compose.ui.res.painterResource
 
 @Composable
 fun RegisterScreen(onBack: () -> Unit) {
@@ -43,11 +46,19 @@ fun RegisterScreen(onBack: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(AppColors.Bg)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        AppColors.Navy,
+                        Color(0xFF121B55),
+                        Color(0xFF080C2A)
+                    )
+                )
+            )
             .clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) { focusManager.clearFocus() }
     ) {
-        Box(Modifier.size(350.dp).align(Alignment.TopEnd).offset(x = 80.dp, y = (-100).dp).clip(CircleShape).background(AppColors.Indigo.copy(alpha = 0.04f)))
-        Box(Modifier.size(250.dp).align(Alignment.BottomStart).offset(x = (-80).dp, y = 50.dp).clip(CircleShape).background(AppColors.Navy.copy(alpha = 0.03f)))
+        Box(Modifier.size(350.dp).align(Alignment.TopEnd).offset(x = 80.dp, y = (-100).dp).clip(CircleShape).background(Color.White.copy(alpha = 0.04f)))
+        Box(Modifier.size(250.dp).align(Alignment.BottomStart).offset(x = (-80).dp, y = 50.dp).clip(CircleShape).background(AppColors.Lavender.copy(alpha = 0.10f)))
 
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding()
@@ -55,8 +66,8 @@ fun RegisterScreen(onBack: () -> Unit) {
             // Top bar
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { onBack() }) {
-                    Icon(Icons.Default.ChevronLeft, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp))
-                    Text("Giriş Yap", fontSize = 13.sp, color = AppColors.TextMuted)
+                    Icon(Icons.Default.ChevronLeft, null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(18.dp))
+                    Text("Giriş Yap", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
                 }
                 Spacer(Modifier.weight(1f))
                 LanguageSwitcher()
@@ -64,12 +75,16 @@ fun RegisterScreen(onBack: () -> Unit) {
 
             // Logo
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(AppColors.Navy)) {
-                    Icon(Icons.Default.Navigation, null, tint = Color.White, modifier = Modifier.size(22.dp))
-                }
+                Image(
+                    painter = painterResource(R.drawable.logo_arveygo),
+                    contentDescription = "ArveyGo Logo",
+                    modifier = Modifier
+                        .height(68.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                )
                 Spacer(Modifier.height(8.dp))
-                Text("ArveyGo", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
-                Text("ARAÇ TAKİP SİSTEMİ", fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted, letterSpacing = 2.sp)
+                Text("ArveyGo", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Kurumsal kullanıcı hesabı oluştur", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.72f))
             }
 
             Spacer(Modifier.height(18.dp))
@@ -77,7 +92,7 @@ fun RegisterScreen(onBack: () -> Unit) {
             // Card
             Column(
                 modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
-                    .shadow(6.dp, RoundedCornerShape(16.dp), ambientColor = AppColors.Navy.copy(alpha = 0.06f))
+                    .shadow(10.dp, RoundedCornerShape(18.dp), ambientColor = Color.Black.copy(alpha = 0.25f))
                     .background(AppColors.Surface, RoundedCornerShape(16.dp)).padding(22.dp)
             ) {
                 Text("Yeni Hesap Oluştur", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)

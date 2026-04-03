@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arveya.arveygo.models.Vehicle
 import com.arveya.arveygo.services.APIService
-import com.arveya.arveygo.ui.theme.AppColors
 import kotlinx.coroutines.launch
 
 private enum class BlockageAction(
@@ -68,7 +67,7 @@ fun BlockageDialog(
                     "Emin misiniz?",
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp,
-                    color = AppColors.Navy
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             },
             text = {
@@ -79,7 +78,7 @@ fun BlockageDialog(
                     Text(
                         "${vehicle.plate} aracı için:",
                         fontSize = 13.sp,
-                        color = AppColors.TextMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
                     Text(
@@ -92,7 +91,7 @@ fun BlockageDialog(
                     Text(
                         "komutu gönderilecek.",
                         fontSize = 13.sp,
-                        color = AppColors.TextMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -123,7 +122,7 @@ fun BlockageDialog(
             },
             dismissButton = {
                 TextButton(onClick = { showConfirm = false; pendingAction = null }) {
-                    Text("İptal", color = AppColors.TextMuted)
+                    Text("İptal", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
             shape = RoundedCornerShape(16.dp)
@@ -144,8 +143,8 @@ fun BlockageDialog(
                     Icon(Icons.Default.Check, null, tint = Color(0xFF22C55E), modifier = Modifier.size(26.dp))
                 }
             },
-            title = { Text("Komut Gönderildi", fontWeight = FontWeight.Bold, color = AppColors.Navy) },
-            text = { Text(successMsg!!, fontSize = 14.sp, color = AppColors.TextMuted, textAlign = TextAlign.Center) },
+            title = { Text("Komut Gönderildi", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text(successMsg!!, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center) },
             confirmButton = {
                 Button(
                     onClick = { onDismiss() },
@@ -173,8 +172,8 @@ fun BlockageDialog(
                 }
                 Spacer(Modifier.width(10.dp))
                 Column {
-                    Text("Blokaj", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AppColors.Navy)
-                    Text(vehicle.plate, fontSize = 11.sp, color = AppColors.TextMuted)
+                    Text("Blokaj", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(vehicle.plate, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         },
@@ -208,14 +207,14 @@ fun BlockageDialog(
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(action.label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-                            Text(action.subtitle, fontSize = 11.sp, color = AppColors.TextMuted)
+                            Text(action.label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                            Text(action.subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Icon(Icons.Default.ChevronRight, null, tint = action.color.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
                     }
                 }
 
-                HorizontalDivider(color = AppColors.BorderSoft, modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 4.dp))
 
                 // Cancel pending command
                 Row(
@@ -223,8 +222,8 @@ fun BlockageDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(10.dp))
-                        .background(AppColors.Bg)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surface)
                         .clickable(enabled = !isLoading) {
                             isLoading = true
                             errorMsg = null
@@ -245,14 +244,14 @@ fun BlockageDialog(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .size(36.dp)
-                            .background(AppColors.TextMuted.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
                     ) {
-                        Icon(Icons.Default.Cancel, null, tint = AppColors.TextMuted, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Cancel, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                     }
                     Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Bekleyen Komutu İptal Et", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
-                        Text("Gönderilmemiş komutları temizle", fontSize = 11.sp, color = AppColors.TextMuted)
+                        Text("Bekleyen Komutu İptal Et", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Gönderilmemiş komutları temizle", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
@@ -283,7 +282,7 @@ fun BlockageDialog(
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss, enabled = !isLoading) {
-                Text("Kapat", color = AppColors.TextMuted)
+                Text("Kapat", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )

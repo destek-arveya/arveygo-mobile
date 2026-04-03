@@ -180,18 +180,18 @@ struct LanguageSwitcher: View {
                     .font(.system(size: 14))
                 Text(strings.currentLang)
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.navy)
+                    .foregroundColor(AppTheme.authNightText)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .semibold))
-                    .foregroundColor(AppTheme.textMuted)
+                    .foregroundColor(AppTheme.authNightTextMuted)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(AppTheme.bg)
+            .background(AppTheme.authNightField)
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(AppTheme.borderSoft, lineWidth: 1)
+                    .stroke(AppTheme.authNightBorder, lineWidth: 1)
             )
         }
     }

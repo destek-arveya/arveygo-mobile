@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.arveya.arveygo.LocalAuthViewModel
 import com.arveya.arveygo.models.*
 import com.arveya.arveygo.services.APIService
 import com.arveya.arveygo.services.WSEvent
@@ -35,6 +36,8 @@ import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+
+private const val VEHICLE_SETTINGS_HIDDEN_IGNITION_PREFIX = "__mobile_private_ign__"
 
 // Tab enum matching iOS
 private enum class DetailTab(val label: String) {
@@ -56,7 +59,7 @@ fun VehicleDetailScreen(
     var selectedTab by remember { mutableStateOf(DetailTab.OVERVIEW) }
     val context = LocalContext.current
     var currentVehicle by remember { mutableStateOf(vehicle) }
-    var showMotorcycleSettings by remember { mutableStateOf(false) }
+    var showVehicleSettings by remember { mutableStateOf(false) }
     var driverName by remember { mutableStateOf("") }
     var driverPhone by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
@@ -167,11 +170,11 @@ fun VehicleDetailScreen(
         }
     }
 
-    // If motorcycle settings is showing, show the full-screen settings page
-    if (showMotorcycleSettings) {
-        MotorcycleSettingsScreen(
+    // If vehicle settings is showing, show the full-screen settings page
+    if (showVehicleSettings) {
+        VehicleSettingsScreen(
             vehicle = currentVehicle,
-            onBack = { showMotorcycleSettings = false }
+            onBack = { showVehicleSettings = false }
         )
         return
     }
@@ -219,10 +222,8 @@ fun VehicleDetailScreen(
                     }
                 },
                 actions = {
-                    if (currentVehicle.isMotorcycle) {
-                        IconButton(onClick = { showMotorcycleSettings = true }) {
-                            Icon(Icons.Default.Settings, null, tint = AppColors.Online, modifier = Modifier.size(22.dp))
-                        }
+                    IconButton(onClick = { showVehicleSettings = true }) {
+                        Icon(Icons.Default.Settings, null, tint = AppColors.Online, modifier = Modifier.size(22.dp))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.DarkSurface)
@@ -268,62 +269,79 @@ fun VehicleDetailScreen(
 // MARK: - Map Header
 @Composable
 private fun MapHeader(vehicle: Vehicle, context: Context) {
+    val mapViewRef = remember { mutableStateOf<MapView?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            mapViewRef.value?.onDetach()
+            mapViewRef.value = null
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(200.dp)
     ) {
-        AndroidView(
-            factory = { ctx ->
-                MapView(ctx).apply {
-                    setTileSource(TileSourceFactory.MAPNIK)
-                    setMultiTouchControls(false)
-                    controller.setZoom(15.0)
-                    controller.setCenter(GeoPoint(vehicle.lat, vehicle.lng))
-                    zoomController.setVisibility(
-                        org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER
-                    )
-                    // Add vehicle marker
-                    val marker = Marker(this)
-                    marker.position = GeoPoint(vehicle.lat, vehicle.lng)
-                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                    marker.title = vehicle.plate
-                    marker.snippet = vehicle.model
-                    marker.infoWindow = null
-                    // Create colored marker icon
-                    val statusColor = when (vehicle.status) {
-                        VehicleStatus.IGNITION_ON -> android.graphics.Color.rgb(34, 197, 94)
-                        VehicleStatus.IGNITION_OFF -> android.graphics.Color.rgb(239, 68, 68)
-                        VehicleStatus.NO_DATA -> android.graphics.Color.rgb(148, 163, 184)
-                        VehicleStatus.SLEEPING -> android.graphics.Color.rgb(245, 158, 11)
+        if (vehicle.hasValidCoordinates) {
+            AndroidView(
+                factory = { ctx ->
+                    MapView(ctx).apply {
+                        setTileSource(TileSourceFactory.MAPNIK)
+                        setMultiTouchControls(false)
+                        controller.setZoom(15.0)
+                        controller.setCenter(GeoPoint(vehicle.lat, vehicle.lng))
+                        zoomController.setVisibility(
+                            org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER
+                        )
+                        mapViewRef.value = this
+                        // Add vehicle marker
+                        val marker = Marker(this)
+                        marker.position = GeoPoint(vehicle.lat, vehicle.lng)
+                        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        marker.title = vehicle.plate
+                        marker.snippet = vehicle.model
+                        marker.infoWindow = null
+                        // Create colored marker icon
+                        val statusColor = when (vehicle.status) {
+                            VehicleStatus.IGNITION_ON -> android.graphics.Color.rgb(34, 197, 94)
+                            VehicleStatus.IGNITION_OFF -> android.graphics.Color.rgb(239, 68, 68)
+                            VehicleStatus.NO_DATA -> android.graphics.Color.rgb(148, 163, 184)
+                            VehicleStatus.SLEEPING -> android.graphics.Color.rgb(245, 158, 11)
+                        }
+                        val density = ctx.resources.displayMetrics.density
+                        val pinSize = (36 * density).toInt()
+                        val bitmap = android.graphics.Bitmap.createBitmap(pinSize, pinSize, android.graphics.Bitmap.Config.ARGB_8888)
+                        val canvas = android.graphics.Canvas(bitmap)
+                        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                            color = statusColor
+                        }
+                        val borderPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                            color = android.graphics.Color.WHITE
+                            style = android.graphics.Paint.Style.STROKE
+                            strokeWidth = 3f * density
+                        }
+                        canvas.drawCircle(pinSize / 2f, pinSize / 2f, pinSize / 2f - 2f * density, paint)
+                        canvas.drawCircle(pinSize / 2f, pinSize / 2f, pinSize / 2f - 2f * density, borderPaint)
+                        val iconPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                            color = android.graphics.Color.WHITE
+                            textSize = 16f * density
+                            textAlign = android.graphics.Paint.Align.CENTER
+                        }
+                        canvas.drawText("🚗", pinSize / 2f, pinSize / 2f + 6f * density, iconPaint)
+                        marker.icon = android.graphics.drawable.BitmapDrawable(ctx.resources, bitmap)
+                        overlays.add(marker)
                     }
-                    val density = ctx.resources.displayMetrics.density
-                    val pinSize = (36 * density).toInt()
-                    val bitmap = android.graphics.Bitmap.createBitmap(pinSize, pinSize, android.graphics.Bitmap.Config.ARGB_8888)
-                    val canvas = android.graphics.Canvas(bitmap)
-                    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                        color = statusColor
-                    }
-                    val borderPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                        color = android.graphics.Color.WHITE
-                        style = android.graphics.Paint.Style.STROKE
-                        strokeWidth = 3f * density
-                    }
-                    canvas.drawCircle(pinSize / 2f, pinSize / 2f, pinSize / 2f - 2f * density, paint)
-                    canvas.drawCircle(pinSize / 2f, pinSize / 2f, pinSize / 2f - 2f * density, borderPaint)
-                    // Draw car icon
-                    val iconPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                        color = android.graphics.Color.WHITE
-                        textSize = 16f * density
-                        textAlign = android.graphics.Paint.Align.CENTER
-                    }
-                    canvas.drawText("🚗", pinSize / 2f, pinSize / 2f + 6f * density, iconPaint)
-                    marker.icon = android.graphics.drawable.BitmapDrawable(ctx.resources, bitmap)
-                    overlays.add(marker)
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            )
+        }
 
         // Status overlay at bottom-right
         Row(
@@ -1244,24 +1262,131 @@ private fun EventRow(icon: ImageVector, title: String, subtitle: String, time: S
     }
 }
 
-// MARK: - Motorcycle Settings Screen (Full Page)
+// MARK: - Vehicle Settings Screen (Full Page)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MotorcycleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
-    var kontakOnNotification by remember { mutableStateOf(true) }
-    var kontakOffNotification by remember { mutableStateOf(true) }
-    var batteryRemovedNotification by remember { mutableStateOf(true) }
-    var batteryInstalledNotification by remember { mutableStateOf(true) }
-    var motionDetectedNotification by remember { mutableStateOf(true) }
-    var motionDetectedPhoneCall by remember { mutableStateOf(false) }
-    var phoneNumber by remember { mutableStateOf("") }
+fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
+    val authVM = LocalAuthViewModel.current
+    val currentUser by authVM.currentUser.collectAsState()
+    val colors = MaterialTheme.colorScheme
+    val scope = rememberCoroutineScope()
+
+    var ignitionNotificationEnabled by remember { mutableStateOf(false) }
+    var ignitionPushEnabled by remember { mutableStateOf(true) }
+    var ignitionSmsEnabled by remember { mutableStateOf(false) }
+    var ignitionMailEnabled by remember { mutableStateOf(false) }
+    var ignitionLoaded by remember { mutableStateOf(false) }
+    var ignitionSyncing by remember { mutableStateOf(false) }
+    var ignitionMessage by remember { mutableStateOf<String?>(null) }
+
+    var movementAlarm by remember { mutableStateOf(false) }
+    var weeklyHealthSummary by remember { mutableStateOf(false) }
+    var overspeedEnabled by remember { mutableStateOf(false) }
+    var overspeedLimit by remember { mutableIntStateOf(110) }
+    var idleAlertEnabled by remember { mutableStateOf(false) }
+    var idleMinutes by remember { mutableIntStateOf(10) }
     var sleepDelaySeconds by remember { mutableStateOf("30") }
     var wakeIntervalHours by remember { mutableStateOf("6") }
-    var alarmEnabled by remember { mutableStateOf(false) }
-    var alarmDurationSeconds by remember { mutableFloatStateOf(30f) }
     var showKontakAlert by remember { mutableStateOf(false) }
 
-    // Kontak alert dialog
+    fun selectedChannels(): Set<String> = buildSet {
+        if (ignitionPushEnabled) add("push")
+        if (ignitionSmsEnabled) add("sms")
+        if (ignitionMailEnabled) add("email")
+    }
+
+    fun scheduleIgnitionSync() {
+        if (!ignitionLoaded) return
+        scope.launch {
+            val userId = resolveVehicleSettingsUserId(currentUser)
+            val targetId = vehicleSettingsTargetId(vehicle)
+
+            if (userId == null || targetId == null) {
+                ignitionMessage = "Bildirim hedefi hazırlanamadı."
+                return@launch
+            }
+
+            if (ignitionNotificationEnabled && selectedChannels().isEmpty()) {
+                ignitionPushEnabled = true
+            }
+
+            ignitionSyncing = true
+            ignitionMessage = null
+
+            runCatching {
+                syncVehicleIgnitionAlarmSettings(
+                    vehicle = vehicle,
+                    userId = userId,
+                    enabled = ignitionNotificationEnabled,
+                    channels = selectedChannels().toList().sorted()
+                )
+            }.onSuccess {
+                ignitionMessage = if (ignitionNotificationEnabled) {
+                    "Kontak bildirimi güncellendi."
+                } else {
+                    "Kontak bildirimi kapatıldı."
+                }
+            }.onFailure {
+                ignitionMessage = it.localizedMessage ?: "Kontak bildirimi güncellenemedi."
+            }
+
+            ignitionSyncing = false
+        }
+    }
+
+    fun setIgnitionChannel(channel: String, enabled: Boolean) {
+        val channels = selectedChannels().toMutableSet()
+        if (enabled) {
+            channels += channel
+            ignitionMessage = null
+        } else {
+            channels -= channel
+            if (channels.isEmpty()) {
+                ignitionMessage = "En az bir teslimat kanalı açık kalmalı."
+                channels += channel
+            }
+        }
+
+        ignitionPushEnabled = channels.contains("push")
+        ignitionSmsEnabled = channels.contains("sms")
+        ignitionMailEnabled = channels.contains("email")
+        scheduleIgnitionSync()
+    }
+
+    LaunchedEffect(vehicle.id, currentUser?.id) {
+        val userId = resolveVehicleSettingsUserId(currentUser)
+        val targetId = vehicleSettingsTargetId(vehicle)
+
+        if (userId == null || targetId == null) {
+            ignitionLoaded = true
+            ignitionMessage = "Bildirim hedefi hazırlanamadı."
+            return@LaunchedEffect
+        }
+
+        ignitionSyncing = true
+        ignitionMessage = null
+
+        runCatching {
+            fetchVehicleHiddenIgnitionAlarmSets(vehicle, userId)
+        }.onSuccess { sets ->
+            val activeSets = sets.filter { it.isActive && it.status == "active" }
+            val channelUnion = (if (activeSets.isEmpty()) sets else activeSets)
+                .flatMap { it.channelList }
+                .toSet()
+
+            ignitionNotificationEnabled = activeSets.isNotEmpty()
+            ignitionPushEnabled = channelUnion.contains("push") || channelUnion.isEmpty()
+            ignitionSmsEnabled = channelUnion.contains("sms")
+            ignitionMailEnabled = channelUnion.contains("email")
+            ignitionMessage = null
+        }.onFailure {
+            ignitionMessage = it.localizedMessage ?: "Kontak bildirimi yüklenemedi."
+        }
+
+        ignitionLoaded = true
+        ignitionSyncing = false
+    }
+
     if (showKontakAlert) {
         AlertDialog(
             onDismissRequest = { showKontakAlert = false },
@@ -1275,16 +1400,16 @@ private fun MotorcycleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(48.dp)
-                        .background(Color(0xFFFF9800).copy(alpha = 0.1f), CircleShape)
+                        .background(Color(0xFFFF9800).copy(alpha = 0.12f), CircleShape)
                 ) {
                     Icon(Icons.Default.Warning, null, tint = Color(0xFFFF9800), modifier = Modifier.size(24.dp))
                 }
             },
             title = {
-                Text("Kontak Kapalı", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AppColors.Navy)
+                Text("Kontak Kapalı", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = colors.onSurface)
             },
             text = {
-                Text("Ayarları kaydetmek için aracın kontağının açık olması gereklidir.", fontSize = 14.sp, color = AppColors.TextMuted)
+                Text("Ayarları kaydetmek için aracın kontağının açık olması gereklidir.", fontSize = 14.sp, color = colors.onSurface.copy(alpha = 0.7f))
             }
         )
     }
@@ -1295,29 +1420,28 @@ private fun MotorcycleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.ChevronLeft, null, tint = AppColors.Navy, modifier = Modifier.size(18.dp))
-                            Text("Geri", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
+                            Icon(Icons.Default.ChevronLeft, null, tint = colors.onSurface, modifier = Modifier.size(18.dp))
+                            Text("Geri", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
                         }
                     }
                 },
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        Text("Motosiklet Ayarları", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-                        Text("${vehicle.plate} · ${vehicle.model}", fontSize = 10.sp, color = AppColors.TextMuted)
+                        Text("Araç Ayarları", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
+                        Text(vehicle.plate, fontSize = 10.sp, color = colors.onSurface.copy(alpha = 0.55f))
                     }
                 },
                 actions = { Spacer(Modifier.width(48.dp)) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background)
             )
         },
         bottomBar = {
-            Surface(shadowElevation = 8.dp) {
+            Surface(shadowElevation = 8.dp, color = colors.surface) {
                 Button(
                     onClick = {
                         if (!vehicle.ignition) {
                             showKontakAlert = true
                         } else {
-                            // TODO: Save to backend
                             onBack()
                         }
                     },
@@ -1326,11 +1450,11 @@ private fun MotorcycleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                         .height(50.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = AppColors.Online),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Ayarları Kaydet", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Kaydet", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
         }
@@ -1338,141 +1462,289 @@ private fun MotorcycleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(AppColors.Bg)
+                .background(colors.background)
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header icon
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .size(64.dp)
-                    .background(AppColors.Online.copy(alpha = 0.1f), CircleShape)
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Icon(Icons.Default.TwoWheeler, null, tint = AppColors.Online, modifier = Modifier.size(32.dp))
-            }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(52.dp)
+                            .background(vehicle.status.color.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
+                    ) {
+                        Icon(
+                            if (vehicle.isMotorcycle) Icons.Default.TwoWheeler else Icons.Default.DirectionsCar,
+                            null,
+                            tint = vehicle.status.color,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
 
-            // Section: Kontak
-            SettingsSection("Kontak Bildirimleri", Icons.Default.Key) {
-                SettingsToggle("Kontak Açılma Bildirimi", "Kontak açıldığında bildirim al", kontakOnNotification) { kontakOnNotification = it }
-                SettingsToggle("Kontak Kapanma Bildirimi", "Kontak kapandığında bildirim al", kontakOffNotification) { kontakOffNotification = it }
-            }
+                    Spacer(Modifier.width(12.dp))
 
-            // Section: Akü
-            SettingsSection("Akü Bildirimleri", Icons.Default.BatteryChargingFull) {
-                SettingsToggle("Aküden Söküldü Bildirimi", "Cihaz aküden sökülünce bildirim al", batteryRemovedNotification) { batteryRemovedNotification = it }
-                SettingsToggle("Aküye Takıldı Bildirimi", "Cihaz aküye takılınca bildirim al", batteryInstalledNotification) { batteryInstalledNotification = it }
-            }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(vehicle.plate, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
+                        Text(
+                            if (vehicle.model.isBlank()) "Araç ayar merkezi" else vehicle.model,
+                            fontSize = 13.sp,
+                            color = colors.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
 
-            // Section: Hareket
-            SettingsSection("Hareket Algılama", Icons.Default.DirectionsWalk) {
-                SettingsToggle("Hareket Algılandı Bildirimi", "Araç hareket edince bildirim al", motionDetectedNotification) { motionDetectedNotification = it }
-                SettingsToggle("Telefon Araması", "Hareket algılanınca telefon ile ara", motionDetectedPhoneCall) { motionDetectedPhoneCall = it }
-
-                if (motionDetectedPhoneCall) {
-                    OutlinedTextField(
-                        value = phoneNumber,
-                        onValueChange = { phoneNumber = it },
-                        label = { Text("Telefon Numarası") },
-                        leadingIcon = { Icon(Icons.Default.Phone, null, tint = AppColors.Online) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 4.dp)
-                    )
+                    StatusBadge(status = vehicle.status)
                 }
             }
 
-            // Section: Alarm
-            SettingsSection("Alarm Ayarları", Icons.Default.Notifications) {
-                SettingsToggle("Alarm Kur", "Uzaktan alarm çalıştır", alarmEnabled) { alarmEnabled = it }
+            SettingsSection("Kontak Bildirimleri", Icons.Default.Key) {
+                SettingsToggle(
+                    "Kontak Açma / Kapanma Bildirimi",
+                    "Kontak hareketlerini yalnızca size özel alarm kuralı ile yönet",
+                    ignitionNotificationEnabled
+                ) { enabled ->
+                    ignitionNotificationEnabled = enabled
+                    if (enabled && selectedChannels().isEmpty()) {
+                        ignitionPushEnabled = true
+                    }
+                    scheduleIgnitionSync()
+                }
 
-                if (alarmEnabled) {
-                    Column(modifier = Modifier.padding(start = 8.dp, top = 4.dp)) {
+                if (ignitionNotificationEnabled) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(start = 8.dp, top = 6.dp)
+                    ) {
+                        SettingsToggle("Mobil Bildirim", "Uygulama içine push olarak düşsün", ignitionPushEnabled) {
+                            setIgnitionChannel("push", it)
+                        }
+                        SettingsToggle("SMS", "Telefon numaranıza kısa mesaj gelsin", ignitionSmsEnabled) {
+                            setIgnitionChannel("sms", it)
+                        }
+                        SettingsToggle("Mail", "E-posta adresinize bildirim özeti gelsin", ignitionMailEnabled) {
+                            setIgnitionChannel("email", it)
+                        }
+
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.padding(top = 4.dp)
                         ) {
-                            Text("Alarm Süresi", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
-                            Spacer(Modifier.weight(1f))
-                            Text("${alarmDurationSeconds.toInt()} saniye", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AppColors.Online)
-                        }
-                        Slider(
-                            value = alarmDurationSeconds,
-                            onValueChange = { alarmDurationSeconds = it },
-                            valueRange = 10f..60f,
-                            steps = 4,
-                            colors = SliderDefaults.colors(
-                                thumbColor = AppColors.Online,
-                                activeTrackColor = AppColors.Online
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Text("10 sn", fontSize = 10.sp, color = AppColors.TextMuted)
-                            Spacer(Modifier.weight(1f))
-                            Text("60 sn", fontSize = 10.sp, color = AppColors.TextMuted)
+                            if (ignitionSyncing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    strokeWidth = 2.dp,
+                                    color = AppColors.Online
+                                )
+                            } else {
+                                Icon(Icons.Default.Person, null, tint = AppColors.Online, modifier = Modifier.size(14.dp))
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                ignitionMessage ?: "Bu bildirim yalnızca sizin hesabınıza gönderilir.",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = if (ignitionMessage == null) colors.onSurface.copy(alpha = 0.6f) else Color(0xFFEF4444)
+                            )
                         }
                     }
                 }
             }
 
-            // Section: Uyku
-            SettingsSection("Cihaz Uyku Ayarları", Icons.Default.Bedtime) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Uyku Süresi", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
-                        Text("Kontak kapandıktan sonra", fontSize = 10.sp, color = AppColors.TextMuted)
+            SettingsSection("Sürüş ve Güvenlik", Icons.Default.Shield) {
+                SettingsToggle("Hareket Algılandı", "Beklenmeyen hareketlerde anlık uyarı ver", movementAlarm) { movementAlarm = it }
+                SettingsToggle("Haftalık Durum Özeti", "Bakım ve operasyon özetini haftalık paylaş", weeklyHealthSummary) { weeklyHealthSummary = it }
+                SettingsToggle("Hız Aşımı Uyarısı", "Belirlenen limit aşıldığında alarm üret", overspeedEnabled) { overspeedEnabled = it }
+
+                if (overspeedEnabled) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                    ) {
+                        Text("Hız Limiti", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
+                        Spacer(Modifier.weight(1f))
+                        Text("$overspeedLimit km/h", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Offline)
                     }
-                    OutlinedTextField(
-                        value = sleepDelaySeconds,
-                        onValueChange = { sleepDelaySeconds = it.filter { c -> c.isDigit() } },
-                        suffix = { Text("sn", fontSize = 12.sp) },
-                        singleLine = true,
-                        modifier = Modifier.width(80.dp)
+                    Slider(
+                        value = overspeedLimit.toFloat(),
+                        onValueChange = { overspeedLimit = it.toInt() },
+                        valueRange = 50f..180f,
+                        steps = 25,
+                        colors = SliderDefaults.colors(thumbColor = AppColors.Offline, activeTrackColor = AppColors.Offline)
                     )
                 }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Uyanma Periyodu", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
-                        Text("Kaç saatte bir veri atsın", fontSize = 10.sp, color = AppColors.TextMuted)
+                SettingsToggle("Rölanti Uyarısı", "Araç uzun süre çalışır halde beklerse bildir", idleAlertEnabled) { idleAlertEnabled = it }
+                if (idleAlertEnabled) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                    ) {
+                        Text("Rölanti Süresi", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
+                        Spacer(Modifier.weight(1f))
+                        Text("$idleMinutes dk", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Idle)
                     }
-                    OutlinedTextField(
-                        value = wakeIntervalHours,
-                        onValueChange = { wakeIntervalHours = it.filter { c -> c.isDigit() } },
-                        suffix = { Text("saat", fontSize = 12.sp) },
-                        singleLine = true,
-                        modifier = Modifier.width(80.dp)
+                    Slider(
+                        value = idleMinutes.toFloat(),
+                        onValueChange = { idleMinutes = it.toInt() },
+                        valueRange = 3f..60f,
+                        steps = 56,
+                        colors = SliderDefaults.colors(thumbColor = AppColors.Idle, activeTrackColor = AppColors.Idle)
                     )
                 }
             }
+
+            SettingsSection("Cihaz ve Raporlama", Icons.Default.Tune) {
+                OutlinedTextField(
+                    value = sleepDelaySeconds,
+                    onValueChange = { sleepDelaySeconds = it.filter { char -> char.isDigit() } },
+                    label = { Text("Uyku Süresi (sn)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = wakeIntervalHours,
+                    onValueChange = { wakeIntervalHours = it.filter { char -> char.isDigit() } },
+                    label = { Text("Uyanma Periyodu (saat)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+private suspend fun resolveVehicleSettingsUserId(currentUser: AppUser?): Int? {
+    currentUser?.id?.toIntOrNull()?.let { return it }
+    return try {
+        APIService.fetchMe().id.toIntOrNull()
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun vehicleSettingsTargetScope(vehicle: Vehicle): String =
+    if (vehicle.assignmentId != null) "assignment" else "device"
+
+private fun vehicleSettingsTargetId(vehicle: Vehicle): Int? =
+    vehicle.assignmentId?.takeIf { it > 0 } ?: vehicle.deviceId.takeIf { it > 0 }
+
+private fun vehicleSettingsHiddenAlarmName(vehicle: Vehicle, userId: Int, alarmType: String): String {
+    val targetId = vehicleSettingsTargetId(vehicle) ?: 0
+    val targetScope = vehicleSettingsTargetScope(vehicle)
+    return "${VEHICLE_SETTINGS_HIDDEN_IGNITION_PREFIX}u${userId}__${targetScope}_${targetId}__${alarmType}"
+}
+
+private suspend fun fetchVehicleHiddenIgnitionAlarmSets(vehicle: Vehicle, userId: Int): List<AlarmSet> {
+    val targetId = vehicleSettingsTargetId(vehicle) ?: return emptyList()
+    val searchKey = "${VEHICLE_SETTINGS_HIDDEN_IGNITION_PREFIX}u${userId}__${vehicleSettingsTargetScope(vehicle)}_${targetId}__"
+    val json = APIService.get("/api/mobile/alarm-sets/?search=$searchKey")
+    val data = json.optJSONArray("data") ?: return emptyList()
+    return buildList {
+        for (index in 0 until data.length()) {
+            val set = AlarmSet.from(data.optJSONObject(index) ?: org.json.JSONObject())
+            if (set.name.startsWith(searchKey)) add(set)
+        }
+    }
+}
+
+private fun vehicleHiddenIgnitionBody(
+    vehicle: Vehicle,
+    userId: Int,
+    alarmType: String,
+    channels: List<String>
+): org.json.JSONObject {
+    val targetId = vehicleSettingsTargetId(vehicle) ?: 0
+    return org.json.JSONObject().apply {
+        put("name", vehicleSettingsHiddenAlarmName(vehicle, userId, alarmType))
+        put("description", "mobile_private_ignition_notification")
+        put("alarm_type", alarmType)
+        put("status", "active")
+        put("evaluation_mode", "live")
+        put("source_mode", "derived")
+        put("cooldown_sec", 0)
+        put("is_active", true)
+        put("condition_require_ignition", true)
+        put(
+            "targets",
+            org.json.JSONArray().put(
+                org.json.JSONObject()
+                    .put("scope", vehicleSettingsTargetScope(vehicle))
+                    .put("id", targetId)
+            )
+        )
+        put("channels", org.json.JSONArray().apply { channels.forEach { put(it) } })
+        put("recipient_ids", org.json.JSONArray().put(userId))
+    }
+}
+
+private suspend fun syncVehicleIgnitionAlarmSettings(
+    vehicle: Vehicle,
+    userId: Int,
+    enabled: Boolean,
+    channels: List<String>
+) {
+    val existingSets = fetchVehicleHiddenIgnitionAlarmSets(vehicle, userId)
+    val grouped = existingSets.groupBy { it.alarmType }
+
+    for (type in listOf("ignition_on", "ignition_off")) {
+        val matches = (grouped[type] ?: emptyList()).sortedByDescending { it.id }
+        val primary = matches.firstOrNull()
+        val duplicates = matches.drop(1)
+
+        for (duplicate in duplicates) {
+            try {
+                APIService.post("/api/mobile/alarm-sets/${duplicate.id}/archive")
+            } catch (_: Exception) {
+            }
+        }
+
+        if (enabled) {
+            val body = vehicleHiddenIgnitionBody(vehicle, userId, type, channels)
+            if (primary != null) {
+                APIService.put("/api/mobile/alarm-sets/${primary.id}", body)
+            } else {
+                APIService.post("/api/mobile/alarm-sets/", body)
+            }
+        } else if (primary != null && (primary.isActive || primary.status == "active")) {
+            APIService.post("/api/mobile/alarm-sets/${primary.id}/pause")
         }
     }
 }
 
 @Composable
 private fun SettingsSection(title: String, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
+    val colors = MaterialTheme.colorScheme
     Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(bottom = 8.dp)
             ) {
-                Icon(icon, null, tint = AppColors.Online, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(30.dp)
+                        .background(AppColors.Online.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
+                ) {
+                    Icon(icon, null, tint = AppColors.Online, modifier = Modifier.size(16.dp))
+                }
+                Spacer(Modifier.width(10.dp))
+                Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.onSurface)
             }
             content()
         }
@@ -1481,13 +1753,14 @@ private fun SettingsSection(title: String, icon: ImageVector, content: @Composab
 
 @Composable
 private fun SettingsToggle(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val colors = MaterialTheme.colorScheme
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
-            Text(subtitle, fontSize = 10.sp, color = AppColors.TextMuted)
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
+            Text(subtitle, fontSize = 11.sp, color = colors.onSurface.copy(alpha = 0.58f))
         }
         Switch(
             checked = checked,

@@ -5,8 +5,14 @@ import SwiftUI
 // ═══════════════════════════════════════════════════════════════════════════
 struct HubView: View {
     @EnvironmentObject var authVM: AuthViewModel
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var DL = DashboardStrings.shared
     @Binding var selectedTab: AppTab
+
+    // Alarm navigation bridge from child views
+    @Binding var alarmsSearchText: String
+    @Binding var alarmsAutoOpenCreate: Bool
+    @Binding var alarmsPrePlate: String
 
     // Internal navigation
     @State private var navigateToReports = false
@@ -16,6 +22,12 @@ struct HubView: View {
     @State private var navigateToVehicles = false
     @State private var navigateToSettings = false
     @State private var navigateToSupport = false
+
+    // Vehicles → Alarms bridge
+    @State private var vehiclesSelectedPage: AppPage = .vehicles
+    @State private var vehiclesAlarmsSearch: String = ""
+    @State private var vehiclesAlarmsAutoOpen: Bool = false
+    @State private var vehiclesAlarmsPrePlate: String = ""
 
     // ── Design System (matches Dashboard DS) ──
     private enum H {
@@ -27,6 +39,32 @@ struct HubView: View {
         static let text2        = Color(red: 100/255, green: 100/255, blue: 112/255)
         static let text3        = Color(red: 160/255, green: 160/255, blue: 175/255)
         static let r: CGFloat   = 22
+    }
+
+    private var isDark: Bool { colorScheme == .dark }
+    private var pageBackground: Color {
+        isDark ? Color(red: 12/255, green: 17/255, blue: 36/255) : H.pageBg
+    }
+    private var navigationBackground: Color {
+        isDark ? Color(red: 14/255, green: 20/255, blue: 42/255) : H.pageBg
+    }
+    private var cardBackground: Color {
+        isDark ? Color(red: 23/255, green: 29/255, blue: 54/255) : H.cardBg
+    }
+    private var primaryText: Color {
+        isDark ? AppTheme.darkText : H.text1
+    }
+    private var secondaryText: Color {
+        isDark ? AppTheme.darkTextSub : H.text2
+    }
+    private var mutedText: Color {
+        isDark ? AppTheme.darkTextMuted : H.text3
+    }
+    private var cardShadow: Color {
+        isDark ? Color.black.opacity(0.24) : Color.black.opacity(0.05)
+    }
+    private var borderColor: Color {
+        isDark ? Color.white.opacity(0.08) : Color.black.opacity(0.05)
     }
 
     var body: some View {
@@ -88,10 +126,6 @@ struct HubView: View {
                     }
                     .padding(.horizontal, 20)
 
-                    // ── Settings Row ──
-                    settingsRow
-                        .padding(.horizontal, 20)
-
                     // ── Logout ──
                     logoutButton
                         .padding(.horizontal, 20)
@@ -99,13 +133,16 @@ struct HubView: View {
                 }
                 .padding(.top, 4)
             }
-            .background(H.pageBg.ignoresSafeArea())
+            .background(pageBackground.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(navigationBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(isDark ? .dark : .light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Hub")
                         .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundStyle(H.primary)
+                        .foregroundStyle(primaryText)
                 }
             }
             // ── Navigation Destinations ──
@@ -124,14 +161,35 @@ struct HubView: View {
             .navigationDestination(isPresented: $navigateToVehicles) {
                 VehiclesListView(
                     showSideMenu: .constant(false),
-                    selectedPage: .constant(.vehicles),
-                    alarmsSearchText: .constant(""),
-                    alarmsAutoOpenCreate: .constant(false),
-                    alarmsPrePlate: .constant("")
+                    selectedPage: $vehiclesSelectedPage,
+                    alarmsSearchText: $vehiclesAlarmsSearch,
+                    alarmsAutoOpenCreate: $vehiclesAlarmsAutoOpen,
+                    alarmsPrePlate: $vehiclesAlarmsPrePlate
                 )
+                .onChange(of: vehiclesSelectedPage) { _, newPage in
+                    if newPage == .alarms {
+                        let search = vehiclesAlarmsSearch
+                        let autoOpen = vehiclesAlarmsAutoOpen
+                        let prePlate = vehiclesAlarmsPrePlate
+                        navigateToVehicles = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            alarmsSearchText = search
+                            alarmsAutoOpenCreate = autoOpen
+                            alarmsPrePlate = prePlate
+                            selectedTab = .alarms
+                            vehiclesSelectedPage = .vehicles
+                            vehiclesAlarmsSearch = ""
+                            vehiclesAlarmsAutoOpen = false
+                            vehiclesAlarmsPrePlate = ""
+                        }
+                    } else if newPage == .routeHistory {
+                        navigateToVehicles = false
+                        vehiclesSelectedPage = .vehicles
+                    }
+                }
             }
             .navigationDestination(isPresented: $navigateToSupport) {
-                SupportRequestView()
+                SupportRequestView(presentationMode: .push)
             }
             .navigationDestination(isPresented: $navigateToSettings) {
                 SettingsView(showSideMenu: .constant(false))
@@ -168,7 +226,7 @@ struct HubView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(authVM.currentUser?.name ?? "Admin")
                     .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundColor(H.text1)
+                    .foregroundColor(primaryText)
 
                 Text(authVM.currentUser?.role ?? "Süper Yönetici")
                     .font(.system(size: 12, weight: .semibold))
@@ -181,20 +239,27 @@ struct HubView: View {
 
             Spacer()
 
-            // Company badge
-            VStack(spacing: 2) {
-                Image(systemName: "building.2")
-                    .font(.system(size: 14))
-                    .foregroundStyle(H.text3)
-                Text(DL.menuCompany)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(H.text3)
+            Button(action: { navigateToSettings = true }) {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(isDark ? Color.white : H.primary)
+                    .frame(width: 42, height: 42)
+                    .background(H.primary.opacity(isDark ? 0.18 : 0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(borderColor, lineWidth: 1)
+                    )
             }
+            .accessibilityLabel(DL.menuSettings)
         }
         .padding(18)
-        .background(H.cardBg)
+        .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: H.r, style: .continuous))
-        .shadow(color: .black.opacity(0.05), radius: 12, x: 0, y: 4)
+        .overlay(
+            RoundedRectangle(cornerRadius: H.r, style: .continuous)
+                .stroke(borderColor, lineWidth: 1)
+        )
+        .shadow(color: cardShadow, radius: 12, x: 0, y: 4)
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -219,12 +284,12 @@ struct HubView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(H.text1)
+                        .foregroundStyle(primaryText)
                         .lineLimit(1)
 
                     Text(subtitle)
                         .font(.system(size: 12, weight: .regular))
-                        .foregroundStyle(H.text3)
+                        .foregroundStyle(mutedText)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -232,10 +297,14 @@ struct HubView: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: 140)
-            .background(H.cardBg)
+            .background(cardBackground)
             .clipShape(RoundedRectangle(cornerRadius: H.r, style: .continuous))
-            .shadow(color: color.opacity(0.08), radius: 12, x: 0, y: 4)
-            .shadow(color: .black.opacity(0.03), radius: 4, x: 0, y: 2)
+            .overlay(
+                RoundedRectangle(cornerRadius: H.r, style: .continuous)
+                    .stroke(borderColor, lineWidth: 1)
+            )
+            .shadow(color: color.opacity(isDark ? 0.12 : 0.08), radius: 12, x: 0, y: 4)
+            .shadow(color: cardShadow.opacity(0.45), radius: 4, x: 0, y: 2)
         }
         .buttonStyle(HubBounceStyle())
     }
@@ -296,7 +365,7 @@ struct HubView: View {
                 Spacer()
             }
             .padding(18)
-            .background(Color.red.opacity(0.06))
+            .background((isDark ? Color.red.opacity(0.14) : Color.red.opacity(0.06)))
             .clipShape(RoundedRectangle(cornerRadius: H.r, style: .continuous))
         }
         .buttonStyle(HubBounceStyle())
@@ -345,6 +414,11 @@ struct HubBounceStyle: ButtonStyle {
 // MARK: - Preview
 // ═══════════════════════════════════════════════════════════════════════════
 #Preview {
-    HubView(selectedTab: .constant(.hub))
-        .environmentObject(AuthViewModel())
+    HubView(
+        selectedTab: .constant(.hub),
+        alarmsSearchText: .constant(""),
+        alarmsAutoOpenCreate: .constant(false),
+        alarmsPrePlate: .constant("")
+    )
+    .environmentObject(AuthViewModel())
 }

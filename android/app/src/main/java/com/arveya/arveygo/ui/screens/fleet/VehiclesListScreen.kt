@@ -10,6 +10,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,9 +25,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arveya.arveygo.LocalAuthViewModel
 import com.arveya.arveygo.models.*
+import com.arveya.arveygo.services.APIService
 import com.arveya.arveygo.services.WebSocketManager
 import com.arveya.arveygo.services.WSEvent
 import com.arveya.arveygo.ui.components.AvatarCircle
+import com.arveya.arveygo.ui.components.VehicleCardsSkeletonList
 import com.arveya.arveygo.ui.theme.AppColors
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -37,7 +40,9 @@ class VehiclesListViewModel {
     var searchText by mutableStateOf("")
     var statusFilter by mutableStateOf<VehicleStatus?>(null)
     var groupFilter by mutableStateOf<String?>(null)
-    var _initialized = false
+    var isLoading by mutableStateOf(true)
+    var isRefreshing by mutableStateOf(false)
+    var errorMessage by mutableStateOf<String?>(null)
 
     // Alert counts
     val expiredDocs get() = 0
@@ -78,6 +83,64 @@ class VehiclesListViewModel {
     val offlineCount get() = vehicles.count { it.status == VehicleStatus.IGNITION_OFF }
     val noDataCount get() = vehicles.count { it.status == VehicleStatus.NO_DATA }
     val sleepingCount get() = vehicles.count { it.status == VehicleStatus.SLEEPING }
+
+    fun mergeVehicles(list: List<Vehicle>) {
+        if (list.isEmpty()) return
+        val current = vehicles.associateBy { it.id }
+        vehicles.clear()
+        vehicles.addAll(
+            list.map { incoming ->
+                current[incoming.id]?.copy(
+                    lat = incoming.lat,
+                    lng = incoming.lng,
+                    speed = incoming.speed,
+                    kontakOn = incoming.kontakOn,
+                    ignition = incoming.ignition,
+                    status = incoming.status,
+                    lastPacketAt = incoming.lastPacketAt ?: current[incoming.id]?.lastPacketAt,
+                    deviceTime = incoming.deviceTime ?: current[incoming.id]?.deviceTime,
+                    todayKm = if (incoming.todayKm > (current[incoming.id]?.todayKm ?: 0)) incoming.todayKm else current[incoming.id]?.todayKm ?: incoming.todayKm,
+                    dailyKm = if (incoming.dailyKm > (current[incoming.id]?.dailyKm ?: 0.0)) incoming.dailyKm else current[incoming.id]?.dailyKm ?: incoming.dailyKm
+                ) ?: incoming
+            }
+        )
+        errorMessage = null
+        isLoading = false
+    }
+
+    fun mergeVehicle(vehicle: Vehicle) {
+        val index = vehicles.indexOfFirst { it.id == vehicle.id }
+        if (index >= 0) {
+            val existing = vehicles[index]
+            vehicles[index] = existing.copy(
+                lat = vehicle.lat,
+                lng = vehicle.lng,
+                speed = vehicle.speed,
+                kontakOn = vehicle.kontakOn,
+                ignition = vehicle.ignition,
+                status = vehicle.status,
+                lastPacketAt = vehicle.lastPacketAt ?: existing.lastPacketAt,
+                deviceTime = vehicle.deviceTime ?: existing.deviceTime,
+                todayKm = if (vehicle.todayKm > existing.todayKm) vehicle.todayKm else existing.todayKm,
+                dailyKm = if (vehicle.dailyKm > existing.dailyKm) vehicle.dailyKm else existing.dailyKm
+            )
+        } else {
+            vehicles.add(vehicle)
+        }
+    }
+
+    suspend fun loadVehiclesFromApi() {
+        errorMessage = null
+        try {
+            val apiVehicles = APIService.fetchVehicles()
+            mergeVehicles(apiVehicles)
+        } catch (e: Exception) {
+            if (vehicles.isEmpty()) {
+                errorMessage = e.localizedMessage ?: "Araç verileri alınamadı."
+            }
+            isLoading = false
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,15 +153,19 @@ fun VehiclesListScreen(
     val authVM = LocalAuthViewModel.current
     val user by authVM.currentUser.collectAsState()
     val vm = remember { VehiclesListViewModel() }
+    val scope = rememberCoroutineScope()
     var selectedVehicle by remember { mutableStateOf<Vehicle?>(null) }
+    val colors = MaterialTheme.colorScheme
 
     // Subscribe to WebSocket vehicle data
     LaunchedEffect(Unit) {
         launch {
+            vm.loadVehiclesFromApi()
+        }
+        launch {
             WebSocketManager.vehicleList.collectLatest { list ->
                 if (list.isNotEmpty()) {
-                    vm.vehicles.clear()
-                    vm.vehicles.addAll(list)
+                    vm.mergeVehicles(list)
                 }
             }
         }
@@ -106,13 +173,10 @@ fun VehiclesListScreen(
             WebSocketManager.events.collect { event ->
                 when (event) {
                     is WSEvent.Snapshot -> {
-                        vm.vehicles.clear()
-                        vm.vehicles.addAll(event.vehicles)
+                        vm.mergeVehicles(event.vehicles)
                     }
                     is WSEvent.Update -> {
-                        val idx = vm.vehicles.indexOfFirst { it.id == event.vehicle.id }
-                        if (idx >= 0) vm.vehicles[idx] = event.vehicle
-                        else vm.vehicles.add(event.vehicle)
+                        vm.mergeVehicle(event.vehicle)
                     }
                     else -> {}
                 }
@@ -146,14 +210,14 @@ fun VehiclesListScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Araçlarım", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
-                        Text("Filo Yönetimi / Araçlar", fontSize = 10.sp, color = AppColors.TextMuted)
+                        Text("Araçlar", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
+                        Text("Kurumsal filo görünümü", fontSize = 10.sp, color = colors.onSurface.copy(alpha = 0.55f))
                     }
                 },
                 actions = {
                     Box {
                         IconButton(onClick = {}) {
-                            Icon(Icons.Default.Notifications, null, tint = AppColors.TextMuted, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Notifications, null, tint = colors.onSurface.copy(alpha = 0.55f), modifier = Modifier.size(20.dp))
                         }
                         Box(
                             modifier = Modifier
@@ -167,181 +231,200 @@ fun VehiclesListScreen(
                     AvatarCircle(initials = user?.avatar ?: "A", size = 30.dp)
                     Spacer(Modifier.width(12.dp))
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.Surface)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background)
             )
         }
     ) { padding ->
-        Column(
+        PullToRefreshBox(
+            isRefreshing = vm.isRefreshing,
+            onRefresh = {
+                vm.isRefreshing = true
+                scope.launch {
+                    WebSocketManager.reconnect()
+                    vm.loadVehiclesFromApi()
+                    vm.isRefreshing = false
+                }
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(AppColors.Bg)
-                .verticalScroll(rememberScrollState())
         ) {
-            Spacer(Modifier.height(6.dp))
+            when {
+                vm.isLoading && vm.vehicles.isEmpty() -> VehicleCardsSkeletonList()
+                vm.errorMessage != null && vm.vehicles.isEmpty() -> VehicleListErrorState(vm.errorMessage ?: "Araç verileri alınamadı.") {
+                    scope.launch { vm.loadVehiclesFromApi() }
+                }
+                else -> Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(colors.background)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Spacer(Modifier.height(6.dp))
 
-            // ── Status Summary Chips ──
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                item {
-                    StatusChip(
-                        label = "Toplam",
-                        count = vm.vehicles.size,
-                        color = AppColors.Navy,
-                        isSelected = vm.statusFilter == null,
-                        onClick = { vm.statusFilter = null }
-                    )
-                }
-                item {
-                    StatusChip(
-                        label = "Kontak Açık",
-                        count = vm.onlineCount,
-                        color = AppColors.Online,
-                        isSelected = vm.statusFilter == VehicleStatus.IGNITION_ON,
-                        onClick = { vm.statusFilter = if (vm.statusFilter == VehicleStatus.IGNITION_ON) null else VehicleStatus.IGNITION_ON }
-                    )
-                }
-                item {
-                    StatusChip(
-                        label = "Kontak Kapalı",
-                        count = vm.offlineCount,
-                        color = AppColors.Offline,
-                        isSelected = vm.statusFilter == VehicleStatus.IGNITION_OFF,
-                        onClick = { vm.statusFilter = if (vm.statusFilter == VehicleStatus.IGNITION_OFF) null else VehicleStatus.IGNITION_OFF }
-                    )
-                }
-                item {
-                    StatusChip(
-                        label = "Bilgi Yok",
-                        count = vm.noDataCount,
-                        color = AppColors.TextMuted,
-                        isSelected = vm.statusFilter == VehicleStatus.NO_DATA,
-                        onClick = { vm.statusFilter = if (vm.statusFilter == VehicleStatus.NO_DATA) null else VehicleStatus.NO_DATA }
-                    )
-                }
-                item {
-                    StatusChip(
-                        label = "Uyku",
-                        count = vm.sleepingCount,
-                        color = AppColors.Idle,
-                        isSelected = vm.statusFilter == VehicleStatus.SLEEPING,
-                        onClick = { vm.statusFilter = if (vm.statusFilter == VehicleStatus.SLEEPING) null else VehicleStatus.SLEEPING }
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            // ── Search bar ──
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .background(AppColors.Surface, RoundedCornerShape(12.dp))
-                    .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 14.dp)
-                    .height(44.dp)
-            ) {
-                Icon(Icons.Default.Search, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(10.dp))
-                BasicTextField(
-                    value = vm.searchText,
-                    onValueChange = { vm.searchText = it },
-                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, color = AppColors.Navy),
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    decorationBox = { innerTextField ->
-                        Box(contentAlignment = Alignment.CenterStart) {
-                            if (vm.searchText.isEmpty()) {
-                                Text("Plaka, araç veya sürücü ara...", fontSize = 14.sp, color = AppColors.TextMuted)
-                            }
-                            innerTextField()
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        item {
+                            StatusChip(
+                                label = "Toplam",
+                                count = vm.vehicles.size,
+                                color = AppColors.Navy,
+                                isSelected = vm.statusFilter == null,
+                                onClick = { vm.statusFilter = null }
+                            )
+                        }
+                        item {
+                            StatusChip(
+                                label = "Kontak Açık",
+                                count = vm.onlineCount,
+                                color = AppColors.Online,
+                                isSelected = vm.statusFilter == VehicleStatus.IGNITION_ON,
+                                onClick = { vm.statusFilter = if (vm.statusFilter == VehicleStatus.IGNITION_ON) null else VehicleStatus.IGNITION_ON }
+                            )
+                        }
+                        item {
+                            StatusChip(
+                                label = "Kontak Kapalı",
+                                count = vm.offlineCount,
+                                color = AppColors.Offline,
+                                isSelected = vm.statusFilter == VehicleStatus.IGNITION_OFF,
+                                onClick = { vm.statusFilter = if (vm.statusFilter == VehicleStatus.IGNITION_OFF) null else VehicleStatus.IGNITION_OFF }
+                            )
+                        }
+                        item {
+                            StatusChip(
+                                label = "Bilgi Yok",
+                                count = vm.noDataCount,
+                                color = AppColors.TextMuted,
+                                isSelected = vm.statusFilter == VehicleStatus.NO_DATA,
+                                onClick = { vm.statusFilter = if (vm.statusFilter == VehicleStatus.NO_DATA) null else VehicleStatus.NO_DATA }
+                            )
+                        }
+                        item {
+                            StatusChip(
+                                label = "Uyku",
+                                count = vm.sleepingCount,
+                                color = AppColors.Idle,
+                                isSelected = vm.statusFilter == VehicleStatus.SLEEPING,
+                                onClick = { vm.statusFilter = if (vm.statusFilter == VehicleStatus.SLEEPING) null else VehicleStatus.SLEEPING }
+                            )
                         }
                     }
-                )
-                if (vm.searchText.isNotEmpty()) {
-                    IconButton(onClick = { vm.searchText = "" }, modifier = Modifier.size(20.dp)) {
-                        Icon(Icons.Default.Close, null, tint = AppColors.TextFaint, modifier = Modifier.size(16.dp))
-                    }
-                }
-            }
 
-            Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(12.dp))
 
-            // ── Group filter + count ──
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                var groupMenuExpanded by remember { mutableStateOf(false) }
-                Box {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
-                            .background(AppColors.Surface, RoundedCornerShape(8.dp))
-                            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(8.dp))
-                            .clickable { groupMenuExpanded = true }
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .background(colors.surface, RoundedCornerShape(12.dp))
+                            .border(1.dp, colors.outline.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 14.dp)
+                            .height(44.dp)
                     ) {
-                        Icon(Icons.Default.FolderOpen, null, tint = AppColors.TextMuted, modifier = Modifier.size(14.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(vm.groupFilter ?: "Tüm Gruplar", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.Navy)
-                        Spacer(Modifier.width(5.dp))
-                        Icon(Icons.Default.KeyboardArrowDown, null, tint = AppColors.Navy, modifier = Modifier.size(14.dp))
-                    }
-                    DropdownMenu(expanded = groupMenuExpanded, onDismissRequest = { groupMenuExpanded = false }) {
-                        DropdownMenuItem(text = { Text("Tüm Gruplar", fontSize = 12.sp) }, onClick = { vm.groupFilter = null; groupMenuExpanded = false })
-                        vm.groups.forEach { group ->
-                            DropdownMenuItem(text = { Text(group, fontSize = 12.sp) }, onClick = { vm.groupFilter = group; groupMenuExpanded = false })
+                        Icon(Icons.Default.Search, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(10.dp))
+                        BasicTextField(
+                            value = vm.searchText,
+                            onValueChange = { vm.searchText = it },
+                            textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, color = colors.onSurface),
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            decorationBox = { innerTextField ->
+                                Box(contentAlignment = Alignment.CenterStart) {
+                                    if (vm.searchText.isEmpty()) {
+                                        Text("Plaka, araç veya sürücü ara...", fontSize = 14.sp, color = colors.onSurface.copy(alpha = 0.45f))
+                                    }
+                                    innerTextField()
+                                }
+                            }
+                        )
+                        if (vm.searchText.isNotEmpty()) {
+                            IconButton(onClick = { vm.searchText = "" }, modifier = Modifier.size(20.dp)) {
+                                Icon(Icons.Default.Close, null, tint = AppColors.TextFaint, modifier = Modifier.size(16.dp))
+                            }
                         }
                     }
-                }
 
-                Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.height(8.dp))
 
-                Text(
-                    "${vm.filteredVehicles.size} araç listeleniyor",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = AppColors.TextMuted
-                )
-            }
-
-            Spacer(Modifier.height(14.dp))
-
-            // ── Vehicle Cards ──
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                if (vm.filteredVehicles.isEmpty()) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 60.dp)
+                            .padding(horizontal = 16.dp)
                     ) {
-                        Icon(Icons.Default.DirectionsCar, null, tint = AppColors.TextFaint.copy(alpha = 0.4f), modifier = Modifier.size(48.dp))
-                        Spacer(Modifier.height(16.dp))
-                        Text("Araç bulunamadı", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted)
-                        Text("Filtre veya arama kriterlerinizi değiştirin", fontSize = 12.sp, color = AppColors.TextFaint)
+                        var groupMenuExpanded by remember { mutableStateOf(false) }
+                        Box {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .background(colors.surface, RoundedCornerShape(8.dp))
+                                    .border(1.dp, colors.outline.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                    .clickable { groupMenuExpanded = true }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Icon(Icons.Default.FolderOpen, null, tint = colors.onSurface.copy(alpha = 0.55f), modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(vm.groupFilter ?: "Tüm Gruplar", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
+                                Spacer(Modifier.width(5.dp))
+                                Icon(Icons.Default.KeyboardArrowDown, null, tint = colors.onSurface, modifier = Modifier.size(14.dp))
+                            }
+                            DropdownMenu(expanded = groupMenuExpanded, onDismissRequest = { groupMenuExpanded = false }) {
+                                DropdownMenuItem(text = { Text("Tüm Gruplar", fontSize = 12.sp) }, onClick = { vm.groupFilter = null; groupMenuExpanded = false })
+                                vm.groups.forEach { group ->
+                                    DropdownMenuItem(text = { Text(group, fontSize = 12.sp) }, onClick = { vm.groupFilter = group; groupMenuExpanded = false })
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.weight(1f))
+
+                        Text(
+                            "${vm.filteredVehicles.size} araç listeleniyor",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.onSurface.copy(alpha = 0.55f)
+                        )
                     }
-                } else {
-                    vm.filteredVehicles.forEach { vehicle ->
-                        VehicleCard(vehicle = vehicle, onClick = { selectedVehicle = vehicle })
+
+                    Spacer(Modifier.height(14.dp))
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        if (vm.filteredVehicles.isEmpty()) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 60.dp)
+                            ) {
+                                Icon(Icons.Default.DirectionsCar, null, tint = AppColors.TextFaint.copy(alpha = 0.4f), modifier = Modifier.size(48.dp))
+                                Spacer(Modifier.height(16.dp))
+                                Text("Araç bulunamadı", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted)
+                                Text("Filtre veya arama kriterlerinizi değiştirin", fontSize = 12.sp, color = AppColors.TextFaint)
+                            }
+                        } else {
+                            vm.filteredVehicles.forEach { vehicle ->
+                                VehicleCard(
+                                    vehicle = vehicle,
+                                    onClick = { selectedVehicle = vehicle }
+                                )
+                            }
+                        }
                     }
+
+                    Spacer(Modifier.height(24.dp))
                 }
             }
-
-            Spacer(Modifier.height(24.dp))
         }
     }
 }
@@ -355,17 +438,18 @@ private fun StatusChip(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val colors = MaterialTheme.colorScheme
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
             .background(
                 if (isSelected) color.copy(alpha = 0.12f)
-                else AppColors.Surface
+                else colors.surface
             )
             .border(
                 1.dp,
-                if (isSelected) color.copy(alpha = 0.3f) else AppColors.BorderSoft,
+                if (isSelected) color.copy(alpha = 0.3f) else colors.outline.copy(alpha = 0.4f),
                 RoundedCornerShape(20.dp)
             )
             .clickable(onClick = onClick)
@@ -382,7 +466,7 @@ private fun StatusChip(
             label,
             fontSize = 12.sp,
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-            color = if (isSelected) color else AppColors.TextSecondary
+            color = if (isSelected) color else colors.onSurface.copy(alpha = 0.7f)
         )
         Spacer(Modifier.width(6.dp))
         Text(
@@ -394,7 +478,7 @@ private fun StatusChip(
                 .clip(RoundedCornerShape(10.dp))
                 .background(
                     if (isSelected) color.copy(alpha = 0.15f)
-                    else AppColors.Bg
+                else colors.surfaceVariant
                 )
                 .padding(horizontal = 6.dp, vertical = 1.dp)
         )
@@ -404,12 +488,13 @@ private fun StatusChip(
 // ── Vehicle Card ──
 @Composable
 private fun VehicleCard(vehicle: Vehicle, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(AppColors.Surface)
-            .border(1.dp, AppColors.BorderSoft, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .background(colors.surface)
+            .border(1.dp, colors.outline.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
     ) {
         // ── Header: Status + Plate + Type + Fleet Badge + Chevron ──
@@ -432,15 +517,15 @@ private fun VehicleCard(vehicle: Vehicle, onClick: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     vehicle.plate,
-                    fontSize = 17.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = AppColors.Navy
+                    color = colors.onSurface
                 )
                 if (vehicle.vehicleType.isNotEmpty() && vehicle.vehicleType != "Ticari") {
                     Text(
                         vehicle.vehicleType,
-                        fontSize = 11.sp,
-                        color = AppColors.TextMuted,
+                        fontSize = 10.sp,
+                        color = colors.onSurface.copy(alpha = 0.55f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -448,10 +533,9 @@ private fun VehicleCard(vehicle: Vehicle, onClick: () -> Unit) {
             }
 
             FleetStatusBadge(vehicle.fleetStatus)
-            Spacer(Modifier.width(8.dp))
             Icon(
                 Icons.Default.ChevronRight, null,
-                tint = AppColors.TextFaint,
+                tint = colors.onSurface.copy(alpha = 0.35f),
                 modifier = Modifier.size(18.dp)
             )
         }
@@ -462,8 +546,8 @@ private fun VehicleCard(vehicle: Vehicle, onClick: () -> Unit) {
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(AppColors.Bg.copy(alpha = 0.7f))
-                .padding(vertical = 10.dp)
+                .background(colors.surfaceVariant)
+                .padding(vertical = 8.dp)
         ) {
             CompactStatItem(
                 icon = Icons.Default.Speed,
@@ -495,47 +579,23 @@ private fun VehicleCard(vehicle: Vehicle, onClick: () -> Unit) {
             )
         }
 
-        Spacer(Modifier.height(8.dp))
-
-        // ── Location row (if available) ──
-        if (vehicle.locationDisplay != "—") {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 8.dp)
-            ) {
-                Icon(Icons.Default.LocationOn, null, tint = AppColors.Indigo.copy(alpha = 0.6f), modifier = Modifier.size(13.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    vehicle.locationDisplay,
-                    fontSize = 11.sp,
-                    color = AppColors.TextSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-
         // ── Footer: Time + Temp/Humidity + Driver + Fuel ──
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .background(AppColors.Bg.copy(alpha = 0.4f))
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .background(colors.surfaceVariant.copy(alpha = 0.75f))
+                .padding(horizontal = 16.dp, vertical = 9.dp)
         ) {
-            // Device time
-            if (vehicle.deviceTime != null) {
+            if (vehicle.listLastInfoLabel.isNotEmpty()) {
                 Icon(Icons.Default.Schedule, null, tint = AppColors.TextFaint, modifier = Modifier.size(12.dp))
                 Spacer(Modifier.width(3.dp))
-                Text(vehicle.formattedDeviceTime, fontSize = 10.sp, color = AppColors.TextFaint)
+                Text(vehicle.listLastInfoLabel, fontSize = 10.sp, color = colors.onSurface.copy(alpha = 0.42f))
             }
 
             // Temperature
             vehicle.temperatureC?.let { temp ->
-                if (vehicle.deviceTime != null) {
+                if (vehicle.listLastInfoLabel.isNotEmpty()) {
                     Spacer(Modifier.width(8.dp))
                     Box(Modifier.size(3.dp).clip(CircleShape).background(AppColors.BorderSoft))
                     Spacer(Modifier.width(8.dp))
@@ -569,7 +629,7 @@ private fun VehicleCard(vehicle: Vehicle, onClick: () -> Unit) {
                 Text(
                     driverText,
                     fontSize = 10.sp,
-                    color = AppColors.TextMuted,
+                    color = colors.onSurface.copy(alpha = 0.55f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.widthIn(max = 100.dp)
@@ -588,6 +648,7 @@ private fun CompactStatItem(
     color: Color,
     modifier: Modifier = Modifier
 ) {
+    val colors = MaterialTheme.colorScheme
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier.padding(vertical = 4.dp)
@@ -604,13 +665,13 @@ private fun CompactStatItem(
         Spacer(Modifier.height(4.dp))
         Text(
             value,
-            fontSize = 12.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            color = color,
+            color = if (value == "0 km/h" || value == "0 km") colors.onSurface else color,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        Text(label, fontSize = 9.sp, color = AppColors.TextMuted)
+        Text(label, fontSize = 8.sp, color = colors.onSurface.copy(alpha = 0.48f))
     }
 }
 
@@ -626,4 +687,29 @@ private fun FleetStatusBadge(status: FleetVehicleStatus, modifier: Modifier = Mo
             .background(status.color.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
             .padding(horizontal = 10.dp, vertical = 4.dp)
     )
+}
+
+@Composable
+private fun VehicleListErrorState(message: String, onRetry: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 28.dp)
+    ) {
+        Icon(Icons.Default.WifiOff, null, tint = AppColors.Offline, modifier = Modifier.size(44.dp))
+        Spacer(Modifier.height(12.dp))
+        Text("Araç verisi alınamadı", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+        Spacer(Modifier.height(6.dp))
+        Text(message, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f), textAlign = TextAlign.Center)
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = onRetry,
+            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Indigo),
+            shape = RoundedCornerShape(10.dp)
+        ) {
+            Text("Tekrar Dene", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
 }

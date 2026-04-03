@@ -9,8 +9,12 @@ struct BlockageSheet: View {
     @Binding var successMessage: String?
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedAction: BlockageAction = .block
     @State private var showConfirm = false
+
+    private var ds: DS { DS(isDark: colorScheme == .dark) }
+    private var isDark: Bool { colorScheme == .dark }
 
     enum BlockageAction: String, CaseIterable {
         case block   = "block"
@@ -39,19 +43,19 @@ struct BlockageSheet: View {
                 HStack(spacing: 14) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(AppTheme.navy).opacity(0.08))
+                            .fill(ds.text1.opacity(0.08))
                             .frame(width: 52, height: 52)
                         Image(systemName: "car.fill")
                             .font(.system(size: 22))
-                            .foregroundColor(Color(AppTheme.navy))
+                            .foregroundColor(ds.text1)
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(vehicle.plate)
                             .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(AppTheme.navy)
+                            .foregroundColor(ds.text1)
                         Text(vehicle.model.isEmpty ? "Bilinmiyor" : vehicle.model)
                             .font(.system(size: 13))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(ds.text3)
                     }
                     Spacer()
                     // Mevcut durum badge
@@ -65,7 +69,7 @@ struct BlockageSheet: View {
                     }
                 }
                 .padding(20)
-                .background(Color(.systemGroupedBackground))
+                .background(isDark ? ds.cardBg : Color(.systemGroupedBackground))
 
                 Divider()
 
@@ -76,7 +80,7 @@ struct BlockageSheet: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("KOMUT SEÇ")
                                 .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(AppTheme.textMuted)
+                                .foregroundColor(ds.text3)
                                 .tracking(0.5)
 
                             HStack(spacing: 10) {
@@ -94,7 +98,7 @@ struct BlockageSheet: View {
                                 .font(.system(size: 18))
                             Text(selectedAction.description)
                                 .font(.system(size: 13))
-                                .foregroundColor(AppTheme.textSecondary)
+                                .foregroundColor(ds.text1)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         .padding(16)
@@ -162,7 +166,7 @@ struct BlockageSheet: View {
                                 Text("Bekleyen Komutu İptal Et")
                                     .font(.system(size: 13, weight: .medium))
                             }
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(ds.text3)
                             .frame(maxWidth: .infinity)
                             .frame(height: 44)
                             .background(Color(.secondarySystemBackground))
@@ -180,7 +184,7 @@ struct BlockageSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Kapat") { dismiss() }
-                        .foregroundColor(AppTheme.navy)
+                        .foregroundColor(ds.text1)
                 }
             }
             .confirmationDialog(
@@ -206,7 +210,7 @@ struct BlockageSheet: View {
             VStack(spacing: 10) {
                 Image(systemName: action.icon)
                     .font(.system(size: 24))
-                    .foregroundColor(selectedAction == action ? action.color : AppTheme.textMuted)
+                    .foregroundColor(selectedAction == action ? action.color : ds.text3)
                     .frame(width: 52, height: 52)
                     .background(
                         RoundedRectangle(cornerRadius: 14)
@@ -214,7 +218,7 @@ struct BlockageSheet: View {
                     )
                 Text(action.label)
                     .font(.system(size: 12, weight: selectedAction == action ? .semibold : .regular))
-                    .foregroundColor(selectedAction == action ? action.color : AppTheme.textMuted)
+                    .foregroundColor(selectedAction == action ? action.color : ds.text3)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)

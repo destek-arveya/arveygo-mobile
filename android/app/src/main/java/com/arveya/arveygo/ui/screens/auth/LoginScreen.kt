@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -34,9 +35,6 @@ import com.arveya.arveygo.ui.components.LanguageSwitcher
 import com.arveya.arveygo.ui.theme.AppColors
 import com.arveya.arveygo.utils.LoginStrings
 import androidx.compose.ui.res.painterResource
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import androidx.compose.ui.platform.LocalContext
 import com.arveya.arveygo.R
 import com.arveya.arveygo.models.CountryCode
 import kotlinx.coroutines.delay
@@ -85,7 +83,15 @@ fun LoginScreen() {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(AppColors.Bg)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                AppColors.Navy,
+                                Color(0xFF121B55),
+                                Color(0xFF080C2A)
+                            )
+                        )
+                    )
                     .clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) { focusManager.clearFocus() }
             ) {
                 // Decorative circles
@@ -94,7 +100,7 @@ fun LoginScreen() {
                         .size(400.dp)
                         .offset(x = (-100).dp, y = (-150).dp)
                         .clip(CircleShape)
-                        .background(AppColors.Navy.copy(alpha = 0.03f))
+                        .background(Color.White.copy(alpha = 0.04f))
                 )
                 Box(
                     modifier = Modifier
@@ -102,7 +108,7 @@ fun LoginScreen() {
                         .align(Alignment.BottomEnd)
                         .offset(x = 100.dp, y = 100.dp)
                         .clip(CircleShape)
-                        .background(AppColors.Indigo.copy(alpha = 0.04f))
+                        .background(AppColors.Lavender.copy(alpha = 0.10f))
                 )
 
                 Column(
@@ -121,19 +127,16 @@ fun LoginScreen() {
 
                     // Logo
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data("https://arveya.com/images/genel/logo.webp")
-                                .crossfade(true)
-                                .build(),
+                        Image(
+                            painter = painterResource(R.drawable.logo_arveygo),
                             contentDescription = "ArveyGo Logo",
                             modifier = Modifier
-                                .height(64.dp)
+                                .height(68.dp)
                                 .clip(RoundedCornerShape(14.dp))
                         )
                         Spacer(Modifier.height(8.dp))
-                        Text("ArveyGo", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
-                        Text(L.appSubtitle, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted, letterSpacing = 2.sp)
+                        Text("ArveyGo", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Kurumsal filo operasyonlarına giriş", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.72f))
                     }
 
                     Spacer(Modifier.height(24.dp))
@@ -143,13 +146,13 @@ fun LoginScreen() {
                         modifier = Modifier
                             .padding(horizontal = 16.dp)
                             .fillMaxWidth()
-                            .shadow(6.dp, RoundedCornerShape(16.dp), ambientColor = AppColors.Navy.copy(alpha = 0.06f))
+                            .shadow(10.dp, RoundedCornerShape(18.dp), ambientColor = Color.Black.copy(alpha = 0.25f))
                             .background(AppColors.Surface, RoundedCornerShape(16.dp))
                             .padding(22.dp)
                     ) {
                         Text(L.welcomeBack, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
                         Spacer(Modifier.height(6.dp))
-                        Text(L.loginSubtitle, fontSize = 13.sp, color = AppColors.TextMuted)
+                        Text("Araçlar, alarmlar ve rota operasyonları için tek oturumla devam edin.", fontSize = 13.sp, color = AppColors.TextMuted)
                         Spacer(Modifier.height(20.dp))
 
                         // ═══ Tab Switcher: E-posta / Telefon ═══

@@ -134,8 +134,17 @@ struct RouteTrip: Identifiable {
 
 // MARK: - RouteHistoryView
 struct RouteHistoryView: View {
+    enum DisplayMode {
+        case standalone
+        case embedded
+    }
+
     @EnvironmentObject var authVM: AuthViewModel
+    @Environment(\.colorScheme) private var colorScheme
     @Binding var showSideMenu: Bool
+    var displayMode: DisplayMode = .standalone
+    var initialVehicle: Vehicle? = nil
+    var autoLoadInitialVehicle: Bool = false
 
     @State private var selectedVehicle: Vehicle?
     @State private var startDate = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
@@ -152,6 +161,7 @@ struct RouteHistoryView: View {
     @State private var showSpeedLegend = false
     @State private var isAutoAdvancing = false  // true when auto-jumping to next trip
     @State private var followVehicle = true     // camera follows vehicle during playback
+    @State private var hasAppliedInitialVehicle = false
 
     @StateObject private var vm = RouteHistoryViewModel()
 
@@ -164,11 +174,31 @@ struct RouteHistoryView: View {
 
     enum MapStyleMode { case standard, satellite, hybrid }
 
+    private var isDark: Bool { colorScheme == .dark }
+    private var pageBackground: Color { isDark ? Color(red: 12/255, green: 17/255, blue: 32/255) : AppTheme.bg }
+    private var surfaceColor: Color { isDark ? Color(red: 21/255, green: 27/255, blue: 48/255) : AppTheme.surface }
+    private var elevatedSurface: Color { isDark ? Color(red: 28/255, green: 35/255, blue: 60/255) : Color.white }
+    private var primaryText: Color { isDark ? AppTheme.darkText : AppTheme.navy }
+    private var secondaryText: Color { isDark ? AppTheme.darkTextSub : AppTheme.textSecondary }
+    private var mutedText: Color { isDark ? AppTheme.darkTextMuted : AppTheme.textMuted }
+    private var borderColor: Color { isDark ? Color.white.opacity(0.08) : AppTheme.borderSoft }
+
     // MARK: - Body
     var body: some View {
-        NavigationStack {
+        Group {
+            if displayMode == .standalone {
+                NavigationStack {
+                    routeHistoryContent
+                }
+            } else {
+                routeHistoryContent
+            }
+        }
+    }
+
+    private var routeHistoryContent: some View {
             ZStack {
-                AppTheme.bg.ignoresSafeArea()
+                pageBackground.ignoresSafeArea()
                 VStack(spacing: 0) {
                     selectorBar
                     mapArea
@@ -180,28 +210,32 @@ struct RouteHistoryView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { withAnimation(.spring(response: 0.3)) { showSideMenu.toggle() } }) {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(AppTheme.navy)
+                if displayMode == .standalone {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: { withAnimation(.spring(response: 0.3)) { showSideMenu.toggle() } }) {
+                            Image(systemName: "line.3.horizontal")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(AppTheme.navy)
+                        }
                     }
                 }
-                ToolbarItem(placement: .principal) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "map.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(AppTheme.indigo)
-                        Text("Rota Geçmişi")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(AppTheme.navy)
+                    ToolbarItem(placement: .principal) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "map.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.indigo)
+                            Text("Rota Geçmişi")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(primaryText)
+                        }
                     }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    AvatarCircle(
-                        initials: authVM.currentUser?.avatar ?? "A",
-                        size: 30
-                    )
+                if displayMode == .standalone {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        AvatarCircle(
+                            initials: authVM.currentUser?.avatar ?? "A",
+                            size: 30
+                        )
+                    }
                 }
             }
             .sheet(isPresented: $showVehiclePicker) {
@@ -219,11 +253,7 @@ struct RouteHistoryView: View {
             .onAppear { handleOnAppear() }
             .onDisappear { stopPlayback() }
             .onChange(of: vm.vehicles) { _, vehicles in
-                if selectedVehicle == nil, let first = vehicles.first {
-                    selectedVehicle = first
-                    vm.selectVehicle(first)
-                    vm.loadRoutes(from: startDate, to: endDate)
-                }
+                applyInitialVehicleIfNeeded(in: vehicles)
             }
             .onChange(of: vm.selectedRoute?.id) { _, _ in
                 if !isAutoAdvancing {
@@ -238,17 +268,28 @@ struct RouteHistoryView: View {
             .onChange(of: playbackSpeed) { _, _ in
                 if isPlaying { restartPlaybackTimer() }
             }
-        }
     }
 
     private func handleOnAppear() {
-        if selectedVehicle == nil, let first = vm.vehicles.first {
-            selectedVehicle = first
-            vm.selectVehicle(first)
-        }
-        if vm.selectedVehicleId != nil {
-            vm.loadRoutes(from: startDate, to: endDate)
-        }
+        applyInitialVehicleIfNeeded(in: vm.vehicles)
+    }
+
+    private func preferredRouteVehicle(in vehicles: [Vehicle]) -> Vehicle? {
+        guard let initialVehicle else { return nil }
+        return vehicles.first {
+            $0.id == initialVehicle.id ||
+            $0.deviceId == initialVehicle.deviceId ||
+            $0.plate == initialVehicle.plate
+        } ?? (vehicles.isEmpty ? nil : initialVehicle)
+    }
+
+    private func applyInitialVehicleIfNeeded(in vehicles: [Vehicle]) {
+        guard autoLoadInitialVehicle, !hasAppliedInitialVehicle else { return }
+        guard let preferredVehicle = preferredRouteVehicle(in: vehicles) else { return }
+        selectedVehicle = preferredVehicle
+        vm.selectVehicle(preferredVehicle)
+        vm.loadRoutes(from: startDate, to: endDate)
+        hasAppliedInitialVehicle = true
     }
 
     // MARK: - Zoom to selected route
@@ -287,17 +328,17 @@ struct RouteHistoryView: View {
                     }
                     Text(selectedVehicle?.plate ?? "Araç Seç")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(AppTheme.navy)
+                        .foregroundColor(primaryText)
                         .lineLimit(1)
                     Image(systemName: "chevron.down")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(AppTheme.textMuted)
+                        .foregroundColor(mutedText)
                 }
                 .padding(.horizontal, 10)
                 .frame(height: 36)
-                .background(AppTheme.surface)
+                .background(surfaceColor)
                 .cornerRadius(10)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.indigo.opacity(0.25), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(borderColor, lineWidth: 1))
             }
             .buttonStyle(.plain)
 
@@ -309,16 +350,16 @@ struct RouteHistoryView: View {
                         .foregroundColor(AppTheme.indigo)
                     Text(dateRangeSummary)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(AppTheme.navy)
+                        .foregroundColor(primaryText)
                     Image(systemName: "chevron.down")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(AppTheme.textMuted)
+                        .foregroundColor(mutedText)
                 }
                 .padding(.horizontal, 10)
                 .frame(height: 36)
-                .background(AppTheme.surface)
+                .background(surfaceColor)
                 .cornerRadius(10)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.indigo.opacity(0.25), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(borderColor, lineWidth: 1))
             }
             .buttonStyle(.plain)
 
@@ -333,7 +374,7 @@ struct RouteHistoryView: View {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 12, weight: .bold))
                     }
-                    Text("Ara")
+                    Text(vm.routes.isEmpty ? "Ara" : "Yenile")
                         .font(.system(size: 12, weight: .bold))
                 }
                 .foregroundColor(.white)
@@ -342,11 +383,11 @@ struct RouteHistoryView: View {
                 .background(vm.isLoadingRoutes ? AppTheme.indigo.opacity(0.6) : AppTheme.indigo)
                 .cornerRadius(10)
             }
-            .disabled(vm.isLoadingRoutes)
+            .disabled(vm.isLoadingRoutes || selectedVehicle == nil)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(AppTheme.surface)
+        .background(surfaceColor)
         .shadow(color: .black.opacity(0.05), radius: 3, y: 2)
     }
 
@@ -365,16 +406,16 @@ struct RouteHistoryView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Tarih Aralığı")
                         .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(AppTheme.navy)
+                        .foregroundColor(primaryText)
                     Text("Rota geçmişi için tarih seçin")
                         .font(.system(size: 12))
-                        .foregroundColor(AppTheme.textMuted)
+                        .foregroundColor(mutedText)
                 }
                 Spacer()
                 Button(action: { showDatePickerModal = false }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 24))
-                        .foregroundColor(AppTheme.textFaint)
+                        .foregroundColor(mutedText)
                 }
             }
             .padding(.horizontal, 20)
@@ -400,14 +441,14 @@ struct RouteHistoryView: View {
                                     if isActive {
                                         LinearGradient(colors: [AppTheme.indigo, AppTheme.navy], startPoint: .leading, endPoint: .trailing)
                                     } else {
-                                        LinearGradient(colors: [AppTheme.bg, AppTheme.bg], startPoint: .leading, endPoint: .trailing)
+                                        LinearGradient(colors: [surfaceColor, surfaceColor], startPoint: .leading, endPoint: .trailing)
                                     }
                                 }
                             )
                             .cornerRadius(20)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 20)
-                                    .stroke(isActive ? Color.clear : AppTheme.borderSoft, lineWidth: 1)
+                                    .stroke(isActive ? Color.clear : borderColor, lineWidth: 1)
                             )
                         }
                         .buttonStyle(.plain)
@@ -436,11 +477,11 @@ struct RouteHistoryView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(12)
-                    .background(AppTheme.bg)
+                    .background(elevatedSurface)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(AppTheme.borderSoft, lineWidth: 1)
+                            .stroke(borderColor, lineWidth: 1)
                     )
 
                     Image(systemName: "arrow.right")
@@ -466,11 +507,11 @@ struct RouteHistoryView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(12)
-                    .background(AppTheme.bg)
+                    .background(elevatedSurface)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(AppTheme.borderSoft, lineWidth: 1)
+                            .stroke(borderColor, lineWidth: 1)
                     )
                 }
                 .padding(.horizontal, 20)
