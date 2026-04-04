@@ -29,6 +29,7 @@ import com.arveya.arveygo.ui.components.GradientButton
 import com.arveya.arveygo.ui.components.LanguageSwitcher
 import com.arveya.arveygo.ui.theme.AppColors
 import androidx.compose.ui.res.painterResource
+import com.arveya.arveygo.utils.LoginStrings
 
 @Composable
 fun RegisterScreen(onBack: () -> Unit) {
@@ -40,6 +41,8 @@ fun RegisterScreen(onBack: () -> Unit) {
     val isLoading by authVM.isLoading.collectAsState()
     val errorMessage by authVM.errorMessage.collectAsState()
     val focusManager = LocalFocusManager.current
+    val currentLang by LoginStrings.currentLang.collectAsState()
+    val L = LoginStrings
 
     LaunchedEffect(Unit) { authVM.clearRegisterFields() }
 
@@ -67,7 +70,7 @@ fun RegisterScreen(onBack: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { onBack() }) {
                     Icon(Icons.Default.ChevronLeft, null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(18.dp))
-                    Text("Giriş Yap", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
+                    Text(L.loginButton, fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
                 }
                 Spacer(Modifier.weight(1f))
                 LanguageSwitcher()
@@ -84,7 +87,7 @@ fun RegisterScreen(onBack: () -> Unit) {
                 )
                 Spacer(Modifier.height(8.dp))
                 Text("ArveyGo", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("Kurumsal kullanıcı hesabı oluştur", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.72f))
+                Text(L.t("Kurumsal kullanıcı hesabı oluştur", "Create your enterprise user account", "Crea tu cuenta corporativa", "Créez votre compte professionnel"), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.72f))
             }
 
             Spacer(Modifier.height(18.dp))
@@ -95,9 +98,9 @@ fun RegisterScreen(onBack: () -> Unit) {
                     .shadow(10.dp, RoundedCornerShape(18.dp), ambientColor = Color.Black.copy(alpha = 0.25f))
                     .background(AppColors.Surface, RoundedCornerShape(16.dp)).padding(22.dp)
             ) {
-                Text("Yeni Hesap Oluştur", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                Text(L.t("Yeni Hesap Oluştur", "Create New Account", "Crear Cuenta Nueva", "Créer un compte"), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
                 Spacer(Modifier.height(6.dp))
-                Text("Bilgilerinizi girerek kayıt olun", fontSize = 13.sp, color = AppColors.TextMuted)
+                Text(L.t("Bilgilerinizi girerek kayıt olun", "Sign up by entering your details", "Regístrate ingresando tus datos", "Inscrivez-vous en saisissant vos informations"), fontSize = 13.sp, color = AppColors.TextMuted)
                 Spacer(Modifier.height(24.dp))
 
                 AnimatedVisibility(visible = errorMessage != null) {
@@ -113,31 +116,31 @@ fun RegisterScreen(onBack: () -> Unit) {
                 if (errorMessage != null) Spacer(Modifier.height(16.dp))
 
                 // Name
-                FormField("Ad Soyad", Icons.Default.Person, "Adınız Soyadınız", name) { authVM.registerName.value = it }
+                FormField(L.t("Ad Soyad", "Full Name", "Nombre completo", "Nom complet"), Icons.Default.Person, L.t("Adınız Soyadınız", "Your full name", "Tu nombre completo", "Votre nom complet"), name) { authVM.registerName.value = it }
                 Spacer(Modifier.height(14.dp))
 
                 // Email
-                FormField("E-posta", Icons.Default.Email, "ornek@email.com", email, KeyboardType.Email) { authVM.registerEmail.value = it }
+                FormField(L.emailLabel, Icons.Default.Email, L.emailPlaceholder, email, KeyboardType.Email) { authVM.registerEmail.value = it }
                 Spacer(Modifier.height(14.dp))
 
                 // Password
-                SecureFormField("Şifre", "En az 8 karakter", password) { authVM.registerPassword.value = it }
+                SecureFormField(L.passwordLabel, L.t("En az 8 karakter", "At least 8 characters", "Al menos 8 caracteres", "Au moins 8 caractères"), password) { authVM.registerPassword.value = it }
                 Spacer(Modifier.height(14.dp))
 
                 // Confirm
-                SecureFormField("Şifre Tekrar", "Şifrenizi tekrar girin", confirm) { authVM.registerPasswordConfirm.value = it }
+                SecureFormField(L.t("Şifre Tekrar", "Confirm Password", "Confirmar contraseña", "Confirmer le mot de passe"), L.t("Şifrenizi tekrar girin", "Enter your password again", "Ingresa tu contraseña nuevamente", "Saisissez à nouveau votre mot de passe"), confirm) { authVM.registerPasswordConfirm.value = it }
                 Spacer(Modifier.height(24.dp))
 
                 GradientButton(
-                    text = "Kayıt Ol", onClick = { focusManager.clearFocus(); authVM.register() },
+                    text = L.register, onClick = { focusManager.clearFocus(); authVM.register() },
                     isLoading = isLoading, icon = Icons.Default.ArrowForward, modifier = Modifier.fillMaxWidth()
                 )
 
                 Spacer(Modifier.height(16.dp))
 
                 Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth().clickable { onBack() }) {
-                    Text("Zaten hesabınız var mı? ", fontSize = 13.sp, color = AppColors.TextMuted)
-                    Text("Giriş Yap", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
+                    Text("${L.noAccount} ", fontSize = 13.sp, color = AppColors.TextMuted)
+                    Text(L.loginButton, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Navy)
                 }
             }
 

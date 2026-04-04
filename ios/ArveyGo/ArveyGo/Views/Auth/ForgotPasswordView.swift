@@ -3,6 +3,7 @@ import SwiftUI
 struct ForgotPasswordView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var L = LoginStrings.shared
     @FocusState private var emailFocused: Bool
 
     var body: some View {
@@ -28,7 +29,7 @@ struct ForgotPasswordView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "chevron.left")
                                 .font(.system(size: 13, weight: .semibold))
-                            Text("Giriş Yap")
+                            Text(L.loginButton)
                                 .font(.system(size: 13))
                         }
                         .foregroundColor(Color.white.opacity(0.86))
@@ -66,18 +67,18 @@ struct ForgotPasswordView: View {
                                     .foregroundColor(AppTheme.online)
                             }
 
-                            Text("Bağlantı Gönderildi!")
+                            Text(L.t("Bağlantı Gönderildi!", "Link Sent!", "Enlace enviado", "Lien envoyé"))
                                 .font(.system(size: 18, weight: .bold))
                                 .foregroundColor(AppTheme.authTextPrimary)
 
-                            Text("Şifre sıfırlama bağlantısı **\(authVM.forgotEmail)** adresine gönderildi.")
+                            Text(L.t("Şifre sıfırlama bağlantısı **\(authVM.forgotEmail)** adresine gönderildi.", "Password reset link sent to **\(authVM.forgotEmail)**.", "El enlace para restablecer la contraseña se envió a **\(authVM.forgotEmail)**.", "Le lien de réinitialisation a été envoyé à **\(authVM.forgotEmail)**."))
                                 .font(.system(size: 13))
                                 .foregroundColor(AppTheme.authTextMuted)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 8)
 
                             Button(action: { dismiss() }) {
-                                Text("Giriş Sayfasına Dön")
+                                Text(L.t("Giriş Sayfasına Dön", "Return to Login", "Volver al inicio de sesión", "Retour à la connexion"))
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundColor(AppTheme.authAccent)
                             }
@@ -86,12 +87,12 @@ struct ForgotPasswordView: View {
                         .transition(.scale.combined(with: .opacity))
                     } else {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Şifremi Unuttum")
+                            Text(L.forgotPassword)
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(AppTheme.authTextPrimary)
                                 .frame(maxWidth: .infinity, alignment: .center)
 
-                            Text("E-posta adresinize şifre sıfırlama bağlantısı göndereceğiz")
+                            Text(L.t("E-posta adresinize şifre sıfırlama bağlantısı göndereceğiz", "We'll send a password reset link to your email address", "Enviaremos un enlace de restablecimiento a tu correo electrónico", "Nous enverrons un lien de réinitialisation à votre adresse e-mail"))
                                 .font(.system(size: 13))
                                 .foregroundColor(AppTheme.authTextMuted)
                                 .multilineTextAlignment(.center)
@@ -115,7 +116,7 @@ struct ForgotPasswordView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("E-posta")
+                            Text(L.emailLabel)
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(AppTheme.authTextSecondary)
 
@@ -124,7 +125,7 @@ struct ForgotPasswordView: View {
                                     .font(.system(size: 15))
                                     .foregroundColor(AppTheme.authTextMuted)
                                     .frame(width: 20)
-                                TextField("ornek@email.com", text: $authVM.forgotEmail)
+                                TextField(L.emailPlaceholder, text: $authVM.forgotEmail)
                                     .font(.system(size: 14))
                                     .foregroundColor(AppTheme.authTextPrimary)
                                     .textContentType(.emailAddress)
@@ -152,7 +153,7 @@ struct ForgotPasswordView: View {
                                 } else {
                                     Image(systemName: "paperplane.fill")
                                         .font(.system(size: 13))
-                                    Text("Sıfırlama Bağlantısı Gönder")
+                                    Text(L.t("Sıfırlama Bağlantısı Gönder", "Send Reset Link", "Enviar enlace de restablecimiento", "Envoyer le lien"))
                                 }
                             }
                         }
@@ -174,7 +175,7 @@ struct ForgotPasswordView: View {
 
                 // Footer
                 VStack(spacing: 4) {
-                    Text("© 2026 Arveya Teknoloji")
+                    Text(L.copyright)
                         .font(.system(size: 10))
                         .foregroundColor(Color.white.opacity(0.68))
                 }

@@ -31,6 +31,7 @@ import com.arveya.arveygo.services.WSEvent
 import com.arveya.arveygo.ui.components.AvatarCircle
 import com.arveya.arveygo.ui.components.VehicleCardsSkeletonList
 import com.arveya.arveygo.ui.theme.AppColors
+import com.arveya.arveygo.utils.DashboardStrings
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -55,11 +56,11 @@ class VehiclesListViewModel {
 
     val statusFilterLabel: String
         get() = when (statusFilter) {
-            VehicleStatus.IGNITION_ON -> "Kontak Açık"
-            VehicleStatus.IGNITION_OFF -> "Kontak Kapalı"
-            VehicleStatus.NO_DATA -> "Bilgi Yok"
-            VehicleStatus.SLEEPING -> "Cihaz Uykuda"
-            null -> "Tüm Durumlar"
+            VehicleStatus.IGNITION_ON -> DashboardStrings.t("Kontak Açık", "Ignition On", "Encendido", "Contact mis")
+            VehicleStatus.IGNITION_OFF -> DashboardStrings.t("Kontak Kapalı", "Ignition Off", "Apagado", "Contact coupé")
+            VehicleStatus.NO_DATA -> DashboardStrings.t("Bilgi Yok", "No Data", "Sin datos", "Aucune donnée")
+            VehicleStatus.SLEEPING -> DashboardStrings.t("Cihaz Uykuda", "Device Sleeping", "Dispositivo en reposo", "Appareil en veille")
+            null -> DashboardStrings.t("Tüm Durumlar", "All Statuses", "Todos los estados", "Tous les statuts")
         }
 
     val filteredVehicles: List<Vehicle>
@@ -136,7 +137,7 @@ class VehiclesListViewModel {
             mergeVehicles(apiVehicles)
         } catch (e: Exception) {
             if (vehicles.isEmpty()) {
-                errorMessage = e.localizedMessage ?: "Araç verileri alınamadı."
+                errorMessage = e.localizedMessage ?: DashboardStrings.t("Araç verileri alınamadı.", "Vehicle data could not be loaded.", "No se pudieron cargar los datos del vehículo.", "Impossible de charger les données du véhicule.")
             }
             isLoading = false
         }
@@ -152,6 +153,8 @@ fun VehiclesListScreen(
 ) {
     val authVM = LocalAuthViewModel.current
     val user by authVM.currentUser.collectAsState()
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     val vm = remember { VehiclesListViewModel() }
     val scope = rememberCoroutineScope()
     var selectedVehicle by remember { mutableStateOf<Vehicle?>(null) }
@@ -210,8 +213,8 @@ fun VehiclesListScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Araçlar", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
-                        Text("Kurumsal filo görünümü", fontSize = 10.sp, color = colors.onSurface.copy(alpha = 0.55f))
+                        Text(DL.menuVehicles, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
+                        Text(DL.t("Kurumsal filo görünümü", "Enterprise fleet overview", "Vista empresarial de flota", "Vue d'ensemble de flotte"), fontSize = 10.sp, color = colors.onSurface.copy(alpha = 0.55f))
                     }
                 },
                 actions = {
@@ -251,7 +254,7 @@ fun VehiclesListScreen(
         ) {
             when {
                 vm.isLoading && vm.vehicles.isEmpty() -> VehicleCardsSkeletonList()
-                vm.errorMessage != null && vm.vehicles.isEmpty() -> VehicleListErrorState(vm.errorMessage ?: "Araç verileri alınamadı.") {
+                vm.errorMessage != null && vm.vehicles.isEmpty() -> VehicleListErrorState(vm.errorMessage ?: DL.t("Araç verileri alınamadı.", "Vehicle data could not be loaded.", "No se pudieron cargar los datos del vehículo.", "Impossible de charger les données du véhicule.")) {
                     scope.launch { vm.loadVehiclesFromApi() }
                 }
                 else -> Column(
@@ -269,7 +272,7 @@ fun VehiclesListScreen(
                     ) {
                         item {
                             StatusChip(
-                                label = "Toplam",
+                                label = DL.t("Toplam", "Total", "Total", "Total"),
                                 count = vm.vehicles.size,
                                 color = AppColors.Navy,
                                 isSelected = vm.statusFilter == null,
@@ -278,7 +281,7 @@ fun VehiclesListScreen(
                         }
                         item {
                             StatusChip(
-                                label = "Kontak Açık",
+                                label = DL.t("Kontak Açık", "Ignition On", "Encendido", "Contact mis"),
                                 count = vm.onlineCount,
                                 color = AppColors.Online,
                                 isSelected = vm.statusFilter == VehicleStatus.IGNITION_ON,
@@ -287,7 +290,7 @@ fun VehiclesListScreen(
                         }
                         item {
                             StatusChip(
-                                label = "Kontak Kapalı",
+                                label = DL.t("Kontak Kapalı", "Ignition Off", "Apagado", "Contact coupé"),
                                 count = vm.offlineCount,
                                 color = AppColors.Offline,
                                 isSelected = vm.statusFilter == VehicleStatus.IGNITION_OFF,
@@ -296,7 +299,7 @@ fun VehiclesListScreen(
                         }
                         item {
                             StatusChip(
-                                label = "Bilgi Yok",
+                                label = DL.t("Bilgi Yok", "No Data", "Sin datos", "Aucune donnée"),
                                 count = vm.noDataCount,
                                 color = AppColors.TextMuted,
                                 isSelected = vm.statusFilter == VehicleStatus.NO_DATA,
@@ -305,7 +308,7 @@ fun VehiclesListScreen(
                         }
                         item {
                             StatusChip(
-                                label = "Uyku",
+                                label = DL.t("Uyku", "Sleep", "Sueño", "Veille"),
                                 count = vm.sleepingCount,
                                 color = AppColors.Idle,
                                 isSelected = vm.statusFilter == VehicleStatus.SLEEPING,
@@ -337,7 +340,7 @@ fun VehiclesListScreen(
                             decorationBox = { innerTextField ->
                                 Box(contentAlignment = Alignment.CenterStart) {
                                     if (vm.searchText.isEmpty()) {
-                                        Text("Plaka, araç veya sürücü ara...", fontSize = 14.sp, color = colors.onSurface.copy(alpha = 0.45f))
+                                        Text(DL.t("Plaka, araç veya sürücü ara...", "Search plate, vehicle, or driver...", "Buscar matrícula, vehículo o conductor...", "Rechercher plaque, véhicule ou conducteur..."), fontSize = 14.sp, color = colors.onSurface.copy(alpha = 0.45f))
                                     }
                                     innerTextField()
                                 }
@@ -370,12 +373,12 @@ fun VehiclesListScreen(
                             ) {
                                 Icon(Icons.Default.FolderOpen, null, tint = colors.onSurface.copy(alpha = 0.55f), modifier = Modifier.size(14.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text(vm.groupFilter ?: "Tüm Gruplar", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
+                                Text(vm.groupFilter ?: DL.t("Tüm Gruplar", "All Groups", "Todos los grupos", "Tous les groupes"), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
                                 Spacer(Modifier.width(5.dp))
                                 Icon(Icons.Default.KeyboardArrowDown, null, tint = colors.onSurface, modifier = Modifier.size(14.dp))
                             }
                             DropdownMenu(expanded = groupMenuExpanded, onDismissRequest = { groupMenuExpanded = false }) {
-                                DropdownMenuItem(text = { Text("Tüm Gruplar", fontSize = 12.sp) }, onClick = { vm.groupFilter = null; groupMenuExpanded = false })
+                                DropdownMenuItem(text = { Text(DL.t("Tüm Gruplar", "All Groups", "Todos los grupos", "Tous les groupes"), fontSize = 12.sp) }, onClick = { vm.groupFilter = null; groupMenuExpanded = false })
                                 vm.groups.forEach { group ->
                                     DropdownMenuItem(text = { Text(group, fontSize = 12.sp) }, onClick = { vm.groupFilter = group; groupMenuExpanded = false })
                                 }
@@ -385,7 +388,7 @@ fun VehiclesListScreen(
                         Spacer(Modifier.weight(1f))
 
                         Text(
-                            "${vm.filteredVehicles.size} araç listeleniyor",
+                            DL.t("${vm.filteredVehicles.size} araç listeleniyor", "${vm.filteredVehicles.size} vehicles listed", "${vm.filteredVehicles.size} vehículos listados", "${vm.filteredVehicles.size} véhicules listés"),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = colors.onSurface.copy(alpha = 0.55f)
@@ -409,8 +412,8 @@ fun VehiclesListScreen(
                             ) {
                                 Icon(Icons.Default.DirectionsCar, null, tint = AppColors.TextFaint.copy(alpha = 0.4f), modifier = Modifier.size(48.dp))
                                 Spacer(Modifier.height(16.dp))
-                                Text("Araç bulunamadı", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted)
-                                Text("Filtre veya arama kriterlerinizi değiştirin", fontSize = 12.sp, color = AppColors.TextFaint)
+                                Text(DL.t("Araç bulunamadı", "No vehicles found", "No se encontraron vehículos", "Aucun véhicule trouvé"), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted)
+                                Text(DL.t("Filtre veya arama kriterlerinizi değiştirin", "Change your filters or search criteria", "Cambia los filtros o el criterio de búsqueda", "Modifiez vos filtres ou votre recherche"), fontSize = 12.sp, color = AppColors.TextFaint)
                             }
                         } else {
                             vm.filteredVehicles.forEach { vehicle ->
@@ -552,28 +555,28 @@ private fun VehicleCard(vehicle: Vehicle, onClick: () -> Unit) {
             CompactStatItem(
                 icon = Icons.Default.Speed,
                 value = vehicle.formattedSpeed,
-                label = "Hız",
+                label = DashboardStrings.t("Hız", "Speed", "Velocidad", "Vitesse"),
                 color = if (vehicle.speed > 0) AppColors.Online else AppColors.TextMuted,
                 modifier = Modifier.weight(1f)
             )
             CompactStatItem(
                 icon = Icons.Default.Today,
                 value = vehicle.formattedTodayKm,
-                label = "Bugün",
+                label = DashboardStrings.t("Bugün", "Today", "Hoy", "Aujourd'hui"),
                 color = AppColors.Indigo,
                 modifier = Modifier.weight(1f)
             )
             CompactStatItem(
                 icon = Icons.Default.Route,
                 value = vehicle.formattedTotalKm,
-                label = "Toplam",
+                label = DashboardStrings.t("Toplam", "Total", "Total", "Total"),
                 color = AppColors.Navy,
                 modifier = Modifier.weight(1f)
             )
             CompactStatItem(
                 icon = Icons.Default.VpnKey,
-                value = if (vehicle.kontakOn) "Açık" else "Kapalı",
-                label = "Kontak",
+                value = if (vehicle.kontakOn) DashboardStrings.t("Açık", "Open", "Activo", "Ouvert") else DashboardStrings.t("Kapalı", "Closed", "Cerrado", "Fermé"),
+                label = DashboardStrings.t("Kontak", "Ignition", "Encendido", "Contact"),
                 color = if (vehicle.kontakOn) AppColors.Online else AppColors.Offline,
                 modifier = Modifier.weight(1f)
             )
@@ -691,6 +694,7 @@ private fun FleetStatusBadge(status: FleetVehicleStatus, modifier: Modifier = Mo
 
 @Composable
 private fun VehicleListErrorState(message: String, onRetry: () -> Unit) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -700,7 +704,7 @@ private fun VehicleListErrorState(message: String, onRetry: () -> Unit) {
     ) {
         Icon(Icons.Default.WifiOff, null, tint = AppColors.Offline, modifier = Modifier.size(44.dp))
         Spacer(Modifier.height(12.dp))
-        Text("Araç verisi alınamadı", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+        Text(DashboardStrings.t("Araç verisi alınamadı", "Vehicle data unavailable", "Datos del vehículo no disponibles", "Données véhicule indisponibles"), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(6.dp))
         Text(message, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f), textAlign = TextAlign.Center)
         Spacer(Modifier.height(16.dp))
@@ -709,7 +713,7 @@ private fun VehicleListErrorState(message: String, onRetry: () -> Unit) {
             colors = ButtonDefaults.buttonColors(containerColor = AppColors.Indigo),
             shape = RoundedCornerShape(10.dp)
         ) {
-            Text("Tekrar Dene", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(DashboardStrings.t("Tekrar Dene", "Try Again", "Reintentar", "Réessayer"), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

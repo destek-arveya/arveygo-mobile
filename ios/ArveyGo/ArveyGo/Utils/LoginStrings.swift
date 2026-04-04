@@ -56,6 +56,10 @@ class LoginStrings: ObservableObject {
     var copyright: String { "© 2026 Arveya Teknoloji" }
     var version: String { "v1.0.0" }
 
+    func t(_ tr: String, _ en: String, _ es: String, _ fr: String) -> String {
+        s(tr, en, es, fr)
+    }
+
     private func s(_ tr: String, _ en: String, _ es: String, _ fr: String) -> String {
         switch currentLang {
         case "EN": return en

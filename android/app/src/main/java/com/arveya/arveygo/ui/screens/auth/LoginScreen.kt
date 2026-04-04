@@ -50,7 +50,7 @@ fun LoginScreen() {
     val rememberMe by authVM.rememberMe.collectAsState()
 
     // Force recomposition when language changes
-    val lang by LoginStrings.currentLang.collectAsState()
+    val currentLang by LoginStrings.currentLang.collectAsState()
     val L = LoginStrings
 
     // Login mode: 0 = email, 1 = phone
@@ -136,7 +136,7 @@ fun LoginScreen() {
                         )
                         Spacer(Modifier.height(8.dp))
                         Text("ArveyGo", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        Text("Kurumsal filo operasyonlarına giriş", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.72f))
+                        Text(L.t("Kurumsal filo operasyonlarına giriş", "Secure sign-in for enterprise fleet operations", "Acceso seguro para operaciones de flota empresarial", "Connexion sécurisée pour les opérations de flotte"), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.72f))
                     }
 
                     Spacer(Modifier.height(24.dp))
@@ -152,7 +152,7 @@ fun LoginScreen() {
                     ) {
                         Text(L.welcomeBack, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
                         Spacer(Modifier.height(6.dp))
-                        Text("Araçlar, alarmlar ve rota operasyonları için tek oturumla devam edin.", fontSize = 13.sp, color = AppColors.TextMuted)
+                        Text(L.t("Araçlar, alarmlar ve rota operasyonları için tek oturumla devam edin.", "Continue with one session for vehicles, alarms, and route operations.", "Continúa con una sola sesión para vehículos, alarmas y rutas.", "Continuez avec une seule session pour les véhicules, alarmes et itinéraires."), fontSize = 13.sp, color = AppColors.TextMuted)
                         Spacer(Modifier.height(20.dp))
 
                         // ═══ Tab Switcher: E-posta / Telefon ═══
@@ -548,7 +548,7 @@ fun LoginScreen() {
                                 // Back to phone number
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                                     Text(
-                                        if (lang == "TR") "Numarayı Değiştir" else "Change Number",
+                                        L.t("Numarayı Değiştir", "Change Number", "Cambiar número", "Changer le numéro"),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = AppColors.TextMuted,
@@ -625,7 +625,7 @@ private fun CountryPickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {},
         title = {
-            Text("Ülke Kodu", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+            Text(LoginStrings.t("Ülke Kodu", "Country Code", "Código de país", "Indicatif"), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth().height(400.dp)) {
@@ -633,7 +633,7 @@ private fun CountryPickerDialog(
                 OutlinedTextField(
                     value = searchText,
                     onValueChange = { searchText = it },
-                    placeholder = { Text("Ülke ara / Search", fontSize = 13.sp) },
+                    placeholder = { Text(LoginStrings.t("Ülke ara", "Search country", "Buscar país", "Rechercher un pays"), fontSize = 13.sp) },
                     leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(16.dp)) },
                     singleLine = true,
                     shape = RoundedCornerShape(10.dp),

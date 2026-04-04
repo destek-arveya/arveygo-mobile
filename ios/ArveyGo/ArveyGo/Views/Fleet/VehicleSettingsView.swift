@@ -9,7 +9,8 @@ struct VehicleSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
 
-    @State private var ignitionNotificationEnabled = false
+    @State private var ignitionOnNotificationEnabled = false
+    @State private var ignitionOffNotificationEnabled = false
     @State private var ignitionPushEnabled = true
     @State private var ignitionSmsEnabled = false
     @State private var ignitionMailEnabled = false
@@ -79,20 +80,22 @@ struct VehicleSettingsView: View {
 
             Section(header: sectionHeader("Bildirimler", icon: "bell.badge.fill")) {
                 Toggle(isOn: Binding(
-                    get: { ignitionNotificationEnabled },
-                    set: { newValue in
-                        ignitionNotificationEnabled = newValue
-                        if newValue && selectedIgnitionChannels.isEmpty {
-                            ignitionPushEnabled = true
-                        }
-                        scheduleIgnitionSyncIfReady()
-                    }
+                    get: { ignitionOnNotificationEnabled },
+                    set: { setIgnitionNotificationEnabled("ignition_on", enabled: $0) }
                 )) {
-                    settingLabel("Kontak Açma / Kapanma Bildirimi", subtitle: "Bu araç için kontak hareketlerini yalnızca size bildir")
+                    settingLabel("Kontak Açılma Bildirimi", subtitle: "Kontak açıldığında yalnızca size özel bildirim gönder")
                 }
                 .tint(AppTheme.online)
 
-                if ignitionNotificationEnabled {
+                Toggle(isOn: Binding(
+                    get: { ignitionOffNotificationEnabled },
+                    set: { setIgnitionNotificationEnabled("ignition_off", enabled: $0) }
+                )) {
+                    settingLabel("Kontak Kapanma Bildirimi", subtitle: "Kontak kapandığında yalnızca size özel bildirim gönder")
+                }
+                .tint(AppTheme.online)
+
+                if hasAnyIgnitionNotificationEnabled {
                     VStack(alignment: .leading, spacing: 10) {
                         Toggle(isOn: Binding(
                             get: { ignitionPushEnabled },
@@ -323,6 +326,27 @@ struct VehicleSettingsView: View {
         return channels
     }
 
+    private var hasAnyIgnitionNotificationEnabled: Bool {
+        ignitionOnNotificationEnabled || ignitionOffNotificationEnabled
+    }
+
+    private func setIgnitionNotificationEnabled(_ alarmType: String, enabled: Bool) {
+        switch alarmType {
+        case "ignition_on":
+            ignitionOnNotificationEnabled = enabled
+        case "ignition_off":
+            ignitionOffNotificationEnabled = enabled
+        default:
+            break
+        }
+
+        if enabled && selectedIgnitionChannels.isEmpty {
+            ignitionPushEnabled = true
+        }
+
+        scheduleIgnitionSyncIfReady()
+    }
+
     private func setIgnitionChannel(_ channel: String, enabled: Bool) {
         var channels = selectedIgnitionChannels
 
@@ -330,7 +354,7 @@ struct VehicleSettingsView: View {
             channels.insert(channel)
         } else {
             channels.remove(channel)
-            if channels.isEmpty {
+            if channels.isEmpty && hasAnyIgnitionNotificationEnabled {
                 ignitionSettingsMessage = "En az bir teslimat kanalı açık kalmalı."
                 channels.insert(channel)
             } else {
@@ -373,7 +397,8 @@ struct VehicleSettingsView: View {
             let activeSets = sets.filter { $0.isActive && $0.status == "active" }
             let channelUnion = Set((activeSets.isEmpty ? sets : activeSets).flatMap(\.channelList))
 
-            ignitionNotificationEnabled = !activeSets.isEmpty
+            ignitionOnNotificationEnabled = activeSets.contains { $0.alarmType == "ignition_on" }
+            ignitionOffNotificationEnabled = activeSets.contains { $0.alarmType == "ignition_off" }
             ignitionPushEnabled = channelUnion.contains("push") || channelUnion.isEmpty
             ignitionSmsEnabled = channelUnion.contains("sms")
             ignitionMailEnabled = channelUnion.contains("email")
@@ -399,7 +424,7 @@ struct VehicleSettingsView: View {
             return
         }
 
-        if ignitionNotificationEnabled && selectedIgnitionChannels.isEmpty {
+        if hasAnyIgnitionNotificationEnabled && selectedIgnitionChannels.isEmpty {
             ignitionPushEnabled = true
         }
 
@@ -408,11 +433,14 @@ struct VehicleSettingsView: View {
 
         do {
             let channelList = Array(selectedIgnitionChannels).sorted()
-            let types = ["ignition_on", "ignition_off"]
+            let enabledByType = [
+                "ignition_on": ignitionOnNotificationEnabled,
+                "ignition_off": ignitionOffNotificationEnabled,
+            ]
             let existingSets = try await fetchHiddenIgnitionRules(userId: userId, targetId: targetId)
             let grouped = Dictionary(grouping: existingSets, by: \.alarmType)
 
-            for type in types {
+            for (type, isEnabled) in enabledByType {
                 let matches = (grouped[type] ?? []).sorted { $0.id > $1.id }
                 let primary = matches.first
                 let duplicates = matches.dropFirst()
@@ -421,7 +449,7 @@ struct VehicleSettingsView: View {
                     _ = try? await APIService.shared.post("/api/mobile/alarm-sets/\(duplicate.id)/archive")
                 }
 
-                if ignitionNotificationEnabled {
+                if isEnabled {
                     let body = hiddenIgnitionAlarmBody(
                         name: hiddenIgnitionAlarmName(type: type, userId: userId, targetId: targetId),
                         userId: userId,
@@ -440,9 +468,9 @@ struct VehicleSettingsView: View {
                 }
             }
 
-            ignitionSettingsMessage = ignitionNotificationEnabled
-                ? "Kontak bildirimi güncellendi."
-                : "Kontak bildirimi kapatıldı."
+            ignitionSettingsMessage = hasAnyIgnitionNotificationEnabled
+                ? "Kontak bildirimleri güncellendi."
+                : "Kontak bildirimleri kapatıldı."
         } catch {
             ignitionSettingsMessage = error.localizedDescription
         }

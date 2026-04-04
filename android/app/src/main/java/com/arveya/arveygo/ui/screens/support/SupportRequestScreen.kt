@@ -50,6 +50,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -66,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arveya.arveygo.services.WebSocketManager
 import com.arveya.arveygo.ui.theme.AppColors
+import com.arveya.arveygo.utils.DashboardStrings
 
 private data class SupportFaq(val id: String, val question: String, val answer: String)
 private data class SupportThread(val id: String, val title: String, val preview: String, val updatedAt: String, val status: String, val statusColor: Color)
@@ -83,6 +85,8 @@ private enum class SupportCategory(val label: String, val icon: ImageVector) {
 @Composable
 fun SupportRequestScreen(onBack: () -> Unit, showSideMenu: (() -> Unit)? = null) {
     val colors = MaterialTheme.colorScheme
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     var selectedCategory by remember { mutableStateOf(SupportCategory.CONNECTION) }
     var subject by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -97,28 +101,26 @@ fun SupportRequestScreen(onBack: () -> Unit, showSideMenu: (() -> Unit)? = null)
             SupportThread("2", "Araç eşleme sorusu", "Yeni cihaz aktivasyonu için ek bilgi bekleniyor.", "01.04.2026 10:15", "Yanıt Bekleniyor", AppColors.Idle)
         )
     }
-    val faqItems = remember {
-        listOf(
-            SupportFaq("ownership", "Donanım mülkiyeti kime aittir?", "Satın alınan cihaz sizin mülkiyetinizde kalır. Cihaz kalitesi GPS doğruluğu ve kilometre güvenilirliğini doğrudan etkiler."),
-            SupportFaq("compatibility", "Her marka cihaz kullanılabilir mi?", "Uyumlu cihazlar teknik ekip kontrolünden sonra mevcut filoya entegre edilebilir."),
-            SupportFaq("subscription", "Aylık hizmet bedeli neleri kapsar?", "SIM veri, bulut altyapısı, harita hizmeti ve teknik destek aylık hizmet kapsamında yer alır."),
-            SupportFaq("security", "Veri güvenliği nasıl sağlanır?", "Veriler şifreli aktarılır ve KVKK / GDPR prensiplerine uygun şekilde saklanır.")
-        )
-    }
+    val faqItems = listOf(
+        SupportFaq("ownership", DL.t("Donanım mülkiyeti kime aittir?", "Who owns the hardware?", "¿Quién es el propietario del hardware?", "À qui appartient le matériel ?"), DL.t("Satın alınan cihaz sizin mülkiyetinizde kalır. Cihaz kalitesi GPS doğruluğu ve kilometre güvenilirliğini doğrudan etkiler.", "Purchased hardware remains your property. Device quality directly affects GPS accuracy and mileage reliability.", "El hardware comprado sigue siendo de tu propiedad. La calidad del dispositivo afecta directamente la precisión GPS y la fiabilidad del kilometraje.", "Le matériel acheté reste votre propriété. La qualité de l'appareil influence directement la précision GPS et la fiabilité du kilométrage.")),
+        SupportFaq("compatibility", DL.t("Her marka cihaz kullanılabilir mi?", "Can any device brand be used?", "¿Se puede usar cualquier marca de dispositivo?", "Peut-on utiliser n'importe quelle marque d'appareil ?"), DL.t("Uyumlu cihazlar teknik ekip kontrolünden sonra mevcut filoya entegre edilebilir.", "Compatible devices can be integrated into the existing fleet after technical review.", "Los dispositivos compatibles pueden integrarse en la flota existente tras la revisión técnica.", "Les appareils compatibles peuvent être intégrés à la flotte après validation technique.")),
+        SupportFaq("subscription", DL.t("Aylık hizmet bedeli neleri kapsar?", "What does the monthly service fee include?", "¿Qué incluye la tarifa mensual?", "Que couvre le service mensuel ?"), DL.t("SIM veri, bulut altyapısı, harita hizmeti ve teknik destek aylık hizmet kapsamında yer alır.", "SIM data, cloud infrastructure, map service, and technical support are included in the monthly service.", "Los datos SIM, la infraestructura en la nube, el servicio de mapas y el soporte técnico están incluidos en el servicio mensual.", "Les données SIM, l'infrastructure cloud, le service cartographique et le support technique sont inclus dans le service mensuel.")),
+        SupportFaq("security", DL.t("Veri güvenliği nasıl sağlanır?", "How is data security ensured?", "¿Cómo se garantiza la seguridad de los datos?", "Comment la sécurité des données est-elle assurée ?"), DL.t("Veriler şifreli aktarılır ve KVKK / GDPR prensiplerine uygun şekilde saklanır.", "Data is transferred securely and stored in line with KVKK / GDPR principles.", "Los datos se transfieren de forma segura y se almacenan conforme a los principios de KVKK / GDPR.", "Les données sont transférées de manière sécurisée et stockées conformément aux principes KVKK / GDPR."))
+    )
 
     if (selectedThread != null) {
         AlertDialog(
             onDismissRequest = { selectedThread = null },
-            title = { Text(selectedThread!!.title, fontWeight = FontWeight.SemiBold) },
+            title = { Text(localizedSupportCopy(selectedThread!!.title, DL), fontWeight = FontWeight.SemiBold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(selectedThread!!.preview, fontSize = 14.sp, color = colors.onSurface.copy(alpha = 0.72f))
+                    Text(localizedSupportCopy(selectedThread!!.preview, DL), fontSize = 14.sp, color = colors.onSurface.copy(alpha = 0.72f))
                     Text(selectedThread!!.updatedAt, fontSize = 12.sp, color = colors.onSurface.copy(alpha = 0.5f))
                 }
             },
             confirmButton = {
                 TextButton(onClick = { selectedThread = null }) {
-                    Text("Kapat")
+                    Text(DL.t("Kapat", "Close", "Cerrar", "Fermer"))
                 }
             }
         )
@@ -127,11 +129,11 @@ fun SupportRequestScreen(onBack: () -> Unit, showSideMenu: (() -> Unit)? = null)
     if (isSubmitted) {
         AlertDialog(
             onDismissRequest = { isSubmitted = false },
-            title = { Text("Talep oluşturuldu", fontWeight = FontWeight.SemiBold) },
-            text = { Text("Yeni destek talebin görüşmelerine eklendi ve ekip kuyruğuna aktarıldı.") },
+            title = { Text(DL.t("Talep oluşturuldu", "Request created", "Solicitud creada", "Demande créée"), fontWeight = FontWeight.SemiBold) },
+            text = { Text(DL.t("Yeni destek talebin görüşmelerine eklendi ve ekip kuyruğuna aktarıldı.", "Your new support request was added to conversations and queued for the team.", "Tu nueva solicitud de soporte se añadió a las conversaciones y se envió a la cola del equipo.", "Votre nouvelle demande a été ajoutée aux conversations et transmise à l'équipe.")) },
             confirmButton = {
                 TextButton(onClick = { isSubmitted = false }) {
-                    Text("Tamam")
+                    Text(DL.t("Tamam", "OK", "Aceptar", "OK"))
                 }
             }
         )
@@ -147,8 +149,8 @@ fun SupportRequestScreen(onBack: () -> Unit, showSideMenu: (() -> Unit)? = null)
                 },
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        Text("Destek Merkezi", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
-                        Text("SSS, talepler ve görüşmeler", fontSize = 10.sp, color = colors.onSurface.copy(alpha = 0.55f))
+                        Text(DL.t("Destek Merkezi", "Support Center", "Centro de soporte", "Centre d'assistance"), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
+                        Text(DL.t("SSS, talepler ve görüşmeler", "FAQs, requests, and conversations", "FAQ, solicitudes y conversaciones", "FAQ, demandes et conversations"), fontSize = 10.sp, color = colors.onSurface.copy(alpha = 0.55f))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background)
@@ -176,15 +178,15 @@ fun SupportRequestScreen(onBack: () -> Unit, showSideMenu: (() -> Unit)? = null)
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Destek akışını tek merkezden yönet", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
-                        Text("Sık sorulan soruları incele, yeni bir talep oluştur veya geçmiş görüşmelerine dön.", fontSize = 14.sp, color = colors.onSurface.copy(alpha = 0.68f))
+                        Text(DL.t("Destek akışını tek merkezden yönet", "Manage support from one center", "Gestiona el soporte desde un solo lugar", "Gérez l'assistance depuis un seul endroit"), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
+                        Text(DL.t("Sık sorulan soruları incele, yeni bir talep oluştur veya geçmiş görüşmelerine dön.", "Review FAQs, create a new request, or return to previous conversations.", "Revisa las FAQ, crea una nueva solicitud o vuelve a conversaciones anteriores.", "Consultez la FAQ, créez une nouvelle demande ou revenez aux conversations précédentes."), fontSize = 14.sp, color = colors.onSurface.copy(alpha = 0.68f))
                     }
                 }
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    SupportStat("Açık", "${threads.count { it.status == "Açık" }}", AppColors.Offline, Modifier.weight(1f))
-                    SupportStat("Yanıt Bekleyen", "${threads.count { it.status == "Yanıt Bekleniyor" }}", AppColors.Idle, Modifier.weight(1f))
-                    SupportStat("Toplam", "${threads.size}", AppColors.Indigo, Modifier.weight(1f))
+                    SupportStat(DL.t("Açık", "Open", "Abierto", "Ouvert"), "${threads.count { it.status == "Açık" }}", AppColors.Offline, Modifier.weight(1f))
+                    SupportStat(DL.t("Yanıt Bekleyen", "Waiting Reply", "Esperando respuesta", "En attente de réponse"), "${threads.count { it.status == "Yanıt Bekleniyor" }}", AppColors.Idle, Modifier.weight(1f))
+                    SupportStat(DL.t("Toplam", "Total", "Total", "Total"), "${threads.size}", AppColors.Indigo, Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(14.dp))
                 Button(
@@ -198,11 +200,11 @@ fun SupportRequestScreen(onBack: () -> Unit, showSideMenu: (() -> Unit)? = null)
                 ) {
                     Icon(Icons.Default.Refresh, null, tint = Color.White, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Bağlantıyı Yeniden Dene", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(DL.t("Bağlantıyı Yeniden Dene", "Retry Connection", "Reintentar conexión", "Réessayer la connexion"), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
 
-            SectionTitle("SSS", "En sık sorulan başlıklar")
+            SectionTitle(DL.t("SSS", "FAQ", "FAQ", "FAQ"), DL.t("En sık sorulan başlıklar", "Most frequently asked topics", "Temas más consultados", "Questions les plus fréquentes"))
             faqItems.forEach { item ->
                 SupportCard {
                     Column(
@@ -221,11 +223,11 @@ fun SupportRequestScreen(onBack: () -> Unit, showSideMenu: (() -> Unit)? = null)
                 }
             }
 
-            SectionTitle("Talep Oluştur", "Yeni görüşme başlat")
+            SectionTitle(DL.t("Talep Oluştur", "Create Request", "Crear solicitud", "Créer une demande"), DL.t("Yeni görüşme başlat", "Start a new conversation", "Inicia una nueva conversación", "Démarrer une nouvelle conversation"))
             SupportCard {
-                SupportField("Konu", "Örn: Soket bağlantısı kararsız", subject) { subject = it }
+                SupportField(DL.t("Konu", "Subject", "Asunto", "Sujet"), DL.t("Örn: Soket bağlantısı kararsız", "Example: Socket connection is unstable", "Ej.: la conexión del socket es inestable", "Ex. : la connexion socket est instable"), subject) { subject = it }
                 Spacer(Modifier.height(12.dp))
-                Text("Kategori", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = colors.onSurface.copy(alpha = 0.7f))
+                Text(DL.t("Kategori", "Category", "Categoría", "Catégorie"), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = colors.onSurface.copy(alpha = 0.7f))
                 Spacer(Modifier.height(8.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SupportCategory.entries.chunked(3).forEach { rowItems ->
@@ -244,7 +246,7 @@ fun SupportRequestScreen(onBack: () -> Unit, showSideMenu: (() -> Unit)? = null)
                                         modifier = Modifier.padding(vertical = 12.dp)
                                     ) {
                                         Icon(category.icon, null, tint = if (selected) AppColors.Navy else colors.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
-                                        Text(category.label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = if (selected) AppColors.Navy else colors.onSurface.copy(alpha = 0.7f), maxLines = 1)
+                                        Text(category.localizedLabel(DL), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = if (selected) AppColors.Navy else colors.onSurface.copy(alpha = 0.7f), maxLines = 1)
                                     }
                                 }
                             }
@@ -252,11 +254,11 @@ fun SupportRequestScreen(onBack: () -> Unit, showSideMenu: (() -> Unit)? = null)
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                SupportField("Detay", "Sorununuzu detaylıca açıklayın", description, minLines = 4) { description = it }
+                SupportField(DL.t("Detay", "Details", "Detalles", "Détails"), DL.t("Sorununuzu detaylıca açıklayın", "Describe your issue in detail", "Describe tu problema en detalle", "Décrivez votre problème en détail"), description, minLines = 4) { description = it }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    SupportField("E-posta", "ornek@email.com", contactEmail, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Email) { contactEmail = it }
-                    SupportField("Telefon", "+90 5XX", contactPhone, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Phone) { contactPhone = it }
+                    SupportField(DL.t("E-posta", "Email", "Correo", "E-mail"), "ornek@email.com", contactEmail, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Email) { contactEmail = it }
+                    SupportField(DL.t("Telefon", "Phone", "Teléfono", "Téléphone"), "+90 5XX", contactPhone, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Phone) { contactPhone = it }
                 }
                 Spacer(Modifier.height(14.dp))
                 Button(
@@ -285,11 +287,11 @@ fun SupportRequestScreen(onBack: () -> Unit, showSideMenu: (() -> Unit)? = null)
                 ) {
                     Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Talebi Gönder", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(DL.t("Talebi Gönder", "Send Request", "Enviar solicitud", "Envoyer la demande"), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
 
-            SectionTitle("Görüşmelerim", "Son destek talepleri")
+            SectionTitle(DL.t("Görüşmelerim", "My Conversations", "Mis conversaciones", "Mes conversations"), DL.t("Son destek talepleri", "Recent support requests", "Solicitudes de soporte recientes", "Demandes d'assistance récentes"))
             SupportCard {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     threads.forEachIndexed { index, thread ->
@@ -307,12 +309,12 @@ fun SupportRequestScreen(onBack: () -> Unit, showSideMenu: (() -> Unit)? = null)
                             )
                             Spacer(Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(thread.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(thread.preview, fontSize = 12.sp, color = colors.onSurface.copy(alpha = 0.62f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(localizedSupportCopy(thread.title, DL), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(localizedSupportCopy(thread.preview, DL), fontSize = 12.sp, color = colors.onSurface.copy(alpha = 0.62f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             Spacer(Modifier.width(10.dp))
                             Column(horizontalAlignment = Alignment.End) {
-                                Text(thread.status, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = thread.statusColor)
+                                Text(localizedSupportStatus(thread.status, DL), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = thread.statusColor)
                                 Text(thread.updatedAt, fontSize = 11.sp, color = colors.onSurface.copy(alpha = 0.45f))
                             }
                         }
@@ -325,6 +327,32 @@ fun SupportRequestScreen(onBack: () -> Unit, showSideMenu: (() -> Unit)? = null)
         }
     }
 }
+
+private fun SupportCategory.localizedLabel(strings: DashboardStrings): String =
+    when (this) {
+        SupportCategory.CONNECTION -> strings.t("Bağlantı", "Connection", "Conexión", "Connexion")
+        SupportCategory.DEVICE -> strings.t("Cihaz", "Device", "Dispositivo", "Appareil")
+        SupportCategory.SOFTWARE -> strings.t("Yazılım", "Software", "Software", "Logiciel")
+        SupportCategory.BILLING -> strings.t("Fatura", "Billing", "Facturación", "Facturation")
+        SupportCategory.INTEGRATION -> strings.t("Entegrasyon", "Integration", "Integración", "Intégration")
+        SupportCategory.OTHER -> strings.t("Diğer", "Other", "Otro", "Autre")
+    }
+
+private fun localizedSupportStatus(status: String, strings: DashboardStrings): String =
+    when (status) {
+        "Açık" -> strings.t("Açık", "Open", "Abierto", "Ouvert")
+        "Yanıt Bekleniyor" -> strings.t("Yanıt Bekleniyor", "Waiting Reply", "Esperando respuesta", "En attente de réponse")
+        else -> status
+    }
+
+private fun localizedSupportCopy(text: String, strings: DashboardStrings): String =
+    when (text) {
+        "Socket bağlantısı kararsız" -> strings.t("Socket bağlantısı kararsız", "Socket connection is unstable", "La conexión del socket es inestable", "La connexion socket est instable")
+        "Teknik ekip logları inceliyor." -> strings.t("Teknik ekip logları inceliyor.", "The technical team is reviewing the logs.", "El equipo técnico está revisando los registros.", "L'équipe technique examine les journaux.")
+        "Araç eşleme sorusu" -> strings.t("Araç eşleme sorusu", "Vehicle pairing question", "Consulta sobre emparejamiento de vehículo", "Question sur l'association du véhicule")
+        "Yeni cihaz aktivasyonu için ek bilgi bekleniyor." -> strings.t("Yeni cihaz aktivasyonu için ek bilgi bekleniyor.", "Waiting for additional information for new device activation.", "Se espera información adicional para activar el nuevo dispositivo.", "Des informations complémentaires sont attendues pour activer le nouvel appareil.")
+        else -> text
+    }
 
 @Composable
 private fun SupportCard(content: @Composable ColumnScope.() -> Unit) {

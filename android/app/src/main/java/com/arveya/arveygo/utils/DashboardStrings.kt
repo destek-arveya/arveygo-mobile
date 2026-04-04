@@ -87,6 +87,8 @@ object DashboardStrings {
     val menuLogout: String get() = s("Çıkış Yap", "Log Out", "Cerrar Sesión", "Se déconnecter")
     val menuCompany: String get() = s("Arveya Teknoloji", "Arveya Technology", "Arveya Tecnología", "Arveya Technologie")
 
+    fun t(tr: String, en: String, es: String, fr: String): String = s(tr, en, es, fr)
+
     // ---------- Helper ----------
     private fun s(tr: String, en: String, es: String, fr: String): String =
         when (_currentLang.value) {

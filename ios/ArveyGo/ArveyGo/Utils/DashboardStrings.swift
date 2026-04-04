@@ -105,6 +105,10 @@ class DashboardStrings: ObservableObject {
     var menuLogout: String { s("Çıkış Yap", "Log Out", "Cerrar Sesión", "Se déconnecter") }
     var menuCompany: String { s("Arveya Teknoloji", "Arveya Technology", "Arveya Tecnología", "Arveya Technologie") }
 
+    func t(_ tr: String, _ en: String, _ es: String, _ fr: String) -> String {
+        s(tr, en, es, fr)
+    }
+
     // ---------- Helper ----------
     private func s(_ tr: String, _ en: String, _ es: String, _ fr: String) -> String {
         switch currentLang {

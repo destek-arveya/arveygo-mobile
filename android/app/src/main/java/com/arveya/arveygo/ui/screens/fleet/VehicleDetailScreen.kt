@@ -30,6 +30,7 @@ import com.arveya.arveygo.services.WSEvent
 import com.arveya.arveygo.services.WebSocketManager
 import com.arveya.arveygo.ui.components.StatusBadge
 import com.arveya.arveygo.ui.theme.AppColors
+import com.arveya.arveygo.utils.DashboardStrings
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -40,11 +41,19 @@ import org.osmdroid.views.overlay.Marker
 private const val VEHICLE_SETTINGS_HIDDEN_IGNITION_PREFIX = "__mobile_private_ign__"
 
 // Tab enum matching iOS
-private enum class DetailTab(val label: String) {
-    OVERVIEW("Genel"),
-    MAINTENANCE("Bakım"),
-    COSTS("Masraf"),
-    EVENTS("Olaylar")
+private enum class DetailTab {
+    OVERVIEW,
+    MAINTENANCE,
+    COSTS,
+    EVENTS;
+
+    val label: String
+        get() = when (this) {
+            OVERVIEW -> DashboardStrings.t("Genel", "Overview", "Resumen", "Aperçu")
+            MAINTENANCE -> DashboardStrings.t("Bakım", "Maintenance", "Mantenimiento", "Maintenance")
+            COSTS -> DashboardStrings.t("Masraf", "Expense", "Gasto", "Dépense")
+            EVENTS -> DashboardStrings.t("Olaylar", "Events", "Eventos", "Événements")
+        }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,6 +65,8 @@ fun VehicleDetailScreen(
     onNavigateToAlarms: ((String) -> Unit)? = null,
     onNavigateToAddAlarm: ((String) -> Unit)? = null
 ) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     var selectedTab by remember { mutableStateOf(DetailTab.OVERVIEW) }
     val context = LocalContext.current
     var currentVehicle by remember { mutableStateOf(vehicle) }
@@ -211,14 +222,14 @@ fun VehicleDetailScreen(
                     IconButton(onClick = onBack) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.ChevronLeft, null, tint = AppColors.DarkText, modifier = Modifier.size(18.dp))
-                            Text("Geri", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.DarkText)
+                            Text(DL.t("Geri", "Back", "Atrás", "Retour"), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.DarkText)
                         }
                     }
                 },
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                         Text(currentVehicle.plate, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppColors.DarkText)
-                        Text("Araç Detayı", fontSize = 10.sp, color = AppColors.DarkTextMuted)
+                        Text(DL.t("Araç Detayı", "Vehicle Detail", "Detalle del vehículo", "Détail du véhicule"), fontSize = 10.sp, color = AppColors.DarkTextMuted)
                     }
                 },
                 actions = {
@@ -372,6 +383,8 @@ private fun MapHeader(vehicle: Vehicle, context: Context) {
 // MARK: - Vehicle Identity Card
 @Composable
 private fun VehicleIdentityCard(vehicle: Vehicle) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -417,16 +430,16 @@ private fun VehicleIdentityCard(vehicle: Vehicle) {
         HorizontalDivider(color = AppColors.DarkBorder)
 
         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-            QuickStatItem("Toplam Km", vehicle.formattedTotalKm, Icons.Default.Speed, AppColors.Lavender, Modifier.weight(1f))
+            QuickStatItem(DL.t("Toplam Km", "Total KM", "KM total", "KM total"), vehicle.formattedTotalKm, Icons.Default.Speed, AppColors.Lavender, Modifier.weight(1f))
             Box(Modifier.width(1.dp).height(40.dp).background(AppColors.DarkBorder))
-            QuickStatItem("Bugün", vehicle.formattedTodayKm, Icons.Default.Route, AppColors.Indigo, Modifier.weight(1f))
+            QuickStatItem(DL.t("Bugün", "Today", "Hoy", "Aujourd'hui"), vehicle.formattedTodayKm, Icons.Default.Route, AppColors.Indigo, Modifier.weight(1f))
             Box(Modifier.width(1.dp).height(40.dp).background(AppColors.DarkBorder))
-            QuickStatItem("SürüCü", run {
+            QuickStatItem(DL.t("Sürücü", "Driver", "Conductor", "Conducteur"), run {
                 val name = if (vehicle.driverName.isNotEmpty()) vehicle.driverName else vehicle.driver
                 if (name.isEmpty()) "—" else name.split(" ").firstOrNull() ?: "—"
             }, Icons.Default.Person, AppColors.Online, Modifier.weight(1f))
             Box(Modifier.width(1.dp).height(40.dp).background(AppColors.DarkBorder))
-            QuickStatItem("Konum", vehicle.locationDisplay, Icons.Default.LocationOn, Color(0xFFFF9800), Modifier.weight(1f))
+            QuickStatItem(DL.t("Konum", "Location", "Ubicación", "Position"), vehicle.locationDisplay, Icons.Default.LocationOn, Color(0xFFFF9800), Modifier.weight(1f))
         }
     }
 }
@@ -458,6 +471,7 @@ private fun QuickStatItem(label: String, value: String, icon: ImageVector, color
 // MARK: - Tab Selector
 @Composable
 private fun TabSelector(selectedTab: DetailTab, onSelect: (DetailTab) -> Unit) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -505,6 +519,8 @@ private fun OverviewTab(
     driverName: String = "",
     onDriverAssigned: (() -> Unit)? = null
 ) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     var showEditDialog by remember { mutableStateOf(false) }
     var showBlockageDialog by remember { mutableStateOf(false) }
 
@@ -545,20 +561,20 @@ private fun OverviewTab(
     ) {
         data class QuickAction(val icon: ImageVector, val label: String, val color: Color, val onClick: () -> Unit)
         val actions = listOf(
-            QuickAction(Icons.Default.Navigation, "Yol Tarifi", Color(0xFF3B82F6)) {
+            QuickAction(Icons.Default.Navigation, DL.t("Yol Tarifi", "Directions", "Ruta", "Itinéraire"), Color(0xFF3B82F6)) {
                 openMapsDirections(context, vehicle.lat, vehicle.lng, vehicle.plate)
             },
-            QuickAction(Icons.Default.History, "Rota Geçmişi", AppColors.Lavender) {
+            QuickAction(Icons.Default.History, DL.t("Rota Geçmişi", "Route History", "Historial de rutas", "Historique des trajets"), AppColors.Lavender) {
                 onBack()
                 onNavigateToRouteHistory?.invoke(vehicle)
             },
-            QuickAction(Icons.Default.Edit, "Düzenle", Color(0xFF8B5CF6)) {
+            QuickAction(Icons.Default.Edit, DL.t("Düzenle", "Edit", "Editar", "Modifier"), Color(0xFF8B5CF6)) {
                 showEditDialog = true
             },
-            QuickAction(Icons.Default.Lock, "Blokaj", Color(0xFFEF4444)) {
+            QuickAction(Icons.Default.Lock, DL.t("Blokaj", "Blockage", "Bloqueo", "Blocage"), Color(0xFFEF4444)) {
                 showBlockageDialog = true
             },
-            QuickAction(Icons.Default.Share, "Paylaş", AppColors.DarkTextMuted) {
+            QuickAction(Icons.Default.Share, DL.t("Paylaş", "Share", "Compartir", "Partager"), AppColors.DarkTextMuted) {
                 shareVehicleLocation(context, vehicle)
             },
         )
@@ -583,41 +599,41 @@ private fun OverviewTab(
 
     // ── Vehicle Info ──
     CleanListCard {
-        DetailRow(Icons.Default.Speed, "Hız", vehicle.formattedSpeed)
+        DetailRow(Icons.Default.Speed, DL.t("Hız", "Speed", "Velocidad", "Vitesse"), vehicle.formattedSpeed)
         ListDivider()
-        DetailRow(Icons.Default.LocationOn, "Konum", vehicle.locationDisplay)
+        DetailRow(Icons.Default.LocationOn, DL.t("Konum", "Location", "Ubicación", "Position"), vehicle.locationDisplay)
         if (vehicle.deviceTime != null) {
             ListDivider()
-            DetailRow(Icons.Default.Schedule, "Son Güncelleme", vehicle.formattedDeviceTime)
+            DetailRow(Icons.Default.Schedule, DL.t("Son Güncelleme", "Last Update", "Última actualización", "Dernière mise à jour"), vehicle.formattedDeviceTime)
         }
         if (vehicle.lastPacketAt != null) {
             ListDivider()
-            DetailRow(Icons.Default.Sync, "Son Paket", vehicle.formattedLastPacketAt)
+            DetailRow(Icons.Default.Sync, DL.t("Son Paket", "Last Packet", "Último paquete", "Dernier paquet"), vehicle.formattedLastPacketAt)
         }
     }
 
     // ── Kontak & Güç ──
     CleanListCard {
         DetailRow(
-            Icons.Default.VpnKey, "Kontak",
+            Icons.Default.VpnKey, DL.t("Kontak", "Ignition", "Encendido", "Contact"),
             vehicle.kontakLabel,
             valueColor = if (vehicle.kontakOn) AppColors.Online else AppColors.Offline
         )
         ListDivider()
-        DetailRow(Icons.Default.WbSunny, "İlk Kontak (Bugün)", vehicle.formattedFirstIgnitionToday)
+        DetailRow(Icons.Default.WbSunny, DL.t("İlk Kontak (Bugün)", "First Ignition (Today)", "Primer encendido (hoy)", "Premier contact (aujourd'hui)"), vehicle.formattedFirstIgnitionToday)
         ListDivider()
-        DetailRow(Icons.Default.VpnKey, "Son Kontak Açma", vehicle.formattedLastIgnitionOn)
+        DetailRow(Icons.Default.VpnKey, DL.t("Son Kontak Açma", "Last Ignition On", "Último encendido", "Dernier contact activé"), vehicle.formattedLastIgnitionOn)
         ListDivider()
-        DetailRow(Icons.Default.VpnKey, "Son Kontak Kapama", vehicle.formattedLastIgnitionOff)
+        DetailRow(Icons.Default.VpnKey, DL.t("Son Kontak Kapama", "Last Ignition Off", "Último apagado", "Dernier contact coupé"), vehicle.formattedLastIgnitionOff)
         ListDivider()
         
         if (vehicle.deviceBattery != null) {
             ListDivider()
-            DetailRow(Icons.Default.PhoneAndroid, "Cihaz Bataryası", formatDeviceBattery(vehicle.deviceBattery))
+            DetailRow(Icons.Default.PhoneAndroid, DL.t("Cihaz Bataryası", "Device Battery", "Batería del dispositivo", "Batterie de l'appareil"), formatDeviceBattery(vehicle.deviceBattery))
         }
         if (vehicle.externalVoltage != null) {
             ListDivider()
-            DetailRow(Icons.Default.Bolt, "Harici Voltaj", formatVoltage(vehicle.externalVoltage))
+            DetailRow(Icons.Default.Bolt, DL.t("Harici Voltaj", "External Voltage", "Voltaje externo", "Tension externe"), formatVoltage(vehicle.externalVoltage))
         }
     }
 
@@ -625,11 +641,11 @@ private fun OverviewTab(
     if (vehicle.temperatureC != null || vehicle.humidityPct != null) {
         CleanListCard {
             vehicle.temperatureC?.let { temp ->
-                DetailRow(Icons.Default.Thermostat, "Sıcaklık", String.format("%.1f°C", temp))
+                DetailRow(Icons.Default.Thermostat, DL.t("Sıcaklık", "Temperature", "Temperatura", "Température"), String.format("%.1f°C", temp))
             }
             if (vehicle.temperatureC != null && vehicle.humidityPct != null) { ListDivider() }
             vehicle.humidityPct?.let { hum ->
-                DetailRow(Icons.Default.WaterDrop, "Nem", "%${hum.toInt()}")
+                DetailRow(Icons.Default.WaterDrop, DL.t("Nem", "Humidity", "Humedad", "Humidité"), "%${hum.toInt()}")
             }
         }
     }
@@ -638,17 +654,17 @@ private fun OverviewTab(
     if (vehicle.fuelType.isNotEmpty() || vehicle.dailyFuelPer100km > 0 || vehicle.fuelPer100km > 0) {
         CleanListCard {
             if (vehicle.fuelType.isNotEmpty()) {
-                DetailRow(Icons.Default.LocalGasStation, "Yakıt Tipi", vehicle.fuelType)
+                DetailRow(Icons.Default.LocalGasStation, DL.t("Yakıt Tipi", "Fuel Type", "Tipo de combustible", "Type de carburant"), vehicle.fuelType)
                 ListDivider()
             }
             val rate = if (vehicle.dailyFuelPer100km > 0) vehicle.dailyFuelPer100km else vehicle.fuelPer100km
             if (rate > 0) {
-                DetailRow(Icons.Default.Speed, "Tüketim", String.format("%.1f L/100km", rate))
+                DetailRow(Icons.Default.Speed, DL.t("Tüketim", "Consumption", "Consumo", "Consommation"), String.format("%.1f L/100km", rate))
                 ListDivider()
             }
-            DetailRow(Icons.Default.WaterDrop, "Bugün Tahmini Yakıt", vehicle.formattedDailyFuelLiters)
+            DetailRow(Icons.Default.WaterDrop, DL.t("Bugün Tahmini Yakıt", "Estimated Fuel Today", "Combustible estimado hoy", "Carburant estimé aujourd'hui"), vehicle.formattedDailyFuelLiters)
             ListDivider()
-            DetailRow(Icons.Default.Payments, "Bugün Tahmini Maliyet", vehicle.formattedDailyFuelCost)
+            DetailRow(Icons.Default.Payments, DL.t("Bugün Tahmini Maliyet", "Estimated Cost Today", "Costo estimado hoy", "Coût estimé aujourd'hui"), vehicle.formattedDailyFuelCost)
         }
     }
 
@@ -675,15 +691,15 @@ private fun OverviewTab(
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    if (displayName.isEmpty()) "Sürücü Atanmamış" else displayName,
+                    if (displayName.isEmpty()) DL.t("Sürücü Atanmamış", "No Driver Assigned", "Sin conductor asignado", "Aucun conducteur assigné") else displayName,
                     fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.DarkText
                 )
-                Text("Sürücü", fontSize = 11.sp, color = AppColors.DarkTextMuted)
+                Text(DL.t("Sürücü", "Driver", "Conductor", "Conducteur"), fontSize = 11.sp, color = AppColors.DarkTextMuted)
             }
             TextButton(onClick = { showDriverAssign = true }) {
                 Icon(Icons.Default.Edit, null, modifier = Modifier.size(13.dp), tint = AppColors.Lavender)
                 Spacer(Modifier.width(4.dp))
-                Text("Değiştir", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AppColors.Lavender)
+                Text(DL.t("Değiştir", "Change", "Cambiar", "Changer"), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AppColors.Lavender)
             }
         }
     }
@@ -760,6 +776,8 @@ private fun DetailRow(
 // MARK: - Maintenance Tab
 @Composable
 private fun MaintenanceTab(vehicle: Vehicle) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     var maintenanceList by remember { mutableStateOf<List<FleetMaintenance>>(emptyList()) }
     var documentsList by remember { mutableStateOf<List<FleetDocument>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -785,7 +803,7 @@ private fun MaintenanceTab(vehicle: Vehicle) {
         return
     }
 
-    SectionCard(title = "BAKIM TAKVİMİ", icon = Icons.Default.Build) {
+    SectionCard(title = DL.t("BAKIM TAKVİMİ", "MAINTENANCE SCHEDULE", "CALENDARIO DE MANTENIMIENTO", "CALENDRIER D'ENTRETIEN"), icon = Icons.Default.Build) {
         if (maintenanceList.isEmpty()) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -793,7 +811,7 @@ private fun MaintenanceTab(vehicle: Vehicle) {
             ) {
                 Icon(Icons.Default.Build, null, tint = AppColors.TextFaint, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.height(8.dp))
-                Text("Bakım kaydı bulunmuyor", fontSize = 13.sp, color = AppColors.TextMuted)
+                Text(DL.t("Bakım kaydı bulunmuyor", "No maintenance records", "No hay registros de mantenimiento", "Aucun entretien"), fontSize = 13.sp, color = AppColors.TextMuted)
             }
         } else {
             Column {
@@ -823,7 +841,7 @@ private fun MaintenanceTab(vehicle: Vehicle) {
         }
     }
 
-    SectionCard(title = "BELGELER", icon = Icons.Default.Description) {
+    SectionCard(title = DL.t("BELGELER", "DOCUMENTS", "DOCUMENTOS", "DOCUMENTS"), icon = Icons.Default.Description) {
         if (documentsList.isEmpty()) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -831,7 +849,7 @@ private fun MaintenanceTab(vehicle: Vehicle) {
             ) {
                 Icon(Icons.Default.Description, null, tint = AppColors.TextFaint, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.height(8.dp))
-                Text("Belge kaydı bulunmuyor", fontSize = 13.sp, color = AppColors.TextMuted)
+                Text(DL.t("Belge kaydı bulunmuyor", "No document records", "No hay documentos", "Aucun document"), fontSize = 13.sp, color = AppColors.TextMuted)
             }
         } else {
             Column {
@@ -854,6 +872,8 @@ private fun MaintenanceTab(vehicle: Vehicle) {
 // MARK: - Costs Tab
 @Composable
 private fun CostsTab(vehicle: Vehicle) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     var costsList by remember { mutableStateOf<List<VehicleCost>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
@@ -875,14 +895,14 @@ private fun CostsTab(vehicle: Vehicle) {
     }
 
     if (costsList.isEmpty()) {
-        SectionCard(title = "MASRAFLAR", icon = Icons.Default.AttachMoney) {
+        SectionCard(title = DL.t("MASRAFLAR", "EXPENSES", "GASTOS", "DÉPENSES"), icon = Icons.Default.AttachMoney) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth().padding(16.dp)
             ) {
                 Icon(Icons.Default.AttachMoney, null, tint = AppColors.TextFaint, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.height(8.dp))
-                Text("Masraf kaydı bulunmuyor", fontSize = 13.sp, color = AppColors.TextMuted)
+                Text(DL.t("Masraf kaydı bulunmuyor", "No expense records", "No hay gastos", "Aucune dépense"), fontSize = 13.sp, color = AppColors.TextMuted)
             }
         }
         return
@@ -893,7 +913,7 @@ private fun CostsTab(vehicle: Vehicle) {
     val byCat = costsList.groupBy { it.category }.mapValues { (_, v) -> v.sumOf { it.amount } }
     val fmt = java.text.NumberFormat.getNumberInstance(java.util.Locale("tr", "TR")).apply { maximumFractionDigits = 0 }
 
-    SectionCard(title = "MASRAF ÖZETİ", icon = Icons.Default.BarChart) {
+    SectionCard(title = DL.t("MASRAF ÖZETİ", "EXPENSE SUMMARY", "RESUMEN DE GASTOS", "RÉSUMÉ DES DÉPENSES"), icon = Icons.Default.BarChart) {
         if (byCat.isNotEmpty()) {
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                 byCat.entries.take(4).forEach { (cat, amount) ->
@@ -904,13 +924,13 @@ private fun CostsTab(vehicle: Vehicle) {
                         else -> AppColors.TextMuted
                     }
                     val label = when (cat.lowercase()) {
-                        "fuel" -> "Yakıt"
-                        "maintenance" -> "Bakım"
-                        "insurance" -> "Sigorta"
-                        "tire" -> "Lastik"
-                        "tax" -> "Vergi"
-                        "fine" -> "Ceza"
-                        else -> "Diğer"
+                        "fuel" -> DL.t("Yakıt", "Fuel", "Combustible", "Carburant")
+                        "maintenance" -> DL.t("Bakım", "Maintenance", "Mantenimiento", "Maintenance")
+                        "insurance" -> DL.t("Sigorta", "Insurance", "Seguro", "Assurance")
+                        "tire" -> DL.t("Lastik", "Tire", "Neumático", "Pneu")
+                        "tax" -> DL.t("Vergi", "Tax", "Impuesto", "Taxe")
+                        "fine" -> DL.t("Ceza", "Fine", "Multa", "Amende")
+                        else -> DL.t("Diğer", "Other", "Otro", "Autre")
                     }
                     val percent = if (totalAmount > 0) ((amount / totalAmount) * 100).toInt() else 0
                     CostSummaryItem(label, "₺${fmt.format(amount)}", color, percent, Modifier.weight(1f))
@@ -923,12 +943,12 @@ private fun CostsTab(vehicle: Vehicle) {
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().background(AppColors.Navy.copy(alpha = 0.04f), RoundedCornerShape(10.dp)).padding(14.dp)
         ) {
-            Text("TOPLAM", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppColors.TextMuted)
+            Text(DL.t("TOPLAM", "TOTAL", "TOTAL", "TOTAL"), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppColors.TextMuted)
             Text("₺${fmt.format(totalAmount)}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
         }
     }
 
-    SectionCard(title = "SON MASRAFLAR", icon = Icons.Default.List) {
+    SectionCard(title = DL.t("SON MASRAFLAR", "RECENT EXPENSES", "GASTOS RECIENTES", "DÉPENSES RÉCENTES"), icon = Icons.Default.List) {
         Column {
             costsList.take(10).forEachIndexed { index, cost ->
                 CostRow(cost)
@@ -943,6 +963,8 @@ private fun CostsTab(vehicle: Vehicle) {
 // MARK: - Events Tab
 @Composable
 private fun EventsTab(vehicle: Vehicle, onNavigateToAlarms: ((String) -> Unit)? = null) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     var alarms by remember { mutableStateOf<List<AlarmEvent>>(emptyList()) }
     var isLoadingAlarms by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
@@ -969,7 +991,7 @@ private fun EventsTab(vehicle: Vehicle, onNavigateToAlarms: ((String) -> Unit)? 
         isLoadingAlarms = false
     }
 
-    SectionCard(title = "SON OLAYLAR", icon = Icons.Default.Schedule) {
+    SectionCard(title = DL.t("SON OLAYLAR", "RECENT EVENTS", "EVENTOS RECIENTES", "ÉVÉNEMENTS RÉCENTS"), icon = Icons.Default.Schedule) {
         if (isLoadingAlarms) {
             Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = AppColors.Indigo, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
@@ -981,7 +1003,7 @@ private fun EventsTab(vehicle: Vehicle, onNavigateToAlarms: ((String) -> Unit)? 
             ) {
                 Icon(Icons.Default.NotificationsOff, null, tint = AppColors.TextFaint, modifier = Modifier.size(32.dp))
                 Spacer(Modifier.height(8.dp))
-                Text("Bu araç için alarm bulunamadı", fontSize = 13.sp, color = AppColors.TextMuted)
+                Text(DL.t("Bu araç için alarm bulunamadı", "No alarms found for this vehicle", "No se encontraron alarmas para este vehículo", "Aucune alarme pour ce véhicule"), fontSize = 13.sp, color = AppColors.TextMuted)
             }
         } else {
             Column {
@@ -1011,7 +1033,7 @@ private fun EventsTab(vehicle: Vehicle, onNavigateToAlarms: ((String) -> Unit)? 
                         onClick = { onNavigateToAlarms(vehicle.plate) },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Tümünü Gör", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Indigo)
+                        Text(DL.t("Tümünü Gör", "View All", "Ver todo", "Voir tout"), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Indigo)
                         Spacer(Modifier.width(4.dp))
                         Icon(Icons.Default.ArrowForward, null, modifier = Modifier.size(14.dp), tint = AppColors.Indigo)
                     }
@@ -1051,14 +1073,15 @@ private fun openMapsDirections(context: Context, lat: Double, lng: Double, label
 // ============================================================================
 
 private fun shareVehicleLocation(context: Context, vehicle: Vehicle) {
+    val DL = DashboardStrings
     val mapsUrl = "https://www.google.com/maps?q=${vehicle.lat},${vehicle.lng}"
-    val shareText = "${vehicle.plate} konumu:\n${vehicle.locationDisplay}\n\n$mapsUrl"
+    val shareText = DL.t("${vehicle.plate} konumu:\n${vehicle.locationDisplay}\n\n$mapsUrl", "${vehicle.plate} location:\n${vehicle.locationDisplay}\n\n$mapsUrl", "Ubicación de ${vehicle.plate}:\n${vehicle.locationDisplay}\n\n$mapsUrl", "Position de ${vehicle.plate} :\n${vehicle.locationDisplay}\n\n$mapsUrl")
     val sendIntent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
         putExtra(Intent.EXTRA_TEXT, shareText)
-        putExtra(Intent.EXTRA_SUBJECT, "${vehicle.plate} Araç Konumu")
+        putExtra(Intent.EXTRA_SUBJECT, DL.t("${vehicle.plate} Araç Konumu", "${vehicle.plate} Vehicle Location", "Ubicación del vehículo ${vehicle.plate}", "Position du véhicule ${vehicle.plate}"))
     }
-    context.startActivity(Intent.createChooser(sendIntent, "Konumu Paylaş"))
+    context.startActivity(Intent.createChooser(sendIntent, DL.t("Konumu Paylaş", "Share Location", "Compartir ubicación", "Partager la position")))
 }
 
 // ============================================================================
@@ -1122,11 +1145,19 @@ private fun ActionButton(icon: ImageVector, label: String, color: Color, modifie
     }
 }
 
-private enum class MaintenanceStatus(val label: String, val color: Color) {
-    COMPLETED("Tamamlandı", Color(0xFF22C55E)),
-    UPCOMING("Yaklaşıyor", Color(0xFFFF9800)),
-    NORMAL("Planlandı", Color.Blue),
-    OVERDUE("Gecikmiş", Color.Red)
+private enum class MaintenanceStatus(val color: Color) {
+    COMPLETED(Color(0xFF22C55E)),
+    UPCOMING(Color(0xFFFF9800)),
+    NORMAL(Color.Blue),
+    OVERDUE(Color.Red);
+
+    val label: String
+        get() = when (this) {
+            COMPLETED -> DashboardStrings.t("Tamamlandı", "Completed", "Completado", "Terminé")
+            UPCOMING -> DashboardStrings.t("Yaklaşıyor", "Upcoming", "Próximo", "À venir")
+            NORMAL -> DashboardStrings.t("Planlandı", "Scheduled", "Programado", "Planifié")
+            OVERDUE -> DashboardStrings.t("Gecikmiş", "Overdue", "Atrasado", "En retard")
+        }
 }
 
 @Composable
@@ -1165,17 +1196,19 @@ private enum class DocStatus(val color: Color) {
 
 @Composable
 private fun DocumentRow(title: String, date: String, daysLeft: Int, status: DocStatus) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp, horizontal = 14.dp)
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppColors.DarkText)
-            Text("Bitiş: $date", fontSize = 11.sp, color = AppColors.DarkTextSub)
+            Text(DL.t("Bitiş: $date", "Expiry: $date", "Vence: $date", "Expiration : $date"), fontSize = 11.sp, color = AppColors.DarkTextSub)
         }
         Column(horizontalAlignment = Alignment.End) {
-            Text("$daysLeft gün", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = status.color)
-            Text("kalan", fontSize = 9.sp, color = AppColors.DarkTextMuted)
+            Text(DL.t("$daysLeft gün", "$daysLeft days", "$daysLeft días", "$daysLeft jours"), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = status.color)
+            Text(DL.t("kalan", "left", "restantes", "restants"), fontSize = 9.sp, color = AppColors.DarkTextMuted)
         }
         Spacer(Modifier.width(8.dp))
         Box(Modifier.size(8.dp).clip(CircleShape).background(status.color))
@@ -1199,6 +1232,8 @@ private fun CostSummaryItem(label: String, amount: String, color: Color, percent
 
 @Composable
 private fun CostRow(cost: VehicleCost) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     val catLower = cost.category.lowercase()
     val color = when {
         catLower == "fuel" || catLower.contains("yakıt") -> Color(0xFFFF9800)
@@ -1213,13 +1248,13 @@ private fun CostRow(cost: VehicleCost) {
         else -> Icons.Default.MoreHoriz
     }
     val label = when (catLower) {
-        "fuel" -> "Yakıt"
-        "maintenance" -> "Bakım"
-        "insurance" -> "Sigorta"
-        "tire" -> "Lastik"
-        "tax" -> "Vergi"
-        "fine" -> "Ceza"
-        "other" -> "Diğer"
+        "fuel" -> DL.t("Yakıt", "Fuel", "Combustible", "Carburant")
+        "maintenance" -> DL.t("Bakım", "Maintenance", "Mantenimiento", "Maintenance")
+        "insurance" -> DL.t("Sigorta", "Insurance", "Seguro", "Assurance")
+        "tire" -> DL.t("Lastik", "Tire", "Neumático", "Pneu")
+        "tax" -> DL.t("Vergi", "Tax", "Impuesto", "Taxe")
+        "fine" -> DL.t("Ceza", "Fine", "Multa", "Amende")
+        "other" -> DL.t("Diğer", "Other", "Otro", "Autre")
         else -> cost.category.replaceFirstChar { it.uppercase() }
     }
     Row(
@@ -1268,10 +1303,13 @@ private fun EventRow(icon: ImageVector, title: String, subtitle: String, time: S
 fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
     val authVM = LocalAuthViewModel.current
     val currentUser by authVM.currentUser.collectAsState()
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     val colors = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
 
-    var ignitionNotificationEnabled by remember { mutableStateOf(false) }
+    var ignitionOnNotificationEnabled by remember { mutableStateOf(false) }
+    var ignitionOffNotificationEnabled by remember { mutableStateOf(false) }
     var ignitionPushEnabled by remember { mutableStateOf(true) }
     var ignitionSmsEnabled by remember { mutableStateOf(false) }
     var ignitionMailEnabled by remember { mutableStateOf(false) }
@@ -1295,6 +1333,9 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
         if (ignitionMailEnabled) add("email")
     }
 
+    fun hasAnyIgnitionNotificationEnabled(): Boolean =
+        ignitionOnNotificationEnabled || ignitionOffNotificationEnabled
+
     fun scheduleIgnitionSync() {
         if (!ignitionLoaded) return
         scope.launch {
@@ -1302,11 +1343,11 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
             val targetId = vehicleSettingsTargetId(vehicle)
 
             if (userId == null || targetId == null) {
-                ignitionMessage = "Bildirim hedefi hazırlanamadı."
+                ignitionMessage = DL.t("Bildirim hedefi hazırlanamadı.", "Notification target could not be prepared.", "No se pudo preparar el destino de la notificación.", "La cible de notification n'a pas pu être préparée.")
                 return@launch
             }
 
-            if (ignitionNotificationEnabled && selectedChannels().isEmpty()) {
+            if (hasAnyIgnitionNotificationEnabled() && selectedChannels().isEmpty()) {
                 ignitionPushEnabled = true
             }
 
@@ -1317,21 +1358,35 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
                 syncVehicleIgnitionAlarmSettings(
                     vehicle = vehicle,
                     userId = userId,
-                    enabled = ignitionNotificationEnabled,
+                    ignitionOnEnabled = ignitionOnNotificationEnabled,
+                    ignitionOffEnabled = ignitionOffNotificationEnabled,
                     channels = selectedChannels().toList().sorted()
                 )
             }.onSuccess {
-                ignitionMessage = if (ignitionNotificationEnabled) {
-                    "Kontak bildirimi güncellendi."
+                ignitionMessage = if (hasAnyIgnitionNotificationEnabled()) {
+                    DL.t("Kontak bildirimleri güncellendi.", "Ignition notifications updated.", "Las notificaciones de encendido se actualizaron.", "Les notifications de contact ont été mises à jour.")
                 } else {
-                    "Kontak bildirimi kapatıldı."
+                    DL.t("Kontak bildirimleri kapatıldı.", "Ignition notifications disabled.", "Las notificaciones de encendido se desactivaron.", "Les notifications de contact ont été désactivées.")
                 }
             }.onFailure {
-                ignitionMessage = it.localizedMessage ?: "Kontak bildirimi güncellenemedi."
+                ignitionMessage = it.localizedMessage ?: DL.t("Kontak bildirimleri güncellenemedi.", "Ignition notifications could not be updated.", "No se pudieron actualizar las notificaciones de encendido.", "Les notifications de contact n'ont pas pu être mises à jour.")
             }
 
             ignitionSyncing = false
         }
+    }
+
+    fun setIgnitionNotificationEnabled(alarmType: String, enabled: Boolean) {
+        when (alarmType) {
+            "ignition_on" -> ignitionOnNotificationEnabled = enabled
+            "ignition_off" -> ignitionOffNotificationEnabled = enabled
+        }
+
+        if (enabled && selectedChannels().isEmpty()) {
+            ignitionPushEnabled = true
+        }
+
+        scheduleIgnitionSync()
     }
 
     fun setIgnitionChannel(channel: String, enabled: Boolean) {
@@ -1341,8 +1396,8 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
             ignitionMessage = null
         } else {
             channels -= channel
-            if (channels.isEmpty()) {
-                ignitionMessage = "En az bir teslimat kanalı açık kalmalı."
+            if (channels.isEmpty() && hasAnyIgnitionNotificationEnabled()) {
+                ignitionMessage = DL.t("En az bir teslimat kanalı açık kalmalı.", "At least one delivery channel must remain enabled.", "Debe permanecer habilitado al menos un canal de entrega.", "Au moins un canal de livraison doit rester actif.")
                 channels += channel
             }
         }
@@ -1359,7 +1414,7 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
 
         if (userId == null || targetId == null) {
             ignitionLoaded = true
-            ignitionMessage = "Bildirim hedefi hazırlanamadı."
+            ignitionMessage = DL.t("Bildirim hedefi hazırlanamadı.", "Notification target could not be prepared.", "No se pudo preparar el destino de la notificación.", "La cible de notification n'a pas pu être préparée.")
             return@LaunchedEffect
         }
 
@@ -1374,13 +1429,14 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
                 .flatMap { it.channelList }
                 .toSet()
 
-            ignitionNotificationEnabled = activeSets.isNotEmpty()
+            ignitionOnNotificationEnabled = activeSets.any { it.alarmType == "ignition_on" }
+            ignitionOffNotificationEnabled = activeSets.any { it.alarmType == "ignition_off" }
             ignitionPushEnabled = channelUnion.contains("push") || channelUnion.isEmpty()
             ignitionSmsEnabled = channelUnion.contains("sms")
             ignitionMailEnabled = channelUnion.contains("email")
             ignitionMessage = null
         }.onFailure {
-            ignitionMessage = it.localizedMessage ?: "Kontak bildirimi yüklenemedi."
+            ignitionMessage = it.localizedMessage ?: DL.t("Kontak bildirimleri yüklenemedi.", "Ignition notifications could not be loaded.", "No se pudieron cargar las notificaciones de encendido.", "Les notifications de contact n'ont pas pu être chargées.")
         }
 
         ignitionLoaded = true
@@ -1392,7 +1448,7 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
             onDismissRequest = { showKontakAlert = false },
             confirmButton = {
                 TextButton(onClick = { showKontakAlert = false }) {
-                    Text("Tamam", fontWeight = FontWeight.Bold, color = AppColors.Online)
+                    Text(DL.t("Tamam", "OK", "Aceptar", "OK"), fontWeight = FontWeight.Bold, color = AppColors.Online)
                 }
             },
             icon = {
@@ -1406,10 +1462,10 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
                 }
             },
             title = {
-                Text("Kontak Kapalı", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = colors.onSurface)
+                Text(DL.t("Kontak Kapalı", "Ignition Off", "Encendido apagado", "Contact coupé"), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = colors.onSurface)
             },
             text = {
-                Text("Ayarları kaydetmek için aracın kontağının açık olması gereklidir.", fontSize = 14.sp, color = colors.onSurface.copy(alpha = 0.7f))
+                Text(DL.t("Ayarları kaydetmek için aracın kontağının açık olması gereklidir.", "The ignition must be on to save settings.", "El encendido debe estar activo para guardar la configuración.", "Le contact doit être activé pour enregistrer les paramètres."), fontSize = 14.sp, color = colors.onSurface.copy(alpha = 0.7f))
             }
         )
     }
@@ -1421,13 +1477,13 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
                     IconButton(onClick = onBack) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.ChevronLeft, null, tint = colors.onSurface, modifier = Modifier.size(18.dp))
-                            Text("Geri", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
+                            Text(DL.t("Geri", "Back", "Atrás", "Retour"), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
                         }
                     }
                 },
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        Text("Araç Ayarları", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
+                        Text(DL.t("Araç Ayarları", "Vehicle Settings", "Ajustes del vehículo", "Paramètres du véhicule"), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
                         Text(vehicle.plate, fontSize = 10.sp, color = colors.onSurface.copy(alpha = 0.55f))
                     }
                 },
@@ -1454,7 +1510,7 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
                 ) {
                     Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Kaydet", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(DL.t("Kaydet", "Save", "Guardar", "Enregistrer"), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
         }
@@ -1498,7 +1554,7 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(vehicle.plate, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
                         Text(
-                            if (vehicle.model.isBlank()) "Araç ayar merkezi" else vehicle.model,
+                            if (vehicle.model.isBlank()) DL.t("Araç ayar merkezi", "Vehicle settings center", "Centro de ajustes del vehículo", "Centre des paramètres du véhicule") else vehicle.model,
                             fontSize = 13.sp,
                             color = colors.onSurface.copy(alpha = 0.6f)
                         )
@@ -1508,31 +1564,35 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
                 }
             }
 
-            SettingsSection("Kontak Bildirimleri", Icons.Default.Key) {
+            SettingsSection(DL.t("Kontak Bildirimleri", "Ignition Notifications", "Notificaciones de encendido", "Notifications de contact"), Icons.Default.Key) {
                 SettingsToggle(
-                    "Kontak Açma / Kapanma Bildirimi",
-                    "Kontak hareketlerini yalnızca size özel alarm kuralı ile yönet",
-                    ignitionNotificationEnabled
+                    DL.t("Kontak Açılma Bildirimi", "Ignition On Notification", "Notificación de encendido", "Notification de mise du contact"),
+                    DL.t("Araç kontağı açıldığında yalnızca size özel bildirim gönder", "Send a private notification only to you when the ignition turns on", "Envíe una notificación privada solo para usted cuando se encienda el contacto", "Envoyer une notification privée uniquement pour vous lorsque le contact s'allume"),
+                    ignitionOnNotificationEnabled
                 ) { enabled ->
-                    ignitionNotificationEnabled = enabled
-                    if (enabled && selectedChannels().isEmpty()) {
-                        ignitionPushEnabled = true
-                    }
-                    scheduleIgnitionSync()
+                    setIgnitionNotificationEnabled("ignition_on", enabled)
                 }
 
-                if (ignitionNotificationEnabled) {
+                SettingsToggle(
+                    DL.t("Kontak Kapanma Bildirimi", "Ignition Off Notification", "Notificación de apagado", "Notification de coupure du contact"),
+                    DL.t("Araç kontağı kapandığında yalnızca size özel bildirim gönder", "Send a private notification only to you when the ignition turns off", "Envíe una notificación privada solo para usted cuando se apague el contacto", "Envoyer une notification privée uniquement pour vous lorsque le contact se coupe"),
+                    ignitionOffNotificationEnabled
+                ) { enabled ->
+                    setIgnitionNotificationEnabled("ignition_off", enabled)
+                }
+
+                if (hasAnyIgnitionNotificationEnabled()) {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.padding(start = 8.dp, top = 6.dp)
                     ) {
-                        SettingsToggle("Mobil Bildirim", "Uygulama içine push olarak düşsün", ignitionPushEnabled) {
+                        SettingsToggle(DL.t("Mobil Bildirim", "Mobile Notification", "Notificación móvil", "Notification mobile"), DL.t("Uygulama içine push olarak düşsün", "Deliver as an in-app push notification", "Enviar como notificación push en la app", "Envoyer comme notification push dans l'application"), ignitionPushEnabled) {
                             setIgnitionChannel("push", it)
                         }
-                        SettingsToggle("SMS", "Telefon numaranıza kısa mesaj gelsin", ignitionSmsEnabled) {
+                        SettingsToggle("SMS", DL.t("Telefon numaranıza kısa mesaj gelsin", "Send a text message to your phone", "Enviar SMS a su teléfono", "Envoyer un SMS à votre téléphone"), ignitionSmsEnabled) {
                             setIgnitionChannel("sms", it)
                         }
-                        SettingsToggle("Mail", "E-posta adresinize bildirim özeti gelsin", ignitionMailEnabled) {
+                        SettingsToggle(DL.t("Mail", "Email", "Correo", "E-mail"), DL.t("E-posta adresinize bildirim özeti gelsin", "Send a notification summary to your email", "Enviar un resumen a su correo", "Envoyer un résumé à votre e-mail"), ignitionMailEnabled) {
                             setIgnitionChannel("email", it)
                         }
 
@@ -1551,7 +1611,7 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
                             }
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                ignitionMessage ?: "Bu bildirim yalnızca sizin hesabınıza gönderilir.",
+                                ignitionMessage ?: DL.t("Bu bildirim yalnızca sizin hesabınıza gönderilir.", "This notification is sent only to your account.", "Esta notificación se envía solo a su cuenta.", "Cette notification est envoyée uniquement à votre compte."),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = if (ignitionMessage == null) colors.onSurface.copy(alpha = 0.6f) else Color(0xFFEF4444)
@@ -1561,17 +1621,17 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
                 }
             }
 
-            SettingsSection("Sürüş ve Güvenlik", Icons.Default.Shield) {
-                SettingsToggle("Hareket Algılandı", "Beklenmeyen hareketlerde anlık uyarı ver", movementAlarm) { movementAlarm = it }
-                SettingsToggle("Haftalık Durum Özeti", "Bakım ve operasyon özetini haftalık paylaş", weeklyHealthSummary) { weeklyHealthSummary = it }
-                SettingsToggle("Hız Aşımı Uyarısı", "Belirlenen limit aşıldığında alarm üret", overspeedEnabled) { overspeedEnabled = it }
+            SettingsSection(DL.t("Sürüş ve Güvenlik", "Driving & Safety", "Conducción y seguridad", "Conduite et sécurité"), Icons.Default.Shield) {
+                SettingsToggle(DL.t("Hareket Algılandı", "Movement Detected", "Movimiento detectado", "Mouvement détecté"), DL.t("Beklenmeyen hareketlerde anlık uyarı ver", "Send an instant alert on unexpected movement", "Enviar alerta instantánea ante movimiento inesperado", "Envoyer une alerte instantanée en cas de mouvement inattendu"), movementAlarm) { movementAlarm = it }
+                SettingsToggle(DL.t("Haftalık Durum Özeti", "Weekly Status Summary", "Resumen semanal de estado", "Résumé hebdomadaire"), DL.t("Bakım ve operasyon özetini haftalık paylaş", "Share maintenance and operations summary weekly", "Compartir semanalmente el resumen de mantenimiento y operaciones", "Partager chaque semaine le résumé maintenance et opérations"), weeklyHealthSummary) { weeklyHealthSummary = it }
+                SettingsToggle(DL.t("Hız Aşımı Uyarısı", "Overspeed Alert", "Alerta de exceso de velocidad", "Alerte de survitesse"), DL.t("Belirlenen limit aşıldığında alarm üret", "Trigger an alert when the limit is exceeded", "Generar alerta cuando se supere el límite", "Déclencher une alerte lorsque la limite est dépassée"), overspeedEnabled) { overspeedEnabled = it }
 
                 if (overspeedEnabled) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                     ) {
-                        Text("Hız Limiti", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
+                        Text(DL.t("Hız Limiti", "Speed Limit", "Límite de velocidad", "Limite de vitesse"), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
                         Spacer(Modifier.weight(1f))
                         Text("$overspeedLimit km/h", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Offline)
                     }
@@ -1584,15 +1644,15 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
                     )
                 }
 
-                SettingsToggle("Rölanti Uyarısı", "Araç uzun süre çalışır halde beklerse bildir", idleAlertEnabled) { idleAlertEnabled = it }
+                SettingsToggle(DL.t("Rölanti Uyarısı", "Idle Alert", "Alerta de ralentí", "Alerte de ralenti"), DL.t("Araç uzun süre çalışır halde beklerse bildir", "Notify if the vehicle idles for too long", "Notificar si el vehículo permanece mucho tiempo al ralentí", "Notifier si le véhicule reste trop longtemps au ralenti"), idleAlertEnabled) { idleAlertEnabled = it }
                 if (idleAlertEnabled) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                     ) {
-                        Text("Rölanti Süresi", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
+                        Text(DL.t("Rölanti Süresi", "Idle Duration", "Duración de ralentí", "Durée de ralenti"), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
                         Spacer(Modifier.weight(1f))
-                        Text("$idleMinutes dk", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Idle)
+                        Text(DL.t("$idleMinutes dk", "$idleMinutes min", "$idleMinutes min", "$idleMinutes min"), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Idle)
                     }
                     Slider(
                         value = idleMinutes.toFloat(),
@@ -1604,18 +1664,18 @@ fun VehicleSettingsScreen(vehicle: Vehicle, onBack: () -> Unit) {
                 }
             }
 
-            SettingsSection("Cihaz ve Raporlama", Icons.Default.Tune) {
+            SettingsSection(DL.t("Cihaz ve Raporlama", "Device & Reporting", "Dispositivo y reportes", "Appareil et rapports"), Icons.Default.Tune) {
                 OutlinedTextField(
                     value = sleepDelaySeconds,
                     onValueChange = { sleepDelaySeconds = it.filter { char -> char.isDigit() } },
-                    label = { Text("Uyku Süresi (sn)") },
+                    label = { Text(DL.t("Uyku Süresi (sn)", "Sleep Delay (sec)", "Tiempo de reposo (seg)", "Délai de veille (sec)")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = wakeIntervalHours,
                     onValueChange = { wakeIntervalHours = it.filter { char -> char.isDigit() } },
-                    label = { Text("Uyanma Periyodu (saat)") },
+                    label = { Text(DL.t("Uyanma Periyodu (saat)", "Wake Interval (hours)", "Periodo de activación (horas)", "Période de réveil (heures)")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1691,13 +1751,17 @@ private fun vehicleHiddenIgnitionBody(
 private suspend fun syncVehicleIgnitionAlarmSettings(
     vehicle: Vehicle,
     userId: Int,
-    enabled: Boolean,
+    ignitionOnEnabled: Boolean,
+    ignitionOffEnabled: Boolean,
     channels: List<String>
 ) {
     val existingSets = fetchVehicleHiddenIgnitionAlarmSets(vehicle, userId)
     val grouped = existingSets.groupBy { it.alarmType }
 
-    for (type in listOf("ignition_on", "ignition_off")) {
+    for ((type, enabled) in listOf(
+        "ignition_on" to ignitionOnEnabled,
+        "ignition_off" to ignitionOffEnabled
+    )) {
         val matches = (grouped[type] ?: emptyList()).sortedByDescending { it.id }
         val primary = matches.firstOrNull()
         val duplicates = matches.drop(1)

@@ -14,6 +14,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.arveya.arveygo.utils.DashboardStrings
 
 // MARK: - Theme Colors (matching iOS AppTheme & web CSS variables)
 object AppColors {
@@ -64,10 +65,34 @@ object AppColors {
     )
 }
 
-enum class ThemeMode(val storageValue: String, val title: String) {
-    LIGHT("light", "Açık"),
-    DARK("dark", "Koyu"),
-    SYSTEM("system", "Sistem");
+enum class ThemeMode(val storageValue: String) {
+    LIGHT("light"),
+    DARK("dark"),
+    SYSTEM("system");
+
+    val title: String
+        get() = when (DashboardStrings.currentLang.value) {
+            "EN" -> when (this) {
+                LIGHT -> "Light"
+                DARK -> "Dark"
+                SYSTEM -> "System"
+            }
+            "ES" -> when (this) {
+                LIGHT -> "Claro"
+                DARK -> "Oscuro"
+                SYSTEM -> "Sistema"
+            }
+            "FR" -> when (this) {
+                LIGHT -> "Clair"
+                DARK -> "Sombre"
+                SYSTEM -> "Système"
+            }
+            else -> when (this) {
+                LIGHT -> "Açık"
+                DARK -> "Koyu"
+                SYSTEM -> "Sistem"
+            }
+        }
 
     companion object {
         fun from(value: String?): ThemeMode = entries.firstOrNull { it.storageValue == value } ?: SYSTEM

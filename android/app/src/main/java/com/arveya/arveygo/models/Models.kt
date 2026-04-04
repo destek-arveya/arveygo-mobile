@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.arveya.arveygo.ui.theme.AppColors
+import com.arveya.arveygo.utils.DashboardStrings
 import org.json.JSONObject
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -64,10 +65,10 @@ enum class VehicleStatus(val key: String) {
 
     val label: String
         get() = when (this) {
-            IGNITION_ON -> "Kontak Açık"
-            IGNITION_OFF -> "Kontak Kapalı"
-            NO_DATA -> "Bilgi Yok"
-            SLEEPING -> "Cihaz Uykuda"
+            IGNITION_ON -> DashboardStrings.t("Kontak Açık", "Ignition On", "Encendido", "Contact mis")
+            IGNITION_OFF -> DashboardStrings.t("Kontak Kapalı", "Ignition Off", "Apagado", "Contact coupé")
+            NO_DATA -> DashboardStrings.t("Bilgi Yok", "No Data", "Sin datos", "Aucune donnée")
+            SLEEPING -> DashboardStrings.t("Cihaz Uykuda", "Device Sleeping", "Dispositivo en reposo", "Appareil en veille")
         }
 
     val icon: String
@@ -585,10 +586,17 @@ data class Vehicle(
 }
 
 // MARK: - Fleet Vehicle Status
-enum class FleetVehicleStatus(val label: String, val color: Color) {
-    ACTIVE("Aktif", AppColors.Online),
-    PASSIVE("Kapalı", AppColors.Offline),
-    MAINTENANCE("Bakımda", AppColors.Idle)
+enum class FleetVehicleStatus(val color: Color) {
+    ACTIVE(AppColors.Online),
+    PASSIVE(AppColors.Offline),
+    MAINTENANCE(AppColors.Idle);
+
+    val label: String
+        get() = when (this) {
+            ACTIVE -> DashboardStrings.t("Aktif", "Active", "Activo", "Actif")
+            PASSIVE -> DashboardStrings.t("Kapalı", "Inactive", "Inactivo", "Inactif")
+            MAINTENANCE -> DashboardStrings.t("Bakımda", "Maintenance", "Mantenimiento", "Maintenance")
+        }
 }
 
 // MARK: - Fleet Tire

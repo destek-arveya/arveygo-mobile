@@ -620,10 +620,10 @@ enum VehicleStatus: String, CaseIterable {
 
     var label: String {
         switch self {
-        case .ignitionOn: return "Kontak Açık"
-        case .ignitionOff: return "Kontak Kapalı"
-        case .noData: return "Bilgi Yok"
-        case .sleeping: return "Cihaz Uykuda"
+        case .ignitionOn: return DashboardStrings.shared.t("Kontak Açık", "Ignition On", "Encendido", "Contact mis")
+        case .ignitionOff: return DashboardStrings.shared.t("Kontak Kapalı", "Ignition Off", "Apagado", "Contact coupé")
+        case .noData: return DashboardStrings.shared.t("Bilgi Yok", "No Data", "Sin datos", "Aucune donnée")
+        case .sleeping: return DashboardStrings.shared.t("Cihaz Uykuda", "Device Sleeping", "Dispositivo en reposo", "Appareil en veille")
         }
     }
 

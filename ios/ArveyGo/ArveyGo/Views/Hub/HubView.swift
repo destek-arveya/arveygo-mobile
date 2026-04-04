@@ -140,7 +140,7 @@ struct HubView: View {
             .toolbarColorScheme(isDark ? .dark : .light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("Hub")
+                    Text(DL.t("Merkez", "Hub", "Centro", "Hub"))
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundStyle(primaryText)
                 }
@@ -228,7 +228,7 @@ struct HubView: View {
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundColor(primaryText)
 
-                Text(authVM.currentUser?.role ?? "Süper Yönetici")
+                Text(authVM.currentUser?.role ?? DL.t("Süper Yönetici", "Super Admin", "Superadministrador", "Super administrateur"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(H.primary.opacity(0.7))
                     .padding(.horizontal, 10)
@@ -375,27 +375,26 @@ struct HubView: View {
     // MARK: — Helpers
     // ═══════════════════════════════════════════════════════════════════════
     private func hubSubtitle(_ key: String) -> String {
-        let lang = DL.currentLang
         switch key {
         case "reports":
-            return lang == "EN" ? "Fleet reports & analytics" : "Filo raporları ve analiz"
+            return DL.t("Filo raporları ve analiz", "Fleet reports & analytics", "Informes y analítica de flota", "Rapports et analyses de flotte")
         case "geofence":
-            return lang == "EN" ? "Virtual boundaries" : "Sanal sınırlar & bölgeler"
+            return DL.t("Sanal sınırlar ve bölgeler", "Virtual boundaries", "Límites virtuales", "Limites virtuelles")
         case "routeHistory":
-            return lang == "EN" ? "Past trips & routes" : "Geçmiş seferler & rotalar"
+            return DL.t("Geçmiş seferler ve rotalar", "Past trips & routes", "Viajes y rutas anteriores", "Trajets et itinéraires passés")
         case "drivers":
-            return lang == "EN" ? "Driver management" : "Sürücü yönetimi"
+            return DL.t("Sürücü yönetimi", "Driver management", "Gestión de conductores", "Gestion des conducteurs")
         case "vehicles":
-            return lang == "EN" ? "All fleet vehicles" : "Tüm filo araçları"
+            return DL.t("Tüm filo araçları", "All fleet vehicles", "Todos los vehículos de la flota", "Tous les véhicules de la flotte")
         case "support":
-            return lang == "EN" ? "Help & support" : "Yardım ve destek"
+            return DL.t("Yardım ve destek", "Help & support", "Ayuda y soporte", "Aide et assistance")
         default:
             return ""
         }
     }
 
     private var settingsSubtitle: String {
-        DL.currentLang == "EN" ? "Language, notifications, app info" : "Dil, bildirimler, uygulama bilgisi"
+        DL.t("Dil, bildirimler, uygulama bilgisi", "Language, notifications, app info", "Idioma, notificaciones, información de la app", "Langue, notifications, infos de l'app")
     }
 }
 

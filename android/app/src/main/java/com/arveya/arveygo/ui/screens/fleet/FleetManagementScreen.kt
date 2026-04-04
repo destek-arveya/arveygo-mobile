@@ -31,17 +31,26 @@ import androidx.compose.ui.unit.sp
 import com.arveya.arveygo.models.*
 import com.arveya.arveygo.services.APIService
 import com.arveya.arveygo.ui.theme.AppColors
+import com.arveya.arveygo.utils.DashboardStrings
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 // ============================================================================
 // MARK: - Tab Enum
 // ============================================================================
-enum class FleetTab(val label: String, val icon: ImageVector) {
-    MAINTENANCE("Bakım", Icons.Default.Build),
-    COSTS("Masraf", Icons.Default.Receipt),
-    DOCUMENTS("Belge", Icons.Default.Description),
-    TIRES("Lastik", Icons.Default.TireRepair)
+enum class FleetTab(val icon: ImageVector) {
+    MAINTENANCE(Icons.Default.Build),
+    COSTS(Icons.Default.Receipt),
+    DOCUMENTS(Icons.Default.Description),
+    TIRES(Icons.Default.TireRepair);
+
+    val label: String
+        get() = when (this) {
+            MAINTENANCE -> DashboardStrings.t("Bakım", "Maintenance", "Mantenimiento", "Maintenance")
+            COSTS -> DashboardStrings.t("Masraf", "Expense", "Gasto", "Dépense")
+            DOCUMENTS -> DashboardStrings.t("Belge", "Document", "Documento", "Document")
+            TIRES -> DashboardStrings.t("Lastik", "Tire", "Neumático", "Pneu")
+        }
 }
 
 // ============================================================================
@@ -50,6 +59,8 @@ enum class FleetTab(val label: String, val icon: ImageVector) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FleetManagementScreen() {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     var selectedTab by remember { mutableStateOf(FleetTab.MAINTENANCE) }
     var showAddSheet by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
@@ -106,7 +117,7 @@ fun FleetManagementScreen() {
                     tiresList = emptyList()
                 }
             } catch (e: Exception) {
-                errorMessage = e.localizedMessage ?: "Veri yüklenemedi"
+                errorMessage = e.localizedMessage ?: DL.t("Veri yüklenemedi", "Failed to load data", "No se pudieron cargar los datos", "Chargement des données impossible")
             }
             isLoading = false
             isRefreshing = false
@@ -117,8 +128,8 @@ fun FleetManagementScreen() {
 
     // Filtered plate label for display
     val selectedPlateLabel = remember(selectedVehicleFilter, catalog) {
-        if (selectedVehicleFilter == null) "Tüm Araçlar"
-        else catalog.vehicles.find { it.imei == selectedVehicleFilter }?.plate ?: "Araç"
+        if (selectedVehicleFilter == null) DL.t("Tüm Araçlar", "All Vehicles", "Todos los vehículos", "Tous les véhicules")
+        else catalog.vehicles.find { it.imei == selectedVehicleFilter }?.plate ?: DL.t("Araç", "Vehicle", "Vehículo", "Véhicule")
     }
 
     // Filter helper
@@ -138,13 +149,13 @@ fun FleetManagementScreen() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Filo Yönetimi", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface) },
+                title = { Text(DL.t("Filo Yönetimi", "Fleet Management", "Gestión de flota", "Gestion de flotte"), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface) },
                 actions = {
                     IconButton(onClick = {
                         editingMaintenance = null; editingCost = null; editingDocument = null; editingTire = null
                         showAddSheet = true
                     }) {
-                        Icon(Icons.Default.Add, "Ekle", tint = AppColors.Indigo)
+                        Icon(Icons.Default.Add, DL.t("Ekle", "Add", "Agregar", "Ajouter"), tint = AppColors.Indigo)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -328,6 +339,8 @@ private fun SearchFilterBar(
     selectedVehicleFilter: String?,
     onSelectVehicle: (String?) -> Unit
 ) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     val focusManager = LocalFocusManager.current
 
     Column(
@@ -340,7 +353,7 @@ private fun SearchFilterBar(
         OutlinedTextField(
             value = searchText,
             onValueChange = onSearchChange,
-            placeholder = { Text("Plaka ara...", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)) },
+            placeholder = { Text(DL.t("Plaka ara...", "Search plate...", "Buscar matrícula...", "Rechercher une plaque..."), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)) },
             leadingIcon = { Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(18.dp)) },
             trailingIcon = {
                 if (searchText.isNotEmpty()) {
@@ -388,7 +401,7 @@ private fun SearchFilterBar(
                     modifier = Modifier.heightIn(max = 300.dp)
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Tüm Araçlar", fontSize = 13.sp, fontWeight = if (selectedVehicleFilter == null) FontWeight.Bold else FontWeight.Normal) },
+                        text = { Text(DL.t("Tüm Araçlar", "All Vehicles", "Todos los vehículos", "Tous les véhicules"), fontSize = 13.sp, fontWeight = if (selectedVehicleFilter == null) FontWeight.Bold else FontWeight.Normal) },
                         onClick = { onSelectVehicle(null) },
                         leadingIcon = { Icon(Icons.Default.SelectAll, null, modifier = Modifier.size(16.dp)) }
                     )
@@ -413,7 +426,7 @@ private fun SearchFilterBar(
                 Spacer(Modifier.width(8.dp))
                 AssistChip(
                     onClick = { onSelectVehicle(null) },
-                    label = { Text("Temizle", fontSize = 11.sp) },
+                    label = { Text(DL.t("Temizle", "Clear", "Limpiar", "Effacer"), fontSize = 11.sp) },
                     leadingIcon = { Icon(Icons.Default.Close, null, modifier = Modifier.size(12.dp)) },
                     shape = RoundedCornerShape(8.dp),
                     colors = AssistChipDefaults.assistChipColors(
@@ -433,6 +446,8 @@ private fun SearchFilterBar(
 // ============================================================================
 @Composable
 private fun RemindersBanner(reminders: List<FleetReminder>) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     val urgentCount = reminders.count { it.daysLeft <= 7 }
     val warningCount = reminders.count { it.daysLeft in 8..30 }
     if (urgentCount == 0 && warningCount == 0) return
@@ -458,13 +473,14 @@ private fun RemindersBanner(reminders: List<FleetReminder>) {
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    if (urgentCount > 0) "$urgentCount acil hatırlatıcı" else "$warningCount yaklaşan hatırlatıcı",
+                    if (urgentCount > 0) DL.t("$urgentCount acil hatırlatıcı", "$urgentCount urgent reminders", "$urgentCount recordatorios urgentes", "$urgentCount rappels urgents")
+                    else DL.t("$warningCount yaklaşan hatırlatıcı", "$warningCount upcoming reminders", "$warningCount recordatorios próximos", "$warningCount rappels à venir"),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = if (urgentCount > 0) Color(0xFFDC2626) else Color(0xFFD97706)
                 )
                 Text(
-                    "Belge süreleri ve bakım planlarını kontrol edin",
+                    DL.t("Belge süreleri ve bakım planlarını kontrol edin", "Check document deadlines and maintenance plans", "Revise vencimientos de documentos y planes de mantenimiento", "Vérifiez les échéances des documents et les plans d'entretien"),
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
@@ -515,8 +531,10 @@ private fun MaintenanceListTab(
     onEdit: (FleetMaintenance) -> Unit,
     onDelete: (FleetMaintenance) -> Unit
 ) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     if (items.isEmpty()) {
-        EmptyStateView("Bakım kaydı bulunamadı", Icons.Default.Build)
+        EmptyStateView(DL.t("Bakım kaydı bulunamadı", "No maintenance records found", "No se encontraron registros de mantenimiento", "Aucun entretien trouvé"), Icons.Default.Build)
         return
     }
     LazyColumn(
@@ -552,8 +570,10 @@ private fun CostsListTab(
     onEdit: (VehicleCost) -> Unit,
     onDelete: (VehicleCost) -> Unit
 ) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     if (items.isEmpty()) {
-        EmptyStateView("Masraf kaydı bulunamadı", Icons.Default.Receipt)
+        EmptyStateView(DL.t("Masraf kaydı bulunamadı", "No expense records found", "No se encontraron registros de gastos", "Aucune dépense trouvée"), Icons.Default.Receipt)
         return
     }
     LazyColumn(
@@ -587,8 +607,10 @@ private fun DocumentsListTab(
     onEdit: (FleetDocument) -> Unit,
     onDelete: (FleetDocument) -> Unit
 ) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     if (items.isEmpty()) {
-        EmptyStateView("Belge kaydı bulunamadı", Icons.Default.Description)
+        EmptyStateView(DL.t("Belge kaydı bulunamadı", "No document records found", "No se encontraron documentos", "Aucun document trouvé"), Icons.Default.Description)
         return
     }
     LazyColumn(
@@ -597,9 +619,9 @@ private fun DocumentsListTab(
     ) {
         items(items, key = { it.id }) { item ->
             val daysText = if (item.daysLeft != null) {
-                if (item.daysLeft < 0) "Süresi ${-item.daysLeft} gün geçmiş"
-                else if (item.daysLeft == 0) "Bugün doluyor"
-                else "${item.daysLeft} gün kaldı"
+                if (item.daysLeft < 0) DL.t("Süresi ${-item.daysLeft} gün geçmiş", "Expired ${-item.daysLeft} days ago", "Venció hace ${-item.daysLeft} días", "Expiré depuis ${-item.daysLeft} jours")
+                else if (item.daysLeft == 0) DL.t("Bugün doluyor", "Expires today", "Vence hoy", "Expire aujourd'hui")
+                else DL.t("${item.daysLeft} gün kaldı", "${item.daysLeft} days left", "Quedan ${item.daysLeft} días", "Il reste ${item.daysLeft} jours")
             } else "—"
             FleetCard(
                 topLabel = item.plate,
@@ -627,8 +649,10 @@ private fun TiresListTab(
     onEdit: (FleetTire) -> Unit,
     onDelete: (FleetTire) -> Unit
 ) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     if (items.isEmpty()) {
-        EmptyStateView("Lastik kaydı bulunamadı", Icons.Default.TireRepair)
+        EmptyStateView(DL.t("Lastik kaydı bulunamadı", "No tire records found", "No se encontraron neumáticos", "Aucun pneu trouvé"), Icons.Default.TireRepair)
         return
     }
     LazyColumn(
@@ -674,6 +698,8 @@ private fun FleetCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Surface(
@@ -750,7 +776,7 @@ private fun FleetCard(
                 ) {
                     Icon(Icons.Default.Edit, null, modifier = Modifier.size(14.dp), tint = AppColors.Indigo)
                     Spacer(Modifier.width(4.dp))
-                    Text("Düzenle", fontSize = 12.sp, color = AppColors.Indigo)
+                    Text(DL.t("Düzenle", "Edit", "Editar", "Modifier"), fontSize = 12.sp, color = AppColors.Indigo)
                 }
                 TextButton(
                     onClick = { showDeleteConfirm = true },
@@ -758,7 +784,7 @@ private fun FleetCard(
                 ) {
                     Icon(Icons.Default.Delete, null, modifier = Modifier.size(14.dp), tint = Color(0xFFEF4444))
                     Spacer(Modifier.width(4.dp))
-                    Text("Sil", fontSize = 12.sp, color = Color(0xFFEF4444))
+                    Text(DL.t("Sil", "Delete", "Eliminar", "Supprimer"), fontSize = 12.sp, color = Color(0xFFEF4444))
                 }
             }
         }
@@ -767,16 +793,16 @@ private fun FleetCard(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Silme Onayı", fontWeight = FontWeight.SemiBold) },
-            text = { Text("Bu kaydı silmek istediğinize emin misiniz?") },
+            title = { Text(DL.t("Silme Onayı", "Delete Confirmation", "Confirmación de eliminación", "Confirmation de suppression"), fontWeight = FontWeight.SemiBold) },
+            text = { Text(DL.t("Bu kaydı silmek istediğinize emin misiniz?", "Are you sure you want to delete this record?", "¿Seguro que desea eliminar este registro?", "Voulez-vous vraiment supprimer cet enregistrement ?")) },
             confirmButton = {
                 TextButton(onClick = { showDeleteConfirm = false; onDelete() }) {
-                    Text("Sil", color = Color(0xFFEF4444))
+                    Text(DL.t("Sil", "Delete", "Eliminar", "Supprimer"), color = Color(0xFFEF4444))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("İptal")
+                    Text(DL.t("İptal", "Cancel", "Cancelar", "Annuler"))
                 }
             }
         )
@@ -802,6 +828,8 @@ private fun MaintenanceFormSheet(
     onSaved: () -> Unit,
     onCancel: () -> Unit
 ) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     val scope = rememberCoroutineScope()
     var isSaving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -820,34 +848,38 @@ private fun MaintenanceFormSheet(
     val isEditing = editing != null
 
     FormSheetContainer(
-        title = if (isEditing) "Bakım Düzenle" else "Yeni Bakım",
+        title = if (isEditing) DL.t("Bakım Düzenle", "Edit Maintenance", "Editar mantenimiento", "Modifier l'entretien") else DL.t("Yeni Bakım", "New Maintenance", "Nuevo mantenimiento", "Nouvel entretien"),
         icon = Icons.Default.Build
     ) {
         // Section: Vehicle
-        FormSectionHeader("Araç Bilgileri", Icons.Default.DirectionsCar)
+        FormSectionHeader(DL.t("Araç Bilgileri", "Vehicle Information", "Información del vehículo", "Informations du véhicule"), Icons.Default.DirectionsCar)
         VehiclePicker(catalog.vehicles, selectedImei) { selectedImei = it }
 
         // Section: Maintenance Details
-        FormSectionHeader("Bakım Detayları", Icons.Default.Build)
-        FormTextField("Bakım Türü", maintenanceType, { maintenanceType = it }, placeholder = "Yağ değişimi, fren bakımı...")
-        DropdownField("Durum", status, listOf("done" to "Tamamlandı", "scheduled" to "Planlandı", "overdue" to "Gecikmiş")) { status = it }
-        FormTextField("Servis Tarihi", serviceDate, { serviceDate = it }, placeholder = "2025-01-15")
-        FormTextField("Sonraki Servis Tarihi", nextServiceDate, { nextServiceDate = it }, placeholder = "2025-07-15")
+        FormSectionHeader(DL.t("Bakım Detayları", "Maintenance Details", "Detalles de mantenimiento", "Détails de l'entretien"), Icons.Default.Build)
+        FormTextField(DL.t("Bakım Türü", "Maintenance Type", "Tipo de mantenimiento", "Type d'entretien"), maintenanceType, { maintenanceType = it }, placeholder = DL.t("Yağ değişimi, fren bakımı...", "Oil change, brake service...", "Cambio de aceite, frenos...", "Vidange, entretien des freins..."))
+        DropdownField(DL.t("Durum", "Status", "Estado", "Statut"), status, listOf(
+            "done" to DL.t("Tamamlandı", "Completed", "Completado", "Terminé"),
+            "scheduled" to DL.t("Planlandı", "Scheduled", "Programado", "Planifié"),
+            "overdue" to DL.t("Gecikmiş", "Overdue", "Atrasado", "En retard")
+        )) { status = it }
+        FormTextField(DL.t("Servis Tarihi", "Service Date", "Fecha de servicio", "Date d'entretien"), serviceDate, { serviceDate = it }, placeholder = "2025-01-15")
+        FormTextField(DL.t("Sonraki Servis Tarihi", "Next Service Date", "Próxima fecha de servicio", "Prochaine date d'entretien"), nextServiceDate, { nextServiceDate = it }, placeholder = "2025-07-15")
 
         // Section: KM & Cost
-        FormSectionHeader("Kilometre & Maliyet", Icons.Default.Speed)
+        FormSectionHeader(DL.t("Kilometre ve Maliyet", "Mileage & Cost", "Kilometraje y costo", "Kilométrage et coût"), Icons.Default.Speed)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FormTextField("Servis KM", kmAtService, { kmAtService = it }, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
-            FormTextField("Sonraki KM", nextServiceKm, { nextServiceKm = it }, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
+            FormTextField(DL.t("Servis KM", "Service KM", "KM de servicio", "KM entretien"), kmAtService, { kmAtService = it }, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
+            FormTextField(DL.t("Sonraki KM", "Next KM", "Próximo KM", "KM suivant"), nextServiceKm, { nextServiceKm = it }, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FormTextField("Maliyet (₺)", cost, { cost = it }, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Decimal)
-            FormTextField("Servis Yeri", workshop, { workshop = it }, modifier = Modifier.weight(1f))
+            FormTextField(DL.t("Maliyet (₺)", "Cost (₺)", "Costo (₺)", "Coût (₺)"), cost, { cost = it }, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Decimal)
+            FormTextField(DL.t("Servis Yeri", "Workshop", "Taller", "Atelier"), workshop, { workshop = it }, modifier = Modifier.weight(1f))
         }
 
         // Section: Notes
-        FormSectionHeader("Notlar", Icons.Default.Notes)
-        FormTextField("Açıklama", description, { description = it }, maxLines = 3)
+        FormSectionHeader(DL.t("Notlar", "Notes", "Notas", "Notes"), Icons.Default.Notes)
+        FormTextField(DL.t("Açıklama", "Description", "Descripción", "Description"), description, { description = it }, maxLines = 3)
 
         if (error != null) {
             Text(error!!, fontSize = 12.sp, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
@@ -856,7 +888,7 @@ private fun MaintenanceFormSheet(
         Spacer(Modifier.height(16.dp))
         SaveButton(isEditing = isEditing, isSaving = isSaving) {
             if (selectedImei.isBlank() || maintenanceType.isBlank()) {
-                error = "Araç ve bakım türü zorunludur"; return@SaveButton
+                error = DL.t("Araç ve bakım türü zorunludur", "Vehicle and maintenance type are required", "El vehículo y el tipo de mantenimiento son obligatorios", "Le véhicule et le type d'entretien sont requis"); return@SaveButton
             }
             isSaving = true; error = null
             scope.launch {
@@ -881,7 +913,7 @@ private fun MaintenanceFormSheet(
                     }
                     onSaved()
                 } catch (e: Exception) {
-                    error = e.localizedMessage ?: "Kayıt başarısız"
+                    error = e.localizedMessage ?: DL.t("Kayıt başarısız", "Save failed", "Error al guardar", "Échec de l'enregistrement")
                 }
                 isSaving = false
             }
@@ -900,6 +932,8 @@ private fun CostFormSheet(
     onSaved: () -> Unit,
     onCancel: () -> Unit
 ) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     val scope = rememberCoroutineScope()
     var isSaving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -915,29 +949,29 @@ private fun CostFormSheet(
     val isEditing = editing != null
 
     FormSheetContainer(
-        title = if (isEditing) "Masraf Düzenle" else "Yeni Masraf",
+        title = if (isEditing) DL.t("Masraf Düzenle", "Edit Expense", "Editar gasto", "Modifier la dépense") else DL.t("Yeni Masraf", "New Expense", "Nuevo gasto", "Nouvelle dépense"),
         icon = Icons.Default.Receipt
     ) {
-        FormSectionHeader("Araç Bilgileri", Icons.Default.DirectionsCar)
+        FormSectionHeader(DL.t("Araç Bilgileri", "Vehicle Information", "Información del vehículo", "Informations du véhicule"), Icons.Default.DirectionsCar)
         VehiclePicker(catalog.vehicles, selectedImei) { selectedImei = it }
 
-        FormSectionHeader("Masraf Detayları", Icons.Default.Receipt)
+        FormSectionHeader(DL.t("Masraf Detayları", "Expense Details", "Detalles del gasto", "Détails de la dépense"), Icons.Default.Receipt)
         if (catalog.costCategories.isNotEmpty()) {
-            DropdownField("Kategori", category, catalog.costCategories.map { it to it.replaceFirstChar { c -> c.uppercase() } }) { category = it }
+            DropdownField(DL.t("Kategori", "Category", "Categoría", "Catégorie"), category, catalog.costCategories.map { it to it.replaceFirstChar { c -> c.uppercase() } }) { category = it }
         } else {
-            FormTextField("Kategori", category, { category = it }, placeholder = "Yakıt, sigorta, bakım...")
+            FormTextField(DL.t("Kategori", "Category", "Categoría", "Catégorie"), category, { category = it }, placeholder = DL.t("Yakıt, sigorta, bakım...", "Fuel, insurance, maintenance...", "Combustible, seguro, mantenimiento...", "Carburant, assurance, entretien..."))
         }
-        FormTextField("Tarih", costDate, { costDate = it }, placeholder = "2025-01-15")
+        FormTextField(DL.t("Tarih", "Date", "Fecha", "Date"), costDate, { costDate = it }, placeholder = "2025-01-15")
 
-        FormSectionHeader("Tutar", Icons.Default.Paid)
+        FormSectionHeader(DL.t("Tutar", "Amount", "Importe", "Montant"), Icons.Default.Paid)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FormTextField("Tutar", amount, { amount = it }, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Decimal)
-            DropdownField("Para Birimi", currency, listOf("TRY" to "₺ TRY", "USD" to "$ USD", "EUR" to "€ EUR"), modifier = Modifier.weight(1f)) { currency = it }
+            FormTextField(DL.t("Tutar", "Amount", "Importe", "Montant"), amount, { amount = it }, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Decimal)
+            DropdownField(DL.t("Para Birimi", "Currency", "Moneda", "Devise"), currency, listOf("TRY" to "₺ TRY", "USD" to "$ USD", "EUR" to "€ EUR"), modifier = Modifier.weight(1f)) { currency = it }
         }
 
-        FormSectionHeader("Ek Bilgiler", Icons.Default.Info)
-        FormTextField("Referans No", referenceNo, { referenceNo = it })
-        FormTextField("Açıklama", description, { description = it }, maxLines = 3)
+        FormSectionHeader(DL.t("Ek Bilgiler", "Additional Information", "Información adicional", "Informations supplémentaires"), Icons.Default.Info)
+        FormTextField(DL.t("Referans No", "Reference No", "N.º de referencia", "N° de référence"), referenceNo, { referenceNo = it })
+        FormTextField(DL.t("Açıklama", "Description", "Descripción", "Description"), description, { description = it }, maxLines = 3)
 
         if (error != null) {
             Text(error!!, fontSize = 12.sp, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
@@ -946,7 +980,7 @@ private fun CostFormSheet(
         Spacer(Modifier.height(16.dp))
         SaveButton(isEditing = isEditing, isSaving = isSaving) {
             if (selectedImei.isBlank() || category.isBlank()) {
-                error = "Araç ve kategori zorunludur"; return@SaveButton
+                error = DL.t("Araç ve kategori zorunludur", "Vehicle and category are required", "El vehículo y la categoría son obligatorios", "Le véhicule et la catégorie sont requis"); return@SaveButton
             }
             isSaving = true; error = null
             scope.launch {
@@ -967,7 +1001,7 @@ private fun CostFormSheet(
                     }
                     onSaved()
                 } catch (e: Exception) {
-                    error = e.localizedMessage ?: "Kayıt başarısız"
+                    error = e.localizedMessage ?: DL.t("Kayıt başarısız", "Save failed", "Error al guardar", "Échec de l'enregistrement")
                 }
                 isSaving = false
             }
@@ -986,6 +1020,8 @@ private fun DocumentFormSheet(
     onSaved: () -> Unit,
     onCancel: () -> Unit
 ) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     val scope = rememberCoroutineScope()
     var isSaving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -1001,29 +1037,29 @@ private fun DocumentFormSheet(
     val isEditing = editing != null
 
     FormSheetContainer(
-        title = if (isEditing) "Belge Düzenle" else "Yeni Belge",
+        title = if (isEditing) DL.t("Belge Düzenle", "Edit Document", "Editar documento", "Modifier le document") else DL.t("Yeni Belge", "New Document", "Nuevo documento", "Nouveau document"),
         icon = Icons.Default.Description
     ) {
-        FormSectionHeader("Araç Bilgileri", Icons.Default.DirectionsCar)
+        FormSectionHeader(DL.t("Araç Bilgileri", "Vehicle Information", "Información del vehículo", "Informations du véhicule"), Icons.Default.DirectionsCar)
         VehiclePicker(catalog.vehicles, selectedImei) { selectedImei = it }
 
-        FormSectionHeader("Belge Bilgileri", Icons.Default.Description)
+        FormSectionHeader(DL.t("Belge Bilgileri", "Document Information", "Información del documento", "Informations du document"), Icons.Default.Description)
         if (catalog.documentTypes.isNotEmpty()) {
-            DropdownField("Belge Türü", docType, catalog.documentTypes.map { it to it.replaceFirstChar { c -> c.uppercase() } }) { docType = it }
+            DropdownField(DL.t("Belge Türü", "Document Type", "Tipo de documento", "Type de document"), docType, catalog.documentTypes.map { it to it.replaceFirstChar { c -> c.uppercase() } }) { docType = it }
         } else {
-            FormTextField("Belge Türü", docType, { docType = it }, placeholder = "ruhsat, sigorta, muayene...")
+            FormTextField(DL.t("Belge Türü", "Document Type", "Tipo de documento", "Type de document"), docType, { docType = it }, placeholder = DL.t("ruhsat, sigorta, muayene...", "registration, insurance, inspection...", "registro, seguro, inspección...", "carte grise, assurance, contrôle technique..."))
         }
-        FormTextField("Başlık", title, { title = it })
+        FormTextField(DL.t("Başlık", "Title", "Título", "Titre"), title, { title = it })
 
-        FormSectionHeader("Tarihler", Icons.Default.CalendarMonth)
+        FormSectionHeader(DL.t("Tarihler", "Dates", "Fechas", "Dates"), Icons.Default.CalendarMonth)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FormTextField("Düzenleme Tarihi", issueDate, { issueDate = it }, modifier = Modifier.weight(1f), placeholder = "2025-01-15")
-            FormTextField("Bitiş Tarihi", expiryDate, { expiryDate = it }, modifier = Modifier.weight(1f), placeholder = "2026-01-15")
+            FormTextField(DL.t("Düzenleme Tarihi", "Issue Date", "Fecha de emisión", "Date d'émission"), issueDate, { issueDate = it }, modifier = Modifier.weight(1f), placeholder = "2025-01-15")
+            FormTextField(DL.t("Bitiş Tarihi", "Expiry Date", "Fecha de vencimiento", "Date d'expiration"), expiryDate, { expiryDate = it }, modifier = Modifier.weight(1f), placeholder = "2026-01-15")
         }
-        FormTextField("Hatırlatma (gün)", reminderDays, { reminderDays = it }, keyboardType = KeyboardType.Number)
+        FormTextField(DL.t("Hatırlatma (gün)", "Reminder (days)", "Recordatorio (días)", "Rappel (jours)"), reminderDays, { reminderDays = it }, keyboardType = KeyboardType.Number)
 
-        FormSectionHeader("Notlar", Icons.Default.Notes)
-        FormTextField("Notlar", notes, { notes = it }, maxLines = 3)
+        FormSectionHeader(DL.t("Notlar", "Notes", "Notas", "Notes"), Icons.Default.Notes)
+        FormTextField(DL.t("Notlar", "Notes", "Notas", "Notes"), notes, { notes = it }, maxLines = 3)
 
         if (error != null) {
             Text(error!!, fontSize = 12.sp, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
@@ -1032,7 +1068,7 @@ private fun DocumentFormSheet(
         Spacer(Modifier.height(16.dp))
         SaveButton(isEditing = isEditing, isSaving = isSaving) {
             if (selectedImei.isBlank() || docType.isBlank()) {
-                error = "Araç ve belge türü zorunludur"; return@SaveButton
+                error = DL.t("Araç ve belge türü zorunludur", "Vehicle and document type are required", "El vehículo y el tipo de documento son obligatorios", "Le véhicule et le type de document sont requis"); return@SaveButton
             }
             isSaving = true; error = null
             scope.launch {
@@ -1054,7 +1090,7 @@ private fun DocumentFormSheet(
                     }
                     onSaved()
                 } catch (e: Exception) {
-                    error = e.localizedMessage ?: "Kayıt başarısız"
+                    error = e.localizedMessage ?: DL.t("Kayıt başarısız", "Save failed", "Error al guardar", "Échec de l'enregistrement")
                 }
                 isSaving = false
             }
@@ -1073,6 +1109,8 @@ private fun TireFormSheet(
     onSaved: () -> Unit,
     onCancel: () -> Unit
 ) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     val scope = rememberCoroutineScope()
     var isSaving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -1091,39 +1129,46 @@ private fun TireFormSheet(
 
     val isEditing = editing != null
     val tirePositions = listOf(
-        "sol_on" to "Sol Ön", "sag_on" to "Sağ Ön",
-        "sol_arka" to "Sol Arka", "sag_arka" to "Sağ Arka",
-        "yedek" to "Yedek"
+        "sol_on" to DL.t("Sol Ön", "Front Left", "Delantera izquierda", "Avant gauche"),
+        "sag_on" to DL.t("Sağ Ön", "Front Right", "Delantera derecha", "Avant droite"),
+        "sol_arka" to DL.t("Sol Arka", "Rear Left", "Trasera izquierda", "Arrière gauche"),
+        "sag_arka" to DL.t("Sağ Arka", "Rear Right", "Trasera derecha", "Arrière droite"),
+        "yedek" to DL.t("Yedek", "Spare", "Repuesto", "Secours")
     )
 
     FormSheetContainer(
-        title = if (isEditing) "Lastik Düzenle" else "Yeni Lastik",
+        title = if (isEditing) DL.t("Lastik Düzenle", "Edit Tire", "Editar neumático", "Modifier le pneu") else DL.t("Yeni Lastik", "New Tire", "Nuevo neumático", "Nouveau pneu"),
         icon = Icons.Default.TireRepair
     ) {
-        FormSectionHeader("Araç Bilgileri", Icons.Default.DirectionsCar)
+        FormSectionHeader(DL.t("Araç Bilgileri", "Vehicle Information", "Información del vehículo", "Informations du véhicule"), Icons.Default.DirectionsCar)
         VehiclePicker(catalog.vehicles, selectedImei) { selectedImei = it }
 
-        FormSectionHeader("Lastik Bilgileri", Icons.Default.TireRepair)
-        DropdownField("Pozisyon", position, tirePositions) { position = it }
+        FormSectionHeader(DL.t("Lastik Bilgileri", "Tire Information", "Información del neumático", "Informations du pneu"), Icons.Default.TireRepair)
+        DropdownField(DL.t("Pozisyon", "Position", "Posición", "Position"), position, tirePositions) { position = it }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FormTextField("Marka", brand, { brand = it }, modifier = Modifier.weight(1f))
-            FormTextField("Model", model, { model = it }, modifier = Modifier.weight(1f))
+            FormTextField(DL.t("Marka", "Brand", "Marca", "Marque"), brand, { brand = it }, modifier = Modifier.weight(1f))
+            FormTextField(DL.t("Model", "Model", "Modelo", "Modèle"), model, { model = it }, modifier = Modifier.weight(1f))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FormTextField("Ebat", size, { size = it }, modifier = Modifier.weight(1f), placeholder = "205/55R16")
-            FormTextField("DOT Kodu", dotCode, { dotCode = it }, modifier = Modifier.weight(1f))
+            FormTextField(DL.t("Ebat", "Size", "Medida", "Dimension"), size, { size = it }, modifier = Modifier.weight(1f), placeholder = "205/55R16")
+            FormTextField(DL.t("DOT Kodu", "DOT Code", "Código DOT", "Code DOT"), dotCode, { dotCode = it }, modifier = Modifier.weight(1f))
         }
 
-        FormSectionHeader("Kilometre & Tarih", Icons.Default.Speed)
-        FormTextField("Montaj Tarihi", installDate, { installDate = it }, placeholder = "2025-01-15")
+        FormSectionHeader(DL.t("Kilometre ve Tarih", "Mileage & Date", "Kilometraje y fecha", "Kilométrage et date"), Icons.Default.Speed)
+        FormTextField(DL.t("Montaj Tarihi", "Installation Date", "Fecha de instalación", "Date de montage"), installDate, { installDate = it }, placeholder = "2025-01-15")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FormTextField("Montaj KM", kmAtInstall, { kmAtInstall = it }, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
-            FormTextField("KM Limiti", kmLimit, { kmLimit = it }, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
+            FormTextField(DL.t("Montaj KM", "Install KM", "KM de instalación", "KM montage"), kmAtInstall, { kmAtInstall = it }, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
+            FormTextField(DL.t("KM Limiti", "KM Limit", "Límite KM", "Limite KM"), kmLimit, { kmLimit = it }, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
         }
-        DropdownField("Durum", status, listOf("active" to "Aktif", "worn" to "Aşınmış", "replaced" to "Değiştirildi", "critical" to "Kritik")) { status = it }
+        DropdownField(DL.t("Durum", "Status", "Estado", "Statut"), status, listOf(
+            "active" to DL.t("Aktif", "Active", "Activo", "Actif"),
+            "worn" to DL.t("Aşınmış", "Worn", "Desgastado", "Usé"),
+            "replaced" to DL.t("Değiştirildi", "Replaced", "Reemplazado", "Remplacé"),
+            "critical" to DL.t("Kritik", "Critical", "Crítico", "Critique")
+        )) { status = it }
 
-        FormSectionHeader("Notlar", Icons.Default.Notes)
-        FormTextField("Notlar", notes, { notes = it }, maxLines = 3)
+        FormSectionHeader(DL.t("Notlar", "Notes", "Notas", "Notes"), Icons.Default.Notes)
+        FormTextField(DL.t("Notlar", "Notes", "Notas", "Notes"), notes, { notes = it }, maxLines = 3)
 
         if (error != null) {
             Text(error!!, fontSize = 12.sp, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
@@ -1132,7 +1177,7 @@ private fun TireFormSheet(
         Spacer(Modifier.height(16.dp))
         SaveButton(isEditing = isEditing, isSaving = isSaving) {
             if (selectedImei.isBlank()) {
-                error = "Araç seçimi zorunludur"; return@SaveButton
+                error = DL.t("Araç seçimi zorunludur", "Vehicle selection is required", "La selección del vehículo es obligatoria", "La sélection du véhicule est requise"); return@SaveButton
             }
             isSaving = true; error = null
             scope.launch {
@@ -1158,7 +1203,7 @@ private fun TireFormSheet(
                     }
                     onSaved()
                 } catch (e: Exception) {
-                    error = e.localizedMessage ?: "Kayıt başarısız"
+                    error = e.localizedMessage ?: DL.t("Kayıt başarısız", "Save failed", "Error al guardar", "Échec de l'enregistrement")
                 }
                 isSaving = false
             }
@@ -1262,8 +1307,10 @@ private fun DropdownField(
     modifier: Modifier = Modifier,
     onSelect: (String) -> Unit
 ) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     var expanded by remember { mutableStateOf(false) }
-    val displayText = options.find { it.first == selectedValue }?.second ?: selectedValue.ifEmpty { "Seçiniz" }
+    val displayText = options.find { it.first == selectedValue }?.second ?: selectedValue.ifEmpty { DL.t("Seçiniz", "Select", "Seleccione", "Sélectionner") }
 
     Column(modifier = modifier.padding(bottom = 8.dp)) {
         Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
@@ -1306,6 +1353,8 @@ private fun VehiclePicker(
     selectedImei: String,
     onSelect: (String) -> Unit
 ) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     var expanded by remember { mutableStateOf(false) }
     var vehicleSearch by remember { mutableStateOf("") }
     val selectedPlate = vehicles.find { it.imei == selectedImei }?.plate ?: ""
@@ -1315,11 +1364,11 @@ private fun VehiclePicker(
     }
 
     Column(modifier = Modifier.padding(bottom = 8.dp)) {
-        Text("Araç Seçimi", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+        Text(DL.t("Araç Seçimi", "Vehicle Selection", "Selección de vehículo", "Sélection du véhicule"), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
         Spacer(Modifier.height(4.dp))
         Box {
             OutlinedTextField(
-                value = selectedPlate.ifEmpty { "Araç seçiniz..." },
+                value = selectedPlate.ifEmpty { DL.t("Araç seçiniz...", "Select a vehicle...", "Seleccione un vehículo...", "Sélectionnez un véhicule...") },
                 onValueChange = {},
                 readOnly = true,
                 modifier = Modifier
@@ -1352,7 +1401,7 @@ private fun VehiclePicker(
                 OutlinedTextField(
                     value = vehicleSearch,
                     onValueChange = { vehicleSearch = it },
-                    placeholder = { Text("Plaka ara...", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)) },
+                    placeholder = { Text(DL.t("Plaka ara...", "Search plate...", "Buscar matrícula...", "Rechercher une plaque..."), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)) },
                     leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)) },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1393,7 +1442,7 @@ private fun VehiclePicker(
                 }
                 if (filteredVehicles.isEmpty()) {
                     Text(
-                        "Araç bulunamadı",
+                        DL.t("Araç bulunamadı", "No vehicle found", "No se encontró vehículo", "Aucun véhicule trouvé"),
                         modifier = Modifier.padding(16.dp),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
@@ -1413,6 +1462,8 @@ private fun VehiclePicker(
 
 @Composable
 private fun SaveButton(isEditing: Boolean, isSaving: Boolean, onClick: () -> Unit) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     Button(
         onClick = onClick,
         enabled = !isSaving,
@@ -1436,7 +1487,9 @@ private fun SaveButton(isEditing: Boolean, isSaving: Boolean, onClick: () -> Uni
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            if (isSaving) "Kaydediliyor..." else if (isEditing) "Güncelle" else "Kaydet",
+            if (isSaving) DL.t("Kaydediliyor...", "Saving...", "Guardando...", "Enregistrement...")
+            else if (isEditing) DL.t("Güncelle", "Update", "Actualizar", "Mettre à jour")
+            else DL.t("Kaydet", "Save", "Guardar", "Enregistrer"),
             fontWeight = FontWeight.SemiBold,
             fontSize = 14.sp
         )
@@ -1469,6 +1522,8 @@ private fun EmptyStateView(message: String, icon: ImageVector) {
 
 @Composable
 private fun ErrorView(message: String, onRetry: () -> Unit) {
+    val currentLang by DashboardStrings.currentLang.collectAsState()
+    val DL = DashboardStrings
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1482,7 +1537,7 @@ private fun ErrorView(message: String, onRetry: () -> Unit) {
         OutlinedButton(onClick = onRetry, shape = RoundedCornerShape(8.dp)) {
             Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text("Tekrar Dene", fontSize = 13.sp)
+            Text(DL.t("Tekrar Dene", "Try Again", "Intentar de nuevo", "Réessayer"), fontSize = 13.sp)
         }
     }
 }

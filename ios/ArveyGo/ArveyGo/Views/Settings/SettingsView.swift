@@ -9,17 +9,17 @@ struct SettingsView: View {
 
         var title: String {
             switch self {
-            case .terms: return "Kullanım Koşulları"
-            case .privacy: return "Gizlilik Politikası"
+            case .terms: return DashboardStrings.shared.t("Kullanım Koşulları", "Terms of Use", "Términos de uso", "Conditions d'utilisation")
+            case .privacy: return DashboardStrings.shared.t("Gizlilik Politikası", "Privacy Policy", "Política de privacidad", "Politique de confidentialité")
             }
         }
 
         var summary: String {
             switch self {
             case .terms:
-                return "Platformu kullanırken hesap güvenliği, veri doğruluğu ve kullanım sınırları bu dokümanda açıklanır."
+                return DashboardStrings.shared.t("Platformu kullanırken hesap güvenliği, veri doğruluğu ve kullanım sınırları bu dokümanda açıklanır.", "This document explains account security, data accuracy, and usage boundaries while using the platform.", "Este documento explica la seguridad de la cuenta, la precisión de los datos y los límites de uso en la plataforma.", "Ce document explique la sécurité du compte, l'exactitude des données et les limites d'usage de la plateforme.")
             case .privacy:
-                return "Konum, araç telemetrisi ve hesap verilerinin nasıl işlendiği ve korunduğu bu dokümanda yer alır."
+                return DashboardStrings.shared.t("Konum, araç telemetrisi ve hesap verilerinin nasıl işlendiği ve korunduğu bu dokümanda yer alır.", "This document describes how location, vehicle telemetry, and account data are processed and protected.", "Este documento describe cómo se procesan y protegen los datos de ubicación, telemetría y cuenta.", "Ce document décrit comment les données de localisation, télémétrie véhicule et compte sont traitées et protégées.")
             }
         }
     }
@@ -86,7 +86,7 @@ struct SettingsView: View {
                     Text(DL.settingsTitle)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(ds.text1)
-                    Text("Tercihler ve uygulama ayarları")
+                    Text(DL.t("Tercihler ve uygulama ayarları", "Preferences and app settings", "Preferencias y ajustes de la app", "Préférences et réglages de l'application"))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(ds.text3)
                 }
@@ -119,10 +119,10 @@ struct SettingsView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Kontrol ve kişiselleştirme")
+                    Text(DL.t("Kontrol ve kişiselleştirme", "Control and personalization", "Control y personalización", "Contrôle et personnalisation"))
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(ds.text1)
-                    Text("Dil, tema, bildirim ve uygulama tercihlerini tek bir merkezden yönet.")
+                    Text(DL.t("Dil, tema, bildirim ve uygulama tercihlerini tek bir merkezden yönet.", "Manage language, theme, notifications, and app preferences from one place.", "Gestiona idioma, tema, notificaciones y preferencias de la app desde un solo lugar.", "Gérez langue, thème, notifications et préférences de l'app depuis un seul endroit."))
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(ds.text2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -130,9 +130,9 @@ struct SettingsView: View {
             }
 
             HStack(spacing: 10) {
-                settingsStat(title: "Dil", value: LS.currentLang)
-                settingsStat(title: "Tema", value: themeManager.mode.title)
-                settingsStat(title: "Sürüm", value: "1.0.0")
+                settingsStat(title: DL.languageLabel, value: LS.currentLang)
+                settingsStat(title: DL.t("Tema", "Theme", "Tema", "Thème"), value: themeManager.mode.title)
+                settingsStat(title: DL.t("Sürüm", "Version", "Versión", "Version"), value: "1.0.0")
             }
         }
         .padding(20)
@@ -165,10 +165,10 @@ struct SettingsView: View {
     }
 
     private var preferencesCard: some View {
-        settingsCard(title: "Tercihler", subtitle: "Günlük kullanım için temel ayarlar") {
+        settingsCard(title: DL.t("Tercihler", "Preferences", "Preferencias", "Préférences"), subtitle: DL.t("Günlük kullanım için temel ayarlar", "Core settings for daily use", "Ajustes clave para el uso diario", "Réglages essentiels au quotidien")) {
             VStack(spacing: 18) {
                 VStack(alignment: .leading, spacing: 12) {
-                    settingsSectionHeader(icon: "globe", title: DL.languageLabel, detail: "Arayüz dilini seç")
+                    settingsSectionHeader(icon: "globe", title: DL.languageLabel, detail: DL.t("Arayüz dilini seç", "Choose the interface language", "Elige el idioma de la interfaz", "Choisissez la langue de l'interface"))
 
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         ForEach(languages, id: \.code) { language in
@@ -210,7 +210,7 @@ struct SettingsView: View {
                 Divider().overlay(ds.divider)
 
                 VStack(alignment: .leading, spacing: 12) {
-                    settingsSectionHeader(icon: "circle.lefthalf.filled", title: themeLabel, detail: "Uygulamanın görünüm modunu belirle")
+                    settingsSectionHeader(icon: "circle.lefthalf.filled", title: themeLabel, detail: DL.t("Uygulamanın görünüm modunu belirle", "Choose the app appearance mode", "Elige el modo de apariencia", "Choisissez le mode d'apparence"))
 
                     HStack(spacing: 10) {
                         ForEach(ThemeManager.ThemeMode.allCases, id: \.rawValue) { mode in
@@ -250,7 +250,7 @@ struct SettingsView: View {
     }
 
     private var navigationCard: some View {
-        settingsCard(title: "Uygulama", subtitle: "Bildirim ve erişim tercihleri") {
+        settingsCard(title: DL.t("Uygulama", "Application", "Aplicación", "Application"), subtitle: DL.t("Bildirim ve erişim tercihleri", "Notification and access preferences", "Preferencias de notificación y acceso", "Préférences de notification et d'accès")) {
             VStack(spacing: 0) {
                 NavigationLink(destination: NotificationSettingsView()) {
                     settingsRow(
@@ -266,7 +266,7 @@ struct SettingsView: View {
     }
 
     private var appInfoCard: some View {
-        settingsCard(title: DL.appInfoTitle, subtitle: "Sürüm ve platform bilgileri") {
+        settingsCard(title: DL.appInfoTitle, subtitle: DL.t("Sürüm ve platform bilgileri", "Version and platform information", "Información de versión y plataforma", "Informations sur la version et la plateforme")) {
             VStack(spacing: 0) {
                 infoRow(icon: "app.badge.fill", label: DL.appInfoApp, value: "ArveyGo v1.0.0")
                 Divider().overlay(ds.divider).padding(.leading, 54)
@@ -278,17 +278,17 @@ struct SettingsView: View {
     }
 
     private var legalCard: some View {
-        settingsCard(title: DL.legalTitle, subtitle: "Yasal metinler ve kullanım çerçevesi") {
+        settingsCard(title: DL.legalTitle, subtitle: DL.t("Yasal metinler ve kullanım çerçevesi", "Legal texts and usage framework", "Textos legales y marco de uso", "Textes juridiques et cadre d'utilisation")) {
             VStack(spacing: 0) {
                 Button { activeDocument = .terms } label: {
-                    settingsRow(icon: "doc.text.fill", tint: AppTheme.indigo, title: DL.termsOfUse, subtitle: "Hizmet kullanım koşullarını incele")
+                    settingsRow(icon: "doc.text.fill", tint: AppTheme.indigo, title: DL.termsOfUse, subtitle: DL.t("Hizmet kullanım koşullarını incele", "Review service usage terms", "Revisa las condiciones de uso del servicio", "Consultez les conditions d'utilisation du service"))
                 }
                 .buttonStyle(.plain)
 
                 Divider().overlay(ds.divider).padding(.leading, 54)
 
                 Button { activeDocument = .privacy } label: {
-                    settingsRow(icon: "hand.raised.fill", tint: AppTheme.online, title: DL.privacyPolicy, subtitle: "Veri işleme ve gizlilik yaklaşımı")
+                    settingsRow(icon: "hand.raised.fill", tint: AppTheme.online, title: DL.privacyPolicy, subtitle: DL.t("Veri işleme ve gizlilik yaklaşımı", "Data processing and privacy approach", "Enfoque de privacidad y tratamiento de datos", "Approche de confidentialité et traitement des données"))
                 }
                 .buttonStyle(.plain)
             }
@@ -403,14 +403,14 @@ struct SettingsView: View {
 
     private func modeDescription(_ mode: ThemeManager.ThemeMode) -> String {
         switch mode {
-        case .light: return "Açık yüzeyler ve yüksek görünürlük"
-        case .dark: return "Göz yormayan koyu görünüm"
-        case .system: return "Cihaz ayarını otomatik takip eder"
+        case .light: return DL.t("Açık yüzeyler ve yüksek görünürlük", "Bright surfaces and high visibility", "Superficies claras y alta visibilidad", "Surfaces claires et haute visibilité")
+        case .dark: return DL.t("Göz yormayan koyu görünüm", "Dark appearance that reduces eye strain", "Apariencia oscura que reduce la fatiga visual", "Mode sombre qui réduit la fatigue visuelle")
+        case .system: return DL.t("Cihaz ayarını otomatik takip eder", "Automatically follow the device setting", "Seguir automáticamente la configuración del dispositivo", "Suivre automatiquement le réglage de l'appareil")
         }
     }
 
     private var themeLabel: String {
-        DL.currentLang == "EN" ? "Theme" : "Tema"
+        DL.t("Tema", "Theme", "Tema", "Thème")
     }
 
     private func legalDocumentSheet(_ document: LegalDocument) -> some View {
@@ -425,9 +425,9 @@ struct SettingsView: View {
                     .foregroundStyle(ds.text2)
 
                 VStack(alignment: .leading, spacing: 12) {
-                    legalParagraph("ArveyGo, filo operasyonlarının güvenli ve izlenebilir biçimde yürütülmesi için konum, telemetri ve kullanıcı ayarlarını işler.")
-                    legalParagraph("Kullanıcı hesaplarının güvenliği, yetkisiz paylaşımın önlenmesi ve veri bütünlüğünün korunması kurum sorumluluklarıyla birlikte değerlendirilir.")
-                    legalParagraph("Daha kapsamlı hukuk metni web sürümü ve kurumsal sözleşmeler içinde yayımlanır; mobil uygulama tarafında bu özet, kullanım farkındalığı sağlamak için sunulur.")
+                    legalParagraph(DL.t("ArveyGo, filo operasyonlarının güvenli ve izlenebilir biçimde yürütülmesi için konum, telemetri ve kullanıcı ayarlarını işler.", "ArveyGo processes location, telemetry, and user settings so fleet operations can run securely and traceably.", "ArveyGo procesa ubicación, telemetría y ajustes de usuario para que las operaciones de flota sean seguras y trazables.", "ArveyGo traite la localisation, la télémétrie et les réglages utilisateur afin que les opérations de flotte soient sûres et traçables."))
+                    legalParagraph(DL.t("Kullanıcı hesaplarının güvenliği, yetkisiz paylaşımın önlenmesi ve veri bütünlüğünün korunması kurum sorumluluklarıyla birlikte değerlendirilir.", "User account security, prevention of unauthorized sharing, and protection of data integrity are handled alongside organizational responsibilities.", "La seguridad de las cuentas, la prevención del uso no autorizado y la protección de la integridad de los datos se gestionan junto con las responsabilidades de la organización.", "La sécurité des comptes, la prévention du partage non autorisé et la protection de l'intégrité des données sont gérées avec les responsabilités de l'organisation."))
+                    legalParagraph(DL.t("Daha kapsamlı hukuk metni web sürümü ve kurumsal sözleşmeler içinde yayımlanır; mobil uygulama tarafında bu özet, kullanım farkındalığı sağlamak için sunulur.", "More comprehensive legal text is published in the web version and corporate agreements; this mobile summary is provided for awareness.", "El texto legal completo se publica en la versión web y en los acuerdos corporativos; este resumen móvil se ofrece como referencia.", "Un texte juridique plus complet est publié dans la version web et les accords d'entreprise ; ce résumé mobile est fourni à titre informatif."))
                 }
             }
             .padding(20)
@@ -437,7 +437,7 @@ struct SettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Kapat") { activeDocument = nil }
+                Button(DL.t("Kapat", "Close", "Cerrar", "Fermer")) { activeDocument = nil }
                     .foregroundStyle(AppTheme.indigo)
             }
         }

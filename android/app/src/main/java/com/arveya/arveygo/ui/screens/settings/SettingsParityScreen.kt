@@ -85,7 +85,7 @@ fun SettingsParityScreen() {
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(DL.settingsTitle, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-                        Text("Tercihler ve uygulama ayarları", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f))
+                        Text(DL.t("Tercihler ve uygulama ayarları", "Preferences and app settings", "Preferencias y ajustes de la app", "Préférences et réglages de l'application"), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
@@ -103,8 +103,8 @@ fun SettingsParityScreen() {
         ) {
             HeroSettingsCard(currentLang = currentLang, themeMode = ThemeManager.mode)
 
-            SettingsSectionCard("Tercihler", "Günlük kullanım için temel ayarlar") {
-                SettingsSectionHeader(Icons.Default.Language, DL.languageLabel, "Arayüz dilini seç")
+            SettingsSectionCard(DL.t("Tercihler", "Preferences", "Preferencias", "Préférences"), DL.t("Günlük kullanım için temel ayarlar", "Core settings for daily use", "Ajustes clave para el uso diario", "Réglages essentiels au quotidien")) {
+                SettingsSectionHeader(Icons.Default.Language, DL.languageLabel, DL.t("Arayüz dilini seç", "Choose the interface language", "Elige el idioma de la interfaz", "Choisissez la langue de l'interface"))
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     languages.chunked(2).forEach { rowItems ->
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
@@ -139,7 +139,7 @@ fun SettingsParityScreen() {
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 18.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
 
-                SettingsSectionHeader(Icons.Default.Palette, "Tema", "Uygulamanın görünüm modunu belirle")
+                SettingsSectionHeader(Icons.Default.Palette, DL.t("Tema", "Theme", "Tema", "Thème"), DL.t("Uygulamanın görünüm modunu belirle", "Choose the app appearance mode", "Elige el modo de apariencia", "Choisissez le mode d'apparence"))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     ThemeMode.entries.forEach { mode ->
                         val selected = ThemeManager.mode == mode
@@ -164,9 +164,9 @@ fun SettingsParityScreen() {
                                 Text(mode.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface)
                                 Text(
                                     when (mode) {
-                                        ThemeMode.LIGHT -> "Her zaman açık görünüm"
-                                        ThemeMode.DARK -> "Her zaman koyu görünüm"
-                                        ThemeMode.SYSTEM -> "Telefon ayarını takip eder"
+                                        ThemeMode.LIGHT -> DL.t("Her zaman açık görünüm", "Always use light appearance", "Usar siempre apariencia clara", "Toujours utiliser le mode clair")
+                                        ThemeMode.DARK -> DL.t("Her zaman koyu görünüm", "Always use dark appearance", "Usar siempre apariencia oscura", "Toujours utiliser le mode sombre")
+                                        ThemeMode.SYSTEM -> DL.t("Telefon ayarını takip eder", "Follow the phone setting", "Seguir la configuración del teléfono", "Suivre le réglage du téléphone")
                                     },
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium,
@@ -178,13 +178,13 @@ fun SettingsParityScreen() {
                 }
             }
 
-            SettingsSectionCard("Uygulama", "Bildirim ve erişim tercihleri") {
+            SettingsSectionCard(DL.t("Uygulama", "Application", "Aplicación", "Application"), DL.t("Bildirim ve erişim tercihleri", "Notification and access preferences", "Preferencias de notificación y acceso", "Préférences de notification et d'accès")) {
                 SettingsNavRow(Icons.Default.NotificationsActive, DL.notificationSettings, DL.notificationSettingsSubtitle) {
                     showNotifSettings = true
                 }
             }
 
-            SettingsSectionCard(DL.appInfoTitle, "Sürüm ve platform bilgileri") {
+            SettingsSectionCard(DL.appInfoTitle, DL.t("Sürüm ve platform bilgileri", "Version and platform information", "Información de versión y plataforma", "Informations sur la version et la plateforme")) {
                 InfoRow(Icons.Default.Apps, DL.appInfoApp, "ArveyGo v1.0.0")
                 HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
                 InfoRow(Icons.Default.PhoneAndroid, DL.appInfoPlatform, "Android ${android.os.Build.VERSION.RELEASE}")
@@ -192,10 +192,10 @@ fun SettingsParityScreen() {
                 InfoRow(Icons.Default.Description, DL.appInfoDeveloper, "Arveya Teknoloji")
             }
 
-            SettingsSectionCard(DL.legalTitle, "Yasal ve gizlilik dokümanları") {
-                SettingsNavRow(Icons.Default.Description, DL.termsOfUse, "Hesap güvenliği ve kullanım şartları") { }
+            SettingsSectionCard(DL.legalTitle, DL.t("Yasal ve gizlilik dokümanları", "Legal and privacy documents", "Documentos legales y de privacidad", "Documents juridiques et de confidentialité")) {
+                SettingsNavRow(Icons.Default.Description, DL.termsOfUse, DL.t("Hesap güvenliği ve kullanım şartları", "Account security and usage terms", "Seguridad de la cuenta y condiciones de uso", "Sécurité du compte et conditions d'utilisation")) { }
                 HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
-                SettingsNavRow(Icons.Default.PrivacyTip, DL.privacyPolicy, "Veri işleme ve gizlilik bilgileri") { }
+                SettingsNavRow(Icons.Default.PrivacyTip, DL.privacyPolicy, DL.t("Veri işleme ve gizlilik bilgileri", "Data processing and privacy details", "Información de tratamiento de datos y privacidad", "Informations sur le traitement des données et la confidentialité")) { }
             }
 
             Column(
@@ -239,15 +239,15 @@ private fun HeroSettingsCard(currentLang: String, themeMode: ThemeMode) {
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Kontrol ve kişiselleştirme", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                    Text("Dil, tema ve bildirim tercihlerini tek merkezden yönet.", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                    Text(DashboardStrings.t("Kontrol ve kişiselleştirme", "Control and personalization", "Control y personalización", "Contrôle et personnalisation"), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text(DashboardStrings.t("Dil, tema ve bildirim tercihlerini tek merkezden yönet.", "Manage language, theme, and notifications from one place.", "Gestiona idioma, tema y notificaciones desde un solo lugar.", "Gérez langue, thème et notifications depuis un seul endroit."), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                 }
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                SettingsStat("Dil", currentLang, Modifier.weight(1f))
-                SettingsStat("Tema", themeMode.title, Modifier.weight(1f))
-                SettingsStat("Sürüm", "1.0.0", Modifier.weight(1f))
+                SettingsStat(DashboardStrings.languageLabel, currentLang, Modifier.weight(1f))
+                SettingsStat(DashboardStrings.t("Tema", "Theme", "Tema", "Thème"), themeMode.title, Modifier.weight(1f))
+                SettingsStat(DashboardStrings.t("Sürüm", "Version", "Versión", "Version"), "1.0.0", Modifier.weight(1f))
             }
         }
     }

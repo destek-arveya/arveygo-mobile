@@ -79,6 +79,8 @@ object LoginStrings {
     val copyright: String get() = "© 2026 Arveya Teknoloji"
     val version: String get() = "v1.0.0"
 
+    fun t(tr: String, en: String, es: String, fr: String): String = s(tr, en, es, fr)
+
     // ---------- Helper ----------
     private fun s(tr: String, en: String, es: String, fr: String): String =
         when (_currentLang.value) {

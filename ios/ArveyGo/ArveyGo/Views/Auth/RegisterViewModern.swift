@@ -3,6 +3,7 @@ import SwiftUI
 struct RegisterView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var L = LoginStrings.shared
     @FocusState private var focusedField: Field?
 
     enum Field { case name, email, password, confirm }
@@ -18,7 +19,7 @@ struct RegisterView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "chevron.left")
                                     .font(.system(size: 13, weight: .semibold))
-                                Text("Giriş Yap")
+                                Text(L.loginButton)
                                     .font(.system(size: 13, weight: .semibold))
                             }
                             .foregroundStyle(AppTheme.authNightTextSecondary)
@@ -32,9 +33,9 @@ struct RegisterView: View {
                     .padding(.bottom, 20)
 
                     AuthNeoHero(
-                        eyebrow: "YENI HESAP",
-                        title: "Yeni kullanıcı hesabını hızlıca oluştur",
-                        subtitle: "Kurumsal erişim için temel bilgileri tamamlayın.",
+                        eyebrow: L.t("YENI HESAP", "NEW ACCOUNT", "NUEVA CUENTA", "NOUVEAU COMPTE"),
+                        title: L.t("Yeni kullanıcı hesabını hızlıca oluştur", "Create your new user account quickly", "Crea tu nueva cuenta rápidamente", "Créez rapidement votre nouveau compte"),
+                        subtitle: L.t("Kurumsal erişim için temel bilgileri tamamlayın.", "Complete the core details for enterprise access.", "Completa los datos principales para el acceso corporativo.", "Complétez les informations essentielles pour l'accès professionnel."),
                         chips: []
                     )
                     .padding(.horizontal, 20)
@@ -44,10 +45,10 @@ struct RegisterView: View {
                             VStack(alignment: .leading, spacing: 0) {
                                 HStack(alignment: .center) {
                                     VStack(alignment: .leading, spacing: 5) {
-                                        Text("Yeni Hesap Oluştur")
+                                        Text(L.t("Yeni Hesap Oluştur", "Create New Account", "Crear Cuenta Nueva", "Créer un compte"))
                                             .font(.system(size: 20, weight: .bold))
                                             .foregroundStyle(AppTheme.authNightText)
-                                        Text("Kurumsal kullanım için kullanıcı bilgilerini tamamlayın")
+                                        Text(L.t("Kurumsal kullanım için kullanıcı bilgilerini tamamlayın", "Complete user details for enterprise use", "Completa los datos del usuario para uso corporativo", "Complétez les informations utilisateur pour l'usage professionnel"))
                                             .font(.system(size: 13, weight: .regular))
                                             .foregroundStyle(AppTheme.authNightTextSecondary)
                                     }
@@ -65,8 +66,8 @@ struct RegisterView: View {
                                         .padding(.bottom, 16)
                                 }
 
-                                AuthNeoField(label: "Ad Soyad", icon: "person", isFocused: focusedField == .name) {
-                                    TextField("", text: $authVM.registerName, prompt: authPrompt("Adınız Soyadınız"))
+                                AuthNeoField(label: L.t("Ad Soyad", "Full Name", "Nombre completo", "Nom complet"), icon: "person", isFocused: focusedField == .name) {
+                                    TextField("", text: $authVM.registerName, prompt: authPrompt(L.t("Adınız Soyadınız", "Your full name", "Tu nombre completo", "Votre nom complet")))
                                         .font(.system(size: 14, weight: .regular))
                                         .foregroundStyle(AppTheme.authNightText)
                                         .tint(.white)
@@ -74,8 +75,8 @@ struct RegisterView: View {
                                 }
                                 .padding(.bottom, 14)
 
-                                AuthNeoField(label: "E-posta", icon: "envelope", isFocused: focusedField == .email) {
-                                    TextField("", text: $authVM.registerEmail, prompt: authPrompt("ornek@email.com"))
+                                AuthNeoField(label: L.emailLabel, icon: "envelope", isFocused: focusedField == .email) {
+                                    TextField("", text: $authVM.registerEmail, prompt: authPrompt(L.emailPlaceholder))
                                         .font(.system(size: 14, weight: .regular))
                                         .foregroundStyle(AppTheme.authNightText)
                                         .textContentType(.emailAddress)
@@ -87,8 +88,8 @@ struct RegisterView: View {
                                 }
                                 .padding(.bottom, 14)
 
-                                AuthNeoField(label: "Şifre", icon: "lock", isFocused: focusedField == .password) {
-                                    SecureField("", text: $authVM.registerPassword, prompt: authPrompt("En az 8 karakter"))
+                                AuthNeoField(label: L.passwordLabel, icon: "lock", isFocused: focusedField == .password) {
+                                    SecureField("", text: $authVM.registerPassword, prompt: authPrompt(L.t("En az 8 karakter", "At least 8 characters", "Al menos 8 caracteres", "Au moins 8 caractères")))
                                         .font(.system(size: 14, weight: .regular))
                                         .foregroundStyle(AppTheme.authNightText)
                                         .tint(.white)
@@ -96,8 +97,8 @@ struct RegisterView: View {
                                 }
                                 .padding(.bottom, 14)
 
-                                AuthNeoField(label: "Şifre Tekrar", icon: "lock.shield", isFocused: focusedField == .confirm) {
-                                    SecureField("", text: $authVM.registerPasswordConfirm, prompt: authPrompt("Şifrenizi tekrar girin"))
+                                AuthNeoField(label: L.t("Şifre Tekrar", "Confirm Password", "Confirmar contraseña", "Confirmer le mot de passe"), icon: "lock.shield", isFocused: focusedField == .confirm) {
+                                    SecureField("", text: $authVM.registerPasswordConfirm, prompt: authPrompt(L.t("Şifrenizi tekrar girin", "Enter your password again", "Ingresa tu contraseña nuevamente", "Saisissez à nouveau votre mot de passe")))
                                         .font(.system(size: 14, weight: .regular))
                                         .foregroundStyle(AppTheme.authNightText)
                                         .tint(.white)
@@ -113,7 +114,7 @@ struct RegisterView: View {
                                         if authVM.isLoading {
                                             LoadingSpinner()
                                         } else {
-                                            Text("Kayıt Ol")
+                                            Text(L.register)
                                             Image(systemName: "arrow.right")
                                                 .font(.system(size: 13, weight: .semibold))
                                         }
@@ -123,15 +124,15 @@ struct RegisterView: View {
                                 .disabled(authVM.isLoading)
                                 .padding(.bottom, 16)
 
-                                AuthNeoDivider(title: "veya")
+                                AuthNeoDivider(title: L.orDivider)
                                     .padding(.bottom, 16)
 
                                 Button(action: { dismiss() }) {
                                     HStack(spacing: 4) {
-                                        Text("Zaten hesabınız var mı?")
+                                        Text(L.noAccount)
                                             .font(.system(size: 13, weight: .regular))
                                             .foregroundStyle(AppTheme.authNightTextMuted)
-                                        Text("Giriş Yap")
+                                        Text(L.loginButton)
                                             .font(.system(size: 13, weight: .semibold))
                                             .foregroundStyle(AppTheme.authNightText)
                                     }

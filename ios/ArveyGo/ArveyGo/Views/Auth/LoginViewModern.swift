@@ -33,9 +33,9 @@ struct LoginView: View {
                     .padding(.bottom, 20)
 
                     AuthNeoHero(
-                        eyebrow: "ARVEYGO MOBILE",
-                        title: "Filo kontrolüne güvenli biçimde giriş yap",
-                        subtitle: "Tüm araç, alarm ve operasyon ekranlarına tek oturumla erişin.",
+                        eyebrow: L.t("ARVEYGO MOBILE", "ARVEYGO MOBILE", "ARVEYGO MOBILE", "ARVEYGO MOBILE"),
+                        title: L.t("Filo kontrolüne güvenli biçimde giriş yap", "Sign in securely to fleet control", "Accede de forma segura al control de flota", "Connectez-vous en toute sécurité au contrôle de flotte"),
+                        subtitle: L.t("Tüm araç, alarm ve operasyon ekranlarına tek oturumla erişin.", "Access all vehicle, alarm, and operations screens with one session.", "Accede a todas las pantallas de vehículos, alarmas y operaciones con una sola sesión.", "Accédez à tous les écrans véhicules, alarmes et opérations avec une seule session."),
                         chips: []
                     )
                     .padding(.horizontal, 20)
@@ -395,7 +395,7 @@ struct LoginView: View {
                         otpCode = ""
                         otpError = nil
                     }) {
-                        Text(L.currentLang == "TR" ? "Numarayı Değiştir" : "Change Number")
+                        Text(L.t("Numarayı Değiştir", "Change Number", "Cambiar número", "Changer le numéro"))
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(AppTheme.authNightTextMuted)
                             .frame(maxWidth: .infinity)

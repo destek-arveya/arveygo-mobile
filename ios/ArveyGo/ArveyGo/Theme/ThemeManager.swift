@@ -20,12 +20,12 @@ class ThemeManager: ObservableObject {
         }
 
         var title: String {
-            let lang = DashboardStrings.shared.currentLang
-            switch self {
-            case .light:  return lang == "EN" ? "Light" : "Açık"
-            case .dark:   return lang == "EN" ? "Dark" : "Koyu"
-            case .system: return lang == "EN" ? "System" : "Sistem"
-            }
+            DashboardStrings.shared.t(
+                self == .light ? "Açık" : self == .dark ? "Koyu" : "Sistem",
+                self == .light ? "Light" : self == .dark ? "Dark" : "System",
+                self == .light ? "Claro" : self == .dark ? "Oscuro" : "Sistema",
+                self == .light ? "Clair" : self == .dark ? "Sombre" : "Système"
+            )
         }
     }
 

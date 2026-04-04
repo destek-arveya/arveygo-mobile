@@ -35,6 +35,7 @@ enum AppPage: String, CaseIterable {
 struct ContentView: View {
     @EnvironmentObject var authVM: AuthViewModel
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var DL = DashboardStrings.shared
     @State private var selectedTab: AppTab = .liveMap
     @State private var showSupportRequest = false
     @StateObject private var dashboardVM = DashboardViewModel()
@@ -169,11 +170,11 @@ struct ContentView: View {
 
             // Tab items
             HStack(spacing: 0) {
-                tabItem(tab: .dashboard,  icon: "square.grid.2x2.fill",       label: "Özet")
-                tabItem(tab: .alarms,     icon: "bell.fill",                   label: "Alarmlar")
+                tabItem(tab: .dashboard,  icon: "square.grid.2x2.fill",       label: DL.t("Özet", "Summary", "Resumen", "Résumé"))
+                tabItem(tab: .alarms,     icon: "bell.fill",                   label: DL.menuAlarms)
                 mapCenterTab
-                tabItem(tab: .fleet,      icon: "wrench.and.screwdriver.fill", label: "Filo")
-                tabItem(tab: .hub,        icon: "circle.grid.2x2.fill",       label: "Hub")
+                tabItem(tab: .fleet,      icon: "wrench.and.screwdriver.fill", label: DL.t("Filo", "Fleet", "Flota", "Flotte"))
+                tabItem(tab: .hub,        icon: "circle.grid.2x2.fill",       label: DL.t("Merkez", "Hub", "Centro", "Hub"))
             }
             .padding(.top, 6)
             .padding(.bottom, 2)

@@ -24,6 +24,7 @@ import com.arveya.arveygo.LocalAuthViewModel
 import com.arveya.arveygo.ui.components.GradientButton
 import com.arveya.arveygo.ui.components.LanguageSwitcher
 import com.arveya.arveygo.ui.theme.AppColors
+import com.arveya.arveygo.utils.LoginStrings
 
 @Composable
 fun ForgotPasswordScreen(onBack: () -> Unit) {
@@ -33,6 +34,8 @@ fun ForgotPasswordScreen(onBack: () -> Unit) {
     val errorMessage by authVM.errorMessage.collectAsState()
     val resetSent by authVM.resetSent.collectAsState()
     val focusManager = LocalFocusManager.current
+    val currentLang by LoginStrings.currentLang.collectAsState()
+    val L = LoginStrings
 
     LaunchedEffect(Unit) { authVM.clearForgotFields() }
 
@@ -50,7 +53,7 @@ fun ForgotPasswordScreen(onBack: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { onBack() }) {
                     Icon(Icons.Default.ChevronLeft, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp))
-                    Text("Giriş Yap", fontSize = 13.sp, color = AppColors.TextMuted)
+                    Text(L.loginButton, fontSize = 13.sp, color = AppColors.TextMuted)
                 }
                 Spacer(Modifier.weight(1f))
                 LanguageSwitcher()
@@ -79,17 +82,17 @@ fun ForgotPasswordScreen(onBack: () -> Unit) {
                                 Icon(Icons.Default.CheckCircle, null, tint = AppColors.Online, modifier = Modifier.size(28.dp))
                             }
                             Spacer(Modifier.height(12.dp))
-                            Text("Bağlantı Gönderildi!", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                            Text(L.t("Bağlantı Gönderildi!", "Link Sent!", "Enlace enviado", "Lien envoyé"), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
                             Spacer(Modifier.height(8.dp))
-                            Text("Şifre sıfırlama bağlantısı $email adresine gönderildi.", fontSize = 13.sp, color = AppColors.TextMuted, modifier = Modifier.padding(horizontal = 8.dp))
+                            Text(L.t("Şifre sıfırlama bağlantısı $email adresine gönderildi.", "Password reset link sent to $email.", "El enlace para restablecer la contraseña se envió a $email.", "Le lien de réinitialisation a été envoyé à $email."), fontSize = 13.sp, color = AppColors.TextMuted, modifier = Modifier.padding(horizontal = 8.dp))
                             Spacer(Modifier.height(16.dp))
-                            Text("Giriş Sayfasına Dön", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Indigo, modifier = Modifier.clickable { onBack() })
+                            Text(L.t("Giriş Sayfasına Dön", "Return to Login", "Volver al inicio de sesión", "Retour à la connexion"), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Indigo, modifier = Modifier.clickable { onBack() })
                         }
                     } else {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Şifremi Unuttum", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
+                            Text(L.forgotPassword, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.Navy)
                             Spacer(Modifier.height(6.dp))
-                            Text("E-posta adresinize şifre sıfırlama bağlantısı göndereceğiz", fontSize = 13.sp, color = AppColors.TextMuted)
+                            Text(L.t("E-posta adresinize şifre sıfırlama bağlantısı göndereceğiz", "We'll send a password reset link to your email address", "Enviaremos un enlace de restablecimiento a tu correo electrónico", "Nous enverrons un lien de réinitialisation à votre adresse e-mail"), fontSize = 13.sp, color = AppColors.TextMuted)
                             Spacer(Modifier.height(24.dp))
 
                             AnimatedVisibility(visible = errorMessage != null) {
@@ -105,11 +108,11 @@ fun ForgotPasswordScreen(onBack: () -> Unit) {
                             if (errorMessage != null) Spacer(Modifier.height(16.dp))
 
                             Column(modifier = Modifier.fillMaxWidth()) {
-                                Text("E-posta", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
+                                Text(L.emailLabel, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextSecondary)
                                 Spacer(Modifier.height(6.dp))
                                 OutlinedTextField(
                                     value = email, onValueChange = { authVM.forgotEmail.value = it },
-                                    placeholder = { Text("ornek@email.com", fontSize = 14.sp) },
+                                    placeholder = { Text(L.emailPlaceholder, fontSize = 14.sp) },
                                     leadingIcon = { Icon(Icons.Default.Email, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp)) },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -121,7 +124,7 @@ fun ForgotPasswordScreen(onBack: () -> Unit) {
                             Spacer(Modifier.height(24.dp))
 
                             GradientButton(
-                                text = "Sıfırlama Bağlantısı Gönder",
+                                text = L.t("Sıfırlama Bağlantısı Gönder", "Send Reset Link", "Enviar enlace de restablecimiento", "Envoyer le lien"),
                                 onClick = { focusManager.clearFocus(); authVM.sendResetLink() },
                                 isLoading = isLoading,
                                 icon = Icons.Default.Send,
@@ -135,7 +138,7 @@ fun ForgotPasswordScreen(onBack: () -> Unit) {
             Spacer(Modifier.weight(1f))
 
             // Footer
-            Text("© 2026 Arveya Teknoloji", fontSize = 10.sp, color = AppColors.TextFaint, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 30.dp))
+            Text(L.copyright, fontSize = 10.sp, color = AppColors.TextFaint, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 30.dp))
         }
     }
 }
