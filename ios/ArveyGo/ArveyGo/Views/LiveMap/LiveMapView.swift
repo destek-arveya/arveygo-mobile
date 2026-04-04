@@ -869,12 +869,17 @@ struct DirectionArrow: Shape {
 // MARK: - Live Map ViewModel
 @MainActor
 class LiveMapViewModel: ObservableObject {
-    @Published var vehicles: [Vehicle] = []
-    @Published var statusFilter: VehicleStatus? = nil
-    @Published var searchText = ""
+    @Published var vehicles: [Vehicle] = [] { didSet { refreshDerivedState() } }
+    @Published var statusFilter: VehicleStatus? = nil { didSet { refreshDerivedState() } }
+    @Published var searchText = "" { didSet { refreshDerivedState() } }
     @Published var wsStatus: WSConnectionStatus = .idle
     @Published var geofences: [Geofence] = []
     @Published var showGeofences = true
+    @Published private(set) var filteredVehicles: [Vehicle] = []
+    @Published private(set) var mappableVehicles: [Vehicle] = []
+    @Published private(set) var onlineCount = 0
+    @Published private(set) var offlineCount = 0
+    @Published private(set) var idleCount = 0
 
     /// Animated positions: maps vehicle ID → animated CLLocationCoordinate2D
     @Published var animatedPositions: [String: CLLocationCoordinate2D] = [:]
@@ -885,13 +890,28 @@ class LiveMapViewModel: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private let wsManager = WebSocketManager.shared
-    private var animationTimers: [String: Timer] = [:]
 
-    var onlineCount: Int { vehicles.filter { $0.status == .ignitionOn }.count }
-    var offlineCount: Int { vehicles.filter { $0.status == .ignitionOff }.count }
-    var idleCount: Int { vehicles.filter { $0.status == .noData || $0.status == .sleeping }.count }
+    /// Get the animated coordinate for a vehicle (falls back to raw lat/lng)
+    func animatedCoordinate(for vehicle: Vehicle) -> CLLocationCoordinate2D {
+        animatedPositions[vehicle.id] ?? CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng)
+    }
 
-    var filteredVehicles: [Vehicle] {
+    /// Get the animated direction for a vehicle
+    func animatedDirection(for vehicle: Vehicle) -> Double {
+        return animatedDirections[vehicle.id] ?? vehicle.direction
+    }
+
+    init() {
+        refreshDerivedState()
+        subscribeToWebSocket()
+        loadGeofences()
+    }
+
+    private func refreshDerivedState() {
+        onlineCount = vehicles.filter { $0.status == .ignitionOn }.count
+        offlineCount = vehicles.filter { $0.status == .ignitionOff }.count
+        idleCount = vehicles.filter { $0.status == .noData || $0.status == .sleeping }.count
+
         var result = vehicles
         if let filter = statusFilter {
             result = result.filter { $0.status == filter }
@@ -905,26 +925,8 @@ class LiveMapViewModel: ObservableObject {
                 $0.imei.lowercased().contains(q)
             }
         }
-        return result
-    }
-
-    var mappableVehicles: [Vehicle] {
-        filteredVehicles.filter(\.hasValidCoordinates)
-    }
-
-    /// Get the animated coordinate for a vehicle (falls back to raw lat/lng)
-    func animatedCoordinate(for vehicle: Vehicle) -> CLLocationCoordinate2D {
-        animatedPositions[vehicle.id] ?? CLLocationCoordinate2D(latitude: vehicle.lat, longitude: vehicle.lng)
-    }
-
-    /// Get the animated direction for a vehicle
-    func animatedDirection(for vehicle: Vehicle) -> Double {
-        return animatedDirections[vehicle.id] ?? vehicle.direction
-    }
-
-    init() {
-        subscribeToWebSocket()
-        loadGeofences()
+        filteredVehicles = result
+        mappableVehicles = result.filter(\.hasValidCoordinates)
     }
 
     func loadGeofences() {
@@ -942,9 +944,8 @@ class LiveMapViewModel: ObservableObject {
     /// Smoothly interpolate a vehicle marker from its current animated position to the new target over ~1 second.
     private func animateVehicle(_ vehicle: Vehicle) {
         guard vehicle.hasValidCoordinates else {
-            animationTimers[vehicle.id]?.invalidate()
-            animationTimers[vehicle.id] = nil
             animatedPositions[vehicle.id] = nil
+            animatedDirections[vehicle.id] = nil
             trailHistory[vehicle.id] = nil
             return
         }
@@ -968,47 +969,17 @@ class LiveMapViewModel: ObservableObject {
             }
         }
 
-        let startPos = animatedPositions[vehicleId] ?? CLLocationCoordinate2D(latitude: targetLat, longitude: targetLng)
-        let startDir = animatedDirections[vehicleId] ?? targetDir
-
-        // If first time or same position, snap instantly
-        if animatedPositions[vehicleId] == nil ||
-           (abs(startPos.latitude - targetLat) < 0.000001 && abs(startPos.longitude - targetLng) < 0.000001) {
-            animatedPositions[vehicleId] = CLLocationCoordinate2D(latitude: targetLat, longitude: targetLng)
+        let targetCoordinate = CLLocationCoordinate2D(latitude: targetLat, longitude: targetLng)
+        if animatedPositions[vehicleId] == nil {
+            animatedPositions[vehicleId] = targetCoordinate
             animatedDirections[vehicleId] = targetDir
             return
         }
 
-        // Cancel previous animation for this vehicle
-        animationTimers[vehicleId]?.invalidate()
-
-        let duration: Double = 1.0
-        let steps = 30 // 30 frames over 1 second
-        let interval = duration / Double(steps)
-
-        nonisolated(unsafe) var currentStepRef = 0
-        let timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] t in
-            guard self != nil else { t.invalidate(); return }
-            currentStepRef += 1
-            let progress = min(Double(currentStepRef) / Double(steps), 1.0)
-            let ease = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress
-
-            let lat = startPos.latitude + (targetLat - startPos.latitude) * ease
-            let lng = startPos.longitude + (targetLng - startPos.longitude) * ease
-            let dir = startDir + (targetDir - startDir) * ease
-
-            let done = currentStepRef >= steps
-            Task { @MainActor [weak self] in
-                self?.animatedPositions[vehicleId] = CLLocationCoordinate2D(latitude: lat, longitude: lng)
-                self?.animatedDirections[vehicleId] = dir
-                if done {
-                    self?.animationTimers.removeValue(forKey: vehicleId)
-                }
-            }
-            if done { t.invalidate() }
+        withAnimation(.linear(duration: 0.35)) {
+            animatedPositions[vehicleId] = targetCoordinate
+            animatedDirections[vehicleId] = targetDir
         }
-        RunLoop.main.add(timer, forMode: .common)
-        animationTimers[vehicleId] = timer
     }
 
     /// Animate all vehicles to their current positions
@@ -1077,13 +1048,6 @@ class LiveMapViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
-    }
-
-
-
-    deinit {
-        animationTimers.values.forEach { $0.invalidate() }
-        animationTimers.removeAll()
     }
 }
 

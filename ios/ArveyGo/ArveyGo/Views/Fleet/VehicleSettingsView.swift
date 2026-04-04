@@ -447,6 +447,7 @@ struct VehicleSettingsView: View {
 
                 for duplicate in duplicates {
                     _ = try? await APIService.shared.post("/api/mobile/alarm-sets/\(duplicate.id)/archive")
+                    AlarmDuplicateGuardStore.shared.invalidate()
                 }
 
                 if isEnabled {
@@ -458,13 +459,24 @@ struct VehicleSettingsView: View {
                         channels: channelList
                     )
 
+                    if let duplicate = try await AlarmDuplicateGuardStore.shared.duplicateMatch(
+                        for: body,
+                        ignoreId: primary?.id,
+                        forceRefresh: primary == nil
+                    ), primary == nil {
+                        ignitionSettingsMessage = "Ayni bildirim zaten mevcut: \(duplicate.name)"
+                        continue
+                    }
+
                     if let primary {
                         _ = try await APIService.shared.put("/api/mobile/alarm-sets/\(primary.id)", body: body)
                     } else {
                         _ = try await APIService.shared.post("/api/mobile/alarm-sets/", body: body)
                     }
+                    AlarmDuplicateGuardStore.shared.invalidate()
                 } else if let primary, primary.status == "active" || primary.isActive {
                     _ = try await APIService.shared.post("/api/mobile/alarm-sets/\(primary.id)/pause")
+                    AlarmDuplicateGuardStore.shared.invalidate()
                 }
             }
 

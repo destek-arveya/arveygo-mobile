@@ -50,6 +50,18 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 
+private data class MarkerRenderState(
+    val lat: Double,
+    val lng: Double,
+    val direction: Float,
+    val plate: String,
+    val speedLabel: String,
+    val statusLabel: String,
+    val statusColor: Int,
+    val selected: Boolean,
+    val motorcycle: Boolean,
+)
+
 // Animated Marker Wrapper - smoothly animates marker position
 private class AnimatedMarker(
     private val mapView: MapView,
@@ -235,6 +247,7 @@ fun LiveMapScreen(
     val vm: LiveMapViewModel = viewModel()
     val vehicles by vm.vehicles.collectAsState()
     val vehicleVersion by vm.vehicleVersion.collectAsState()
+    val filteredVehicles by vm.filteredVehicles.collectAsState()
     val statusFilter by vm.statusFilter.collectAsState()
     val wsStatus by vm.wsStatus.collectAsState()
     var selectedVehicle by remember { mutableStateOf<Vehicle?>(null) }
@@ -272,7 +285,6 @@ fun LiveMapScreen(
         authVM.connectWebSocket()
     }
 
-    val filteredVehicles = vm.filteredVehicles()
     val mappableVehicles = remember(filteredVehicles) {
         filteredVehicles.filter { it.hasValidCoordinates }
     }
@@ -287,6 +299,7 @@ fun LiveMapScreen(
     // MapView reference & animated markers map
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
     val animatedMarkers = remember { mutableMapOf<String, AnimatedMarker>() }
+    val markerRenderStates = remember { mutableMapOf<String, MarkerRenderState>() }
     val searchableVehicles = remember(vehicles, vehicleSearchText) {
         val query = vehicleSearchText.trim().lowercase()
         val sorted = vehicles.sortedWith(
@@ -390,9 +403,11 @@ fun LiveMapScreen(
                 mapView.overlays.remove(am.marker)
             }
             animatedMarkers.remove(id)
+            markerRenderStates.remove(id)
         }
 
         // Add or update markers
+        var shouldInvalidate = false
         mappableVehicles.forEach { vehicle ->
             val target = GeoPoint(vehicle.lat, vehicle.lng)
             val isSel = selectedVehicle?.id == vehicle.id
@@ -402,16 +417,40 @@ fun LiveMapScreen(
                 VehicleStatus.NO_DATA -> Color(0xFF94A3B8).toArgb()
                 VehicleStatus.SLEEPING -> AppColors.Idle.toArgb()
             }
+            val renderState = MarkerRenderState(
+                lat = vehicle.lat,
+                lng = vehicle.lng,
+                direction = vehicle.direction.toFloat(),
+                plate = vehicle.plate,
+                speedLabel = vehicle.formattedSpeed,
+                statusLabel = vehicle.status.label,
+                statusColor = statusColor,
+                selected = isSel,
+                motorcycle = vehicle.isMotorcycle
+            )
 
             val existing = animatedMarkers[vehicle.id]
             if (existing != null) {
-                val bmp = createVehiclePinBitmap(context, statusColor, vehicle.direction.toFloat(), vehicle.plate, vehicle.formattedSpeed, isSel, vehicle.isMotorcycle)
-                existing.marker.icon = BitmapDrawable(context.resources, bmp)
-                existing.marker.title = vehicle.plate
-                existing.marker.snippet = "${vehicle.formattedSpeed} \u00b7 ${vehicle.status.label}"
-                existing.marker.infoWindow = null
-                // SMOOTH ANIMATE to new position
-                existing.animateTo(target)
+                val previousState = markerRenderStates[vehicle.id]
+                if (previousState == null ||
+                    previousState.statusColor != renderState.statusColor ||
+                    previousState.direction != renderState.direction ||
+                    previousState.plate != renderState.plate ||
+                    previousState.speedLabel != renderState.speedLabel ||
+                    previousState.selected != renderState.selected ||
+                    previousState.motorcycle != renderState.motorcycle
+                ) {
+                    val bmp = createVehiclePinBitmap(context, statusColor, vehicle.direction.toFloat(), vehicle.plate, vehicle.formattedSpeed, isSel, vehicle.isMotorcycle)
+                    existing.marker.icon = BitmapDrawable(context.resources, bmp)
+                    existing.marker.title = vehicle.plate
+                    existing.marker.snippet = "${vehicle.formattedSpeed} \u00b7 ${vehicle.status.label}"
+                    existing.marker.infoWindow = null
+                    shouldInvalidate = true
+                }
+                if (previousState == null || previousState.lat != renderState.lat || previousState.lng != renderState.lng) {
+                    existing.animateTo(target)
+                }
+                markerRenderStates[vehicle.id] = renderState
             } else {
                 val marker = Marker(mapView).apply {
                     position = target
@@ -430,9 +469,10 @@ fun LiveMapScreen(
                 }
                 mapView.overlays.add(marker)
                 animatedMarkers[vehicle.id] = AnimatedMarker(mapView, marker)
+                markerRenderStates[vehicle.id] = renderState
+                shouldInvalidate = true
             }
         }
-        mapView.invalidate()
 
         // Update trail polylines for moving vehicles
         mappableVehicles.forEach { vehicle ->
@@ -466,6 +506,7 @@ fun LiveMapScreen(
                     }
                     trailPolylines[vehicle.id] = polyline
                 }
+                shouldInvalidate = true
             }
         }
         // Remove trails for vehicles no longer visible
@@ -475,15 +516,19 @@ fun LiveMapScreen(
                 trailPolylines[id]?.let { mapView.overlays.remove(it) }
                 trailPolylines.remove(id)
                 trailHistory.remove(id)
+                shouldInvalidate = true
             }
         }
-        mapView.invalidate()
 
         // If tracking a vehicle, keep centering on it
         trackingVehicleId?.let { trackId ->
             mappableVehicles.find { it.id == trackId }?.let { trackedVehicle ->
                 mapView.controller?.animateTo(GeoPoint(trackedVehicle.lat, trackedVehicle.lng), 16.0, 600L)
             }
+        }
+
+        if (shouldInvalidate) {
+            mapView.invalidate()
         }
     }
 

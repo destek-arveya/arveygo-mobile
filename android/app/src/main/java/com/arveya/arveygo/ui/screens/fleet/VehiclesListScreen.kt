@@ -3,7 +3,9 @@ package com.arveya.arveygo.ui.screens.fleet
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -39,20 +41,32 @@ import kotlinx.coroutines.launch
 class VehiclesListViewModel {
     val vehicles = mutableStateListOf<Vehicle>()
     var searchText by mutableStateOf("")
+        private set
     var statusFilter by mutableStateOf<VehicleStatus?>(null)
+        private set
     var groupFilter by mutableStateOf<String?>(null)
+        private set
     var isLoading by mutableStateOf(true)
     var isRefreshing by mutableStateOf(false)
     var errorMessage by mutableStateOf<String?>(null)
+    var groups by mutableStateOf<List<String>>(emptyList())
+        private set
+    var filteredVehicles by mutableStateOf<List<Vehicle>>(emptyList())
+        private set
+    var onlineCount by mutableStateOf(0)
+        private set
+    var offlineCount by mutableStateOf(0)
+        private set
+    var noDataCount by mutableStateOf(0)
+        private set
+    var sleepingCount by mutableStateOf(0)
+        private set
 
     // Alert counts
     val expiredDocs get() = 0
     val criticalDocs get() = 0
     val wornTires get() = 0
     val upcomingMaint get() = 0
-
-    val groups: List<String>
-        get() = vehicles.map { it.group }.distinct().sorted()
 
     val statusFilterLabel: String
         get() = when (statusFilter) {
@@ -63,27 +77,45 @@ class VehiclesListViewModel {
             null -> DashboardStrings.t("Tüm Durumlar", "All Statuses", "Todos los estados", "Tous les statuts")
         }
 
-    val filteredVehicles: List<Vehicle>
-        get() {
-            var result = vehicles.toList()
-            statusFilter?.let { filter -> result = result.filter { it.status == filter } }
-            groupFilter?.let { group -> result = result.filter { it.group == group } }
-            val q = searchText.lowercase()
-            if (q.isNotEmpty()) {
-                result = result.filter {
-                    it.plate.lowercase().contains(q) ||
-                            it.model.lowercase().contains(q) ||
-                            it.driver.lowercase().contains(q)
-                }
-            }
-            return result
-        }
+    init {
+        recomputeDerivedState()
+    }
 
-    // Status summary counts
-    val onlineCount get() = vehicles.count { it.status == VehicleStatus.IGNITION_ON }
-    val offlineCount get() = vehicles.count { it.status == VehicleStatus.IGNITION_OFF }
-    val noDataCount get() = vehicles.count { it.status == VehicleStatus.NO_DATA }
-    val sleepingCount get() = vehicles.count { it.status == VehicleStatus.SLEEPING }
+    fun updateSearchText(value: String) {
+        searchText = value
+        recomputeDerivedState()
+    }
+
+    fun updateStatusFilter(value: VehicleStatus?) {
+        statusFilter = value
+        recomputeDerivedState()
+    }
+
+    fun updateGroupFilter(value: String?) {
+        groupFilter = value
+        recomputeDerivedState()
+    }
+
+    private fun recomputeDerivedState() {
+        groups = vehicles.map { it.group }.distinct().sorted()
+        onlineCount = vehicles.count { it.status == VehicleStatus.IGNITION_ON }
+        offlineCount = vehicles.count { it.status == VehicleStatus.IGNITION_OFF }
+        noDataCount = vehicles.count { it.status == VehicleStatus.NO_DATA }
+        sleepingCount = vehicles.count { it.status == VehicleStatus.SLEEPING }
+
+        var result = vehicles.toList()
+        statusFilter?.let { filter -> result = result.filter { it.status == filter } }
+        groupFilter?.let { group -> result = result.filter { it.group == group } }
+        val q = searchText.lowercase()
+        if (q.isNotEmpty()) {
+            result = result.filter {
+                it.plate.lowercase().contains(q) ||
+                    it.model.lowercase().contains(q) ||
+                    it.driver.lowercase().contains(q)
+            }
+        }
+        filteredVehicles = result
+    }
 
     fun mergeVehicles(list: List<Vehicle>) {
         if (list.isEmpty()) return
@@ -107,6 +139,7 @@ class VehiclesListViewModel {
         )
         errorMessage = null
         isLoading = false
+        recomputeDerivedState()
     }
 
     fun mergeVehicle(vehicle: Vehicle) {
@@ -128,6 +161,7 @@ class VehiclesListViewModel {
         } else {
             vehicles.add(vehicle)
         }
+        recomputeDerivedState()
     }
 
     suspend fun loadVehiclesFromApi() {
@@ -257,175 +291,171 @@ fun VehiclesListScreen(
                 vm.errorMessage != null && vm.vehicles.isEmpty() -> VehicleListErrorState(vm.errorMessage ?: DL.t("Araç verileri alınamadı.", "Vehicle data could not be loaded.", "No se pudieron cargar los datos del vehículo.", "Impossible de charger les données du véhicule.")) {
                     scope.launch { vm.loadVehiclesFromApi() }
                 }
-                else -> Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(colors.background)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    Spacer(Modifier.height(6.dp))
-
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        item {
-                            StatusChip(
-                                label = DL.t("Toplam", "Total", "Total", "Total"),
-                                count = vm.vehicles.size,
-                                color = AppColors.Navy,
-                                isSelected = vm.statusFilter == null,
-                                onClick = { vm.statusFilter = null }
-                            )
-                        }
-                        item {
-                            StatusChip(
-                                label = DL.t("Kontak Açık", "Ignition On", "Encendido", "Contact mis"),
-                                count = vm.onlineCount,
-                                color = AppColors.Online,
-                                isSelected = vm.statusFilter == VehicleStatus.IGNITION_ON,
-                                onClick = { vm.statusFilter = if (vm.statusFilter == VehicleStatus.IGNITION_ON) null else VehicleStatus.IGNITION_ON }
-                            )
-                        }
-                        item {
-                            StatusChip(
-                                label = DL.t("Kontak Kapalı", "Ignition Off", "Apagado", "Contact coupé"),
-                                count = vm.offlineCount,
-                                color = AppColors.Offline,
-                                isSelected = vm.statusFilter == VehicleStatus.IGNITION_OFF,
-                                onClick = { vm.statusFilter = if (vm.statusFilter == VehicleStatus.IGNITION_OFF) null else VehicleStatus.IGNITION_OFF }
-                            )
-                        }
-                        item {
-                            StatusChip(
-                                label = DL.t("Bilgi Yok", "No Data", "Sin datos", "Aucune donnée"),
-                                count = vm.noDataCount,
-                                color = AppColors.TextMuted,
-                                isSelected = vm.statusFilter == VehicleStatus.NO_DATA,
-                                onClick = { vm.statusFilter = if (vm.statusFilter == VehicleStatus.NO_DATA) null else VehicleStatus.NO_DATA }
-                            )
-                        }
-                        item {
-                            StatusChip(
-                                label = DL.t("Uyku", "Sleep", "Sueño", "Veille"),
-                                count = vm.sleepingCount,
-                                color = AppColors.Idle,
-                                isSelected = vm.statusFilter == VehicleStatus.SLEEPING,
-                                onClick = { vm.statusFilter = if (vm.statusFilter == VehicleStatus.SLEEPING) null else VehicleStatus.SLEEPING }
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                else -> {
+                    LazyColumn(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .background(colors.surface, RoundedCornerShape(12.dp))
-                            .border(1.dp, colors.outline.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 14.dp)
-                            .height(44.dp)
+                            .fillMaxSize()
+                            .background(colors.background),
+                        contentPadding = PaddingValues(bottom = 24.dp)
                     ) {
-                        Icon(Icons.Default.Search, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(10.dp))
-                        BasicTextField(
-                            value = vm.searchText,
-                            onValueChange = { vm.searchText = it },
-                            textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, color = colors.onSurface),
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            decorationBox = { innerTextField ->
-                                Box(contentAlignment = Alignment.CenterStart) {
-                                    if (vm.searchText.isEmpty()) {
-                                        Text(DL.t("Plaka, araç veya sürücü ara...", "Search plate, vehicle, or driver...", "Buscar matrícula, vehículo o conductor...", "Rechercher plaque, véhicule ou conducteur..."), fontSize = 14.sp, color = colors.onSurface.copy(alpha = 0.45f))
-                                    }
-                                    innerTextField()
+                        item { Spacer(Modifier.height(6.dp)) }
+                        item {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                item {
+                                    StatusChip(
+                                        label = DL.t("Toplam", "Total", "Total", "Total"),
+                                        count = vm.vehicles.size,
+                                        color = AppColors.Navy,
+                                        isSelected = vm.statusFilter == null,
+                                        onClick = { vm.updateStatusFilter(null) }
+                                    )
+                                }
+                                item {
+                                    StatusChip(
+                                        label = DL.t("Kontak Açık", "Ignition On", "Encendido", "Contact mis"),
+                                        count = vm.onlineCount,
+                                        color = AppColors.Online,
+                                        isSelected = vm.statusFilter == VehicleStatus.IGNITION_ON,
+                                        onClick = { vm.updateStatusFilter(if (vm.statusFilter == VehicleStatus.IGNITION_ON) null else VehicleStatus.IGNITION_ON) }
+                                    )
+                                }
+                                item {
+                                    StatusChip(
+                                        label = DL.t("Kontak Kapalı", "Ignition Off", "Apagado", "Contact coupé"),
+                                        count = vm.offlineCount,
+                                        color = AppColors.Offline,
+                                        isSelected = vm.statusFilter == VehicleStatus.IGNITION_OFF,
+                                        onClick = { vm.updateStatusFilter(if (vm.statusFilter == VehicleStatus.IGNITION_OFF) null else VehicleStatus.IGNITION_OFF) }
+                                    )
+                                }
+                                item {
+                                    StatusChip(
+                                        label = DL.t("Bilgi Yok", "No Data", "Sin datos", "Aucune donnée"),
+                                        count = vm.noDataCount,
+                                        color = AppColors.TextMuted,
+                                        isSelected = vm.statusFilter == VehicleStatus.NO_DATA,
+                                        onClick = { vm.updateStatusFilter(if (vm.statusFilter == VehicleStatus.NO_DATA) null else VehicleStatus.NO_DATA) }
+                                    )
+                                }
+                                item {
+                                    StatusChip(
+                                        label = DL.t("Uyku", "Sleep", "Sueño", "Veille"),
+                                        count = vm.sleepingCount,
+                                        color = AppColors.Idle,
+                                        isSelected = vm.statusFilter == VehicleStatus.SLEEPING,
+                                        onClick = { vm.updateStatusFilter(if (vm.statusFilter == VehicleStatus.SLEEPING) null else VehicleStatus.SLEEPING) }
+                                    )
                                 }
                             }
-                        )
-                        if (vm.searchText.isNotEmpty()) {
-                            IconButton(onClick = { vm.searchText = "" }, modifier = Modifier.size(20.dp)) {
-                                Icon(Icons.Default.Close, null, tint = AppColors.TextFaint, modifier = Modifier.size(16.dp))
-                            }
                         }
-                    }
-
-                    Spacer(Modifier.height(8.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                    ) {
-                        var groupMenuExpanded by remember { mutableStateOf(false) }
-                        Box {
+                        item { Spacer(Modifier.height(12.dp)) }
+                        item {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
-                                    .background(colors.surface, RoundedCornerShape(8.dp))
-                                    .border(1.dp, colors.outline.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                                    .clickable { groupMenuExpanded = true }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp)
+                                    .background(colors.surface, RoundedCornerShape(12.dp))
+                                    .border(1.dp, colors.outline.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 14.dp)
+                                    .height(44.dp)
                             ) {
-                                Icon(Icons.Default.FolderOpen, null, tint = colors.onSurface.copy(alpha = 0.55f), modifier = Modifier.size(14.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text(vm.groupFilter ?: DL.t("Tüm Gruplar", "All Groups", "Todos los grupos", "Tous les groupes"), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
-                                Spacer(Modifier.width(5.dp))
-                                Icon(Icons.Default.KeyboardArrowDown, null, tint = colors.onSurface, modifier = Modifier.size(14.dp))
-                            }
-                            DropdownMenu(expanded = groupMenuExpanded, onDismissRequest = { groupMenuExpanded = false }) {
-                                DropdownMenuItem(text = { Text(DL.t("Tüm Gruplar", "All Groups", "Todos los grupos", "Tous les groupes"), fontSize = 12.sp) }, onClick = { vm.groupFilter = null; groupMenuExpanded = false })
-                                vm.groups.forEach { group ->
-                                    DropdownMenuItem(text = { Text(group, fontSize = 12.sp) }, onClick = { vm.groupFilter = group; groupMenuExpanded = false })
+                                Icon(Icons.Default.Search, null, tint = AppColors.TextMuted, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(10.dp))
+                                BasicTextField(
+                                    value = vm.searchText,
+                                    onValueChange = { vm.updateSearchText(it) },
+                                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, color = colors.onSurface),
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true,
+                                    decorationBox = { innerTextField ->
+                                        Box(contentAlignment = Alignment.CenterStart) {
+                                            if (vm.searchText.isEmpty()) {
+                                                Text(DL.t("Plaka, araç veya sürücü ara...", "Search plate, vehicle, or driver...", "Buscar matrícula, vehículo o conductor...", "Rechercher plaque, véhicule ou conducteur..."), fontSize = 14.sp, color = colors.onSurface.copy(alpha = 0.45f))
+                                            }
+                                            innerTextField()
+                                        }
+                                    }
+                                )
+                                if (vm.searchText.isNotEmpty()) {
+                                    IconButton(onClick = { vm.updateSearchText("") }, modifier = Modifier.size(20.dp)) {
+                                        Icon(Icons.Default.Close, null, tint = AppColors.TextFaint, modifier = Modifier.size(16.dp))
+                                    }
                                 }
                             }
                         }
-
-                        Spacer(Modifier.weight(1f))
-
-                        Text(
-                            DL.t("${vm.filteredVehicles.size} araç listeleniyor", "${vm.filteredVehicles.size} vehicles listed", "${vm.filteredVehicles.size} vehículos listados", "${vm.filteredVehicles.size} véhicules listés"),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = colors.onSurface.copy(alpha = 0.55f)
-                        )
-                    }
-
-                    Spacer(Modifier.height(14.dp))
-
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                    ) {
-                        if (vm.filteredVehicles.isEmpty()) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
+                        item { Spacer(Modifier.height(8.dp)) }
+                        item {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 60.dp)
+                                    .padding(horizontal = 16.dp)
                             ) {
-                                Icon(Icons.Default.DirectionsCar, null, tint = AppColors.TextFaint.copy(alpha = 0.4f), modifier = Modifier.size(48.dp))
-                                Spacer(Modifier.height(16.dp))
-                                Text(DL.t("Araç bulunamadı", "No vehicles found", "No se encontraron vehículos", "Aucun véhicule trouvé"), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted)
-                                Text(DL.t("Filtre veya arama kriterlerinizi değiştirin", "Change your filters or search criteria", "Cambia los filtros o el criterio de búsqueda", "Modifiez vos filtres ou votre recherche"), fontSize = 12.sp, color = AppColors.TextFaint)
-                            }
-                        } else {
-                            vm.filteredVehicles.forEach { vehicle ->
-                                VehicleCard(
-                                    vehicle = vehicle,
-                                    onClick = { selectedVehicle = vehicle }
+                                var groupMenuExpanded by remember { mutableStateOf(false) }
+                                Box {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .background(colors.surface, RoundedCornerShape(8.dp))
+                                            .border(1.dp, colors.outline.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                            .clickable { groupMenuExpanded = true }
+                                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    ) {
+                                        Icon(Icons.Default.FolderOpen, null, tint = colors.onSurface.copy(alpha = 0.55f), modifier = Modifier.size(14.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(vm.groupFilter ?: DL.t("Tüm Gruplar", "All Groups", "Todos los grupos", "Tous les groupes"), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
+                                        Spacer(Modifier.width(5.dp))
+                                        Icon(Icons.Default.KeyboardArrowDown, null, tint = colors.onSurface, modifier = Modifier.size(14.dp))
+                                    }
+                                    DropdownMenu(expanded = groupMenuExpanded, onDismissRequest = { groupMenuExpanded = false }) {
+                                        DropdownMenuItem(text = { Text(DL.t("Tüm Gruplar", "All Groups", "Todos los grupos", "Tous les groupes"), fontSize = 12.sp) }, onClick = { vm.updateGroupFilter(null); groupMenuExpanded = false })
+                                        vm.groups.forEach { group ->
+                                            DropdownMenuItem(text = { Text(group, fontSize = 12.sp) }, onClick = { vm.updateGroupFilter(group); groupMenuExpanded = false })
+                                        }
+                                    }
+                                }
+
+                                Spacer(Modifier.weight(1f))
+
+                                Text(
+                                    DL.t("${vm.filteredVehicles.size} araç listeleniyor", "${vm.filteredVehicles.size} vehicles listed", "${vm.filteredVehicles.size} vehículos listados", "${vm.filteredVehicles.size} véhicules listés"),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = colors.onSurface.copy(alpha = 0.55f)
                                 )
                             }
                         }
+                        item { Spacer(Modifier.height(14.dp)) }
+                        if (vm.filteredVehicles.isEmpty()) {
+                            item {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 60.dp)
+                                ) {
+                                    Icon(Icons.Default.DirectionsCar, null, tint = AppColors.TextFaint.copy(alpha = 0.4f), modifier = Modifier.size(48.dp))
+                                    Spacer(Modifier.height(16.dp))
+                                    Text(DL.t("Araç bulunamadı", "No vehicles found", "No se encontraron vehículos", "Aucun véhicule trouvé"), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = AppColors.TextMuted)
+                                    Text(DL.t("Filtre veya arama kriterlerinizi değiştirin", "Change your filters or search criteria", "Cambia los filtros o el criterio de búsqueda", "Modifiez vos filtres ou votre recherche"), fontSize = 12.sp, color = AppColors.TextFaint)
+                                }
+                            }
+                        } else {
+                            items(vm.filteredVehicles, key = { it.id }) { vehicle ->
+                                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                                    VehicleCard(
+                                        vehicle = vehicle,
+                                        onClick = { selectedVehicle = vehicle }
+                                    )
+                                }
+                            }
+                        }
                     }
-
-                    Spacer(Modifier.height(24.dp))
                 }
             }
         }

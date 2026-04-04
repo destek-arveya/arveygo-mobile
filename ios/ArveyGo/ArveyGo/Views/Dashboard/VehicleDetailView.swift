@@ -1214,7 +1214,7 @@ struct EventsTabContent: View {
 
     private func fetchAlarms() async {
         do {
-            let json = try await APIService.shared.get("/api/mobile/alarms?page=1&per_page=50")
+            let json = try await APIService.shared.get("/api/mobile/alarms?page=1&per_page=20&imei=\(vehicle.imei)")
             let dataArr = json["data"] as? [[String: Any]] ?? []
             let results = dataArr.enumerated().compactMap { (i, dict) -> AlarmEvent? in
                 let a = AlarmEvent.from(json: dict, index: i)
@@ -2132,7 +2132,7 @@ struct VehicleDetailAlternativeView: View {
             isLoadingEvents = true
             Task {
                 do {
-                    let json = try await APIService.shared.get("/api/mobile/alarms?page=1&per_page=50")
+                    let json = try await APIService.shared.get("/api/mobile/alarms?page=1&per_page=20&imei=\(vehicle.imei)")
                     let dataArr = json["data"] as? [[String: Any]] ?? []
                     let results = dataArr.enumerated().compactMap { (i, dict) -> AlarmEvent? in
                         let alarm = AlarmEvent.from(json: dict, index: i)
@@ -3027,7 +3027,7 @@ struct VehicleDetailThirdView: View {
             isLoadingEvents = true
             Task {
                 do {
-                    let json = try await APIService.shared.get("/api/mobile/alarms?page=1&per_page=50")
+                    let json = try await APIService.shared.get("/api/mobile/alarms?page=1&per_page=20&imei=\(vehicle.imei)")
                     let dataArr = json["data"] as? [[String: Any]] ?? []
                     let results = dataArr.enumerated().compactMap { index, dict -> AlarmEvent? in
                         let alarm = AlarmEvent.from(json: dict, index: index)
@@ -3822,7 +3822,7 @@ struct VehicleDetailFourthView: View {
             isLoadingEvents = true
             Task {
                 do {
-                    let json = try await APIService.shared.get("/api/mobile/alarms?page=1&per_page=50")
+                    let json = try await APIService.shared.get("/api/mobile/alarms?page=1&per_page=20&imei=\(vehicle.imei)")
                     let dataArr = json["data"] as? [[String: Any]] ?? []
                     let results = dataArr.enumerated().compactMap { index, dict -> AlarmEvent? in
                         let alarm = AlarmEvent.from(json: dict, index: index)
@@ -4690,7 +4690,7 @@ struct VehicleDetailFifthView: View {
             isLoadingEvents = true
             Task {
                 do {
-                    let json = try await APIService.shared.get("/api/mobile/alarms?page=1&per_page=50")
+                    let json = try await APIService.shared.get("/api/mobile/alarms?page=1&per_page=20&imei=\(vehicle.imei)")
                     let dataArr = json["data"] as? [[String: Any]] ?? []
                     let results = dataArr.enumerated().compactMap { index, dict -> AlarmEvent? in
                         let alarm = AlarmEvent.from(json: dict, index: index)

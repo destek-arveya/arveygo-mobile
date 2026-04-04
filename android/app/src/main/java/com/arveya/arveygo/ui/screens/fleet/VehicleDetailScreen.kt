@@ -973,7 +973,7 @@ private fun EventsTab(vehicle: Vehicle, onNavigateToAlarms: ((String) -> Unit)? 
         isLoadingAlarms = true
         try {
             // Fetch all alarms and filter client-side by this vehicle's imei
-            val json = APIService.get("/api/mobile/alarms?page=1&per_page=50")
+            val json = APIService.get("/api/mobile/alarms?page=1&per_page=20&imei=${vehicle.imei}")
             val dataArr = json.optJSONArray("data")
             val results = mutableListOf<AlarmEvent>()
             if (dataArr != null) {
@@ -1769,19 +1769,30 @@ private suspend fun syncVehicleIgnitionAlarmSettings(
         for (duplicate in duplicates) {
             try {
                 APIService.post("/api/mobile/alarm-sets/${duplicate.id}/archive")
+                AlarmDuplicateGuard.invalidate()
             } catch (_: Exception) {
             }
         }
 
         if (enabled) {
             val body = vehicleHiddenIgnitionBody(vehicle, userId, type, channels)
+            val duplicate = AlarmDuplicateGuard.duplicateMatch(
+                body = body,
+                ignoreId = primary?.id,
+                forceRefresh = primary == null
+            )
+            if (duplicate != null && primary == null) {
+                continue
+            }
             if (primary != null) {
                 APIService.put("/api/mobile/alarm-sets/${primary.id}", body)
             } else {
                 APIService.post("/api/mobile/alarm-sets/", body)
             }
+            AlarmDuplicateGuard.invalidate()
         } else if (primary != null && (primary.isActive || primary.status == "active")) {
             APIService.post("/api/mobile/alarm-sets/${primary.id}/pause")
+            AlarmDuplicateGuard.invalidate()
         }
     }
 }

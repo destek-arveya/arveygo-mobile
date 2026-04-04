@@ -284,7 +284,7 @@ struct VehiclesListView: View {
 
     // MARK: - Vehicle Cards
     var vehicleCards: some View {
-        VStack(spacing: 10) {
+        LazyVStack(spacing: 10) {
             ForEach(vm.filteredVehicles) { vehicle in
                 vehicleCard(vehicle)
                     .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -597,13 +597,19 @@ extension Vehicle {
 // MARK: - Vehicles List ViewModel
 @MainActor
 class VehiclesListViewModel: ObservableObject {
-    @Published var vehicles: [Vehicle] = []
-    @Published var searchText = ""
-    @Published var statusFilter: VehicleStatus? = nil
-    @Published var groupFilter: String? = nil
+    @Published var vehicles: [Vehicle] = [] { didSet { refreshDerivedState() } }
+    @Published var searchText = "" { didSet { refreshDerivedState() } }
+    @Published var statusFilter: VehicleStatus? = nil { didSet { refreshDerivedState() } }
+    @Published var groupFilter: String? = nil { didSet { refreshDerivedState() } }
     @Published var isLoading = true
     @Published var isRefreshing = false
     @Published var errorMessage: String?
+    @Published private(set) var groups: [String] = []
+    @Published private(set) var filteredVehicles: [Vehicle] = []
+    @Published private(set) var onlineCount = 0
+    @Published private(set) var offlineCount = 0
+    @Published private(set) var noDataCount = 0
+    @Published private(set) var sleepingCount = 0
 
     // Alert counts
     var expiredDocs: Int { 0 }
@@ -613,10 +619,6 @@ class VehiclesListViewModel: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private let wsManager = WebSocketManager.shared
-
-    var groups: [String] {
-        Array(Set(vehicles.map { $0.group })).sorted()
-    }
 
     var statusFilterLabel: String {
         if let f = statusFilter {
@@ -630,13 +632,19 @@ class VehiclesListViewModel: ObservableObject {
         return "Tüm Durumlar"
     }
 
-    // Status counts
-    var onlineCount: Int { vehicles.filter { $0.status == .ignitionOn }.count }
-    var offlineCount: Int { vehicles.filter { $0.status == .ignitionOff }.count }
-    var noDataCount: Int { vehicles.filter { $0.status == .noData }.count }
-    var sleepingCount: Int { vehicles.filter { $0.status == .sleeping }.count }
+    init() {
+        subscribeToWebSocket()
+        refreshDerivedState()
+        loadVehiclesFromAPI()
+    }
 
-    var filteredVehicles: [Vehicle] {
+    private func refreshDerivedState() {
+        groups = Array(Set(vehicles.map { $0.group })).sorted()
+        onlineCount = vehicles.filter { $0.status == .ignitionOn }.count
+        offlineCount = vehicles.filter { $0.status == .ignitionOff }.count
+        noDataCount = vehicles.filter { $0.status == .noData }.count
+        sleepingCount = vehicles.filter { $0.status == .sleeping }.count
+
         var result = vehicles
         if let filter = statusFilter {
             result = result.filter { $0.status == filter }
@@ -652,12 +660,7 @@ class VehiclesListViewModel: ObservableObject {
                 $0.driver.lowercased().contains(q)
             }
         }
-        return result
-    }
-
-    init() {
-        subscribeToWebSocket()
-        loadVehiclesFromAPI()
+        filteredVehicles = result
     }
 
     private func subscribeToWebSocket() {

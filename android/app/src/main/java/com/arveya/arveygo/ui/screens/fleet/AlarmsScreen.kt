@@ -34,7 +34,9 @@ import com.arveya.arveygo.services.APIService
 import com.arveya.arveygo.ui.components.AlarmEventsSkeletonList
 import com.arveya.arveygo.ui.components.AlarmRulesSkeletonList
 import com.arveya.arveygo.ui.theme.AppColors
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -60,7 +62,8 @@ data class AlarmSet(
     val targetCount: Int,
     val channelCount: Int,
     val recipientCount: Int,
-    val createdAt: String
+    val createdAt: String,
+    val updatedAt: String
 ) {
     val icon: ImageVector get() = when (alarmType) {
         "speed_violation" -> Icons.Default.Speed
@@ -141,10 +144,11 @@ data class AlarmSet(
                 targetCount = json.optInt("target_count", 0),
                 channelCount = json.optInt("channel_count", 0),
                 recipientCount = json.optInt("recipient_count", 0),
-                createdAt = json.optString("created_at", "")
+                createdAt = json.optString("created_at", ""),
+                updatedAt = json.optString("updated_at", "")
             )
         } catch (_: Exception) {
-            AlarmSet(0, "", null, "", "draft", "live", "derived", 300, false, "", "", 0, 0, 0, "")
+            AlarmSet(0, "", null, "", "draft", "live", "derived", 300, false, "", "", 0, 0, 0, "", "")
         }
     }
 
@@ -316,14 +320,22 @@ fun AlarmsScreen(
         setsError = null
 
         try {
-            val json = APIService.get("/api/mobile/alarm-sets/")
-            val dataArr = json.optJSONArray("data")
             val sets = mutableListOf<AlarmSet>()
-            if (dataArr != null) {
-                for (i in 0 until dataArr.length()) {
-                    sets.add(AlarmSet.from(dataArr.getJSONObject(i)))
+            var page = 1
+            var lastPage = 1
+
+            do {
+                val json = APIService.get("/api/mobile/alarm-sets/?page=$page")
+                val dataArr = json.optJSONArray("data")
+                if (dataArr != null) {
+                    for (i in 0 until dataArr.length()) {
+                        sets.add(AlarmSet.from(dataArr.getJSONObject(i)))
+                    }
                 }
-            }
+                lastPage = json.optJSONObject("pagination")?.optInt("last_page", 1) ?: 1
+                page += 1
+            } while (page <= lastPage)
+
             alarmSets = sets
         } catch (e: Exception) {
             setsError = "Alarm kuralları yüklenemedi"
@@ -357,6 +369,7 @@ fun AlarmsScreen(
         try {
             val action = if (set.status == "active") "pause" else "activate"
             APIService.post("/api/mobile/alarm-sets/${set.id}/$action")
+            AlarmDuplicateGuard.invalidate()
             fetchAlarmSets()
         } catch (_: Exception) { }
         actionLoading = null
@@ -366,6 +379,7 @@ fun AlarmsScreen(
         actionLoading = set.id
         try {
             APIService.post("/api/mobile/alarm-sets/${set.id}/archive")
+            AlarmDuplicateGuard.invalidate()
             fetchAlarmSets()
         } catch (_: Exception) { }
         actionLoading = null
@@ -1429,6 +1443,90 @@ private fun CreateAlarmSetSheet(
     var isSaving by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
     var vehicleSearch by remember { mutableStateOf("") }
+    var duplicateMatch by remember { mutableStateOf<AlarmDuplicateMatch?>(null) }
+    var duplicateWarning by remember { mutableStateOf<String?>(null) }
+    var isCheckingDuplicate by remember { mutableStateOf(false) }
+
+    fun buildValidationBody(): JSONObject? {
+        if (name.isBlank()) return null
+        if (selectedVehicles.isEmpty()) return null
+        if (selectedChannels.isEmpty()) return null
+        if (selectedRecipients.isEmpty()) return null
+        if (selectedType == "geofence_alarm" && selectedGeofence == null) return null
+
+        return JSONObject().apply {
+            put("name", name.trim())
+            put("alarm_type", selectedType)
+            put("status", "active")
+            put("evaluation_mode", "live")
+            put("source_mode", if (selectedType == "speed_violation") "existing" else "derived")
+            put("cooldown_sec", 300)
+            put("is_active", true)
+            put("condition_require_ignition", true)
+            val targets = org.json.JSONArray()
+            selectedVehicles.sorted().forEach { assignmentId ->
+                targets.put(JSONObject().apply { put("scope", "assignment"); put("id", assignmentId) })
+            }
+            put("targets", targets)
+            val channels = org.json.JSONArray()
+            selectedChannels.sorted().forEach { channels.put(it) }
+            put("channels", channels)
+            val recipients = org.json.JSONArray()
+            selectedRecipients.sorted().forEach { recipients.put(it) }
+            put("recipient_ids", recipients)
+            when (selectedType) {
+                "speed_violation" -> {
+                    put("condition_speed_limit_kmh", speedLimit.toIntOrNull() ?: 80)
+                    put("condition_speed_duration_sec", 5)
+                }
+                "idle_alarm" -> {
+                    put("condition_idle_after_sec", idleAfterSec.toIntOrNull() ?: 300)
+                    put("condition_speed_threshold_kmh", 0)
+                }
+                "geofence_alarm" -> {
+                    put("condition_geofence_id", selectedGeofence)
+                    put("condition_geofence_trigger", "both")
+                }
+                "off_hours_usage" -> {
+                    put("condition_start_local", "08:00")
+                    put("condition_end_local", "18:00")
+                    put("condition_timezone", "Europe/Istanbul")
+                    put("condition_min_speed_kmh", 1)
+                    val days = org.json.JSONArray()
+                    listOf(1, 2, 3, 4, 5).forEach { days.put(it) }
+                    put("condition_days", days)
+                }
+            }
+        }
+    }
+
+    suspend fun validateDuplicate(forceRefresh: Boolean, debounce: Boolean) {
+        val body = buildValidationBody()
+        if (body == null || currentStep != 4) {
+            duplicateMatch = null
+            duplicateWarning = null
+            isCheckingDuplicate = false
+            return
+        }
+
+        if (debounce) {
+            delay(300)
+        }
+
+        isCheckingDuplicate = true
+        duplicateWarning = null
+        val result = withTimeoutOrNull(5_000) {
+            AlarmDuplicateGuard.duplicateMatch(body = body, forceRefresh = forceRefresh) to true
+        }
+        if (result == null) {
+            duplicateMatch = null
+            duplicateWarning = "Mevcut alarmlar zamaninda dogrulanamadi. Kaydetmeye devam edebilirsiniz."
+        } else {
+            duplicateMatch = result.first
+            duplicateWarning = null
+        }
+        isCheckingDuplicate = false
+    }
 
     // Pre-select vehicle by plate
     LaunchedEffect(catalog, preSelectedPlate) {
@@ -1441,62 +1539,52 @@ private fun CreateAlarmSetSheet(
         catalog?.recipients?.firstOrNull()?.let { selectedRecipients = setOf(it.id) }
     }
 
+    val duplicateCheckToken = remember(
+        currentStep,
+        name,
+        selectedType,
+        selectedVehicles,
+        selectedChannels,
+        selectedRecipients,
+        selectedGeofence,
+        speedLimit,
+        idleAfterSec,
+    ) {
+        if (currentStep != 4) {
+            "inactive-$currentStep"
+        } else {
+            buildValidationBody()?.toString() ?: "invalid"
+        }
+    }
+
+    LaunchedEffect(duplicateCheckToken) {
+        validateDuplicate(forceRefresh = false, debounce = true)
+    }
+
     suspend fun save() {
         if (name.isBlank()) { errorMsg = "Kural adı gerekli"; return }
         if (selectedVehicles.isEmpty()) { errorMsg = "En az bir araç seçin"; currentStep = 2; return }
         if (selectedChannels.isEmpty()) { errorMsg = "En az bir bildirim kanalı seçin"; return }
         if (selectedRecipients.isEmpty()) { errorMsg = "En az bir alıcı seçin"; return }
+        if (selectedType == "geofence_alarm" && selectedGeofence == null) { errorMsg = "Lütfen bir bölge seçin"; currentStep = 3; return }
+
+        val body = buildValidationBody()
+        if (body == null) {
+            errorMsg = "Alarm bilgileri tamamlanamadi"
+            return
+        }
 
         isSaving = true
         errorMsg = null
 
-        val body = JSONObject().apply {
-            put("name", name)
-            put("alarm_type", selectedType)
-            put("status", "active")
-            put("evaluation_mode", "live")
-            put("source_mode", if (selectedType == "speed_violation") "existing" else "derived")
-            put("cooldown_sec", 300)
-            put("is_active", true)
-            put("condition_require_ignition", true)
-            val targets = org.json.JSONArray()
-            selectedVehicles.forEach { assignmentId ->
-                targets.put(JSONObject().apply { put("scope", "assignment"); put("id", assignmentId) })
-            }
-            put("targets", targets)
-            val channels = org.json.JSONArray()
-            selectedChannels.forEach { channels.put(it) }
-            put("channels", channels)
-            val recipients = org.json.JSONArray()
-            selectedRecipients.forEach { recipients.put(it) }
-            put("recipient_ids", recipients)
-            when (selectedType) {
-                "speed_violation" -> {
-                    put("condition_speed_limit_kmh", speedLimit.toIntOrNull() ?: 80)
-                    put("condition_speed_duration_sec", 5)
-                }
-                "idle_alarm" -> {
-                    put("condition_idle_after_sec", idleAfterSec.toIntOrNull() ?: 300)
-                    put("condition_speed_threshold_kmh", 0)
-                }
-                "geofence_alarm" -> {
-                    selectedGeofence?.let { put("condition_geofence_id", it) }
-                    put("condition_geofence_trigger", "both")
-                }
-                "off_hours_usage" -> {
-                    put("condition_start_local", "08:00")
-                    put("condition_end_local", "18:00")
-                    put("condition_timezone", "Europe/Istanbul")
-                    put("condition_min_speed_kmh", 1)
-                    val days = org.json.JSONArray()
-                    listOf(1,2,3,4,5).forEach { days.put(it) }
-                    put("condition_days", days)
-                }
-            }
-        }
-
         try {
+            validateDuplicate(forceRefresh = true, debounce = false)
+            if (duplicateMatch != null) {
+                isSaving = false
+                return
+            }
             APIService.post("/api/mobile/alarm-sets/", body)
+            AlarmDuplicateGuard.invalidate()
             onCreated()
         } catch (e: Exception) {
             errorMsg = "Kayıt başarısız: ${e.message}"
@@ -1758,8 +1846,13 @@ private fun CreateAlarmSetSheet(
                             it.plate.contains(vehicleSearch, true) || it.label.contains(vehicleSearch, true)
                         } ?: emptyList()
 
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            filteredVehicles.forEach { v ->
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 320.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(filteredVehicles, key = { it.assignmentId }) { v ->
                                 val isSelected = selectedVehicles.contains(v.assignmentId)
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -2034,49 +2127,57 @@ private fun CreateAlarmSetSheet(
                         Text("Alıcılar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         Text("Alarm bildirimlerini kimler alsın?", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
 
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            catalog?.recipients?.forEach { r ->
-                                val isSel = selectedRecipients.contains(r.id)
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isSel) AppColors.Indigo.copy(alpha = 0.06f) else MaterialTheme.colorScheme.surface)
-                                        .border(1.dp, if (isSel) AppColors.Indigo.copy(alpha = 0.2f) else MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp))
-                                        .clickable {
-                                            selectedRecipients = if (isSel) selectedRecipients - r.id else selectedRecipients + r.id
-                                        }
-                                        .padding(12.dp)
-                                ) {
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier = Modifier.size(36.dp).clip(CircleShape).background(AppColors.Indigo.copy(alpha = 0.1f))
-                                    ) {
-                                        Text(
-                                            r.name.take(2).uppercase(),
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = AppColors.Indigo
-                                        )
-                                    }
-                                    Spacer(Modifier.width(10.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(r.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-                                        Text(r.email, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                                    }
-                                    Box(
-                                        contentAlignment = Alignment.Center,
+                        if (catalog?.recipients != null) {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 260.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                items(catalog.recipients, key = { it.id }) { r ->
+                                    val isSel = selectedRecipients.contains(r.id)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier
-                                            .size(20.dp)
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(if (isSel) AppColors.Indigo else Color.Transparent)
-                                            .border(1.5.dp, if (isSel) AppColors.Indigo else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (isSel) AppColors.Indigo.copy(alpha = 0.06f) else MaterialTheme.colorScheme.surface)
+                                            .border(1.dp, if (isSel) AppColors.Indigo.copy(alpha = 0.2f) else MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp))
+                                            .clickable {
+                                                selectedRecipients = if (isSel) selectedRecipients - r.id else selectedRecipients + r.id
+                                            }
+                                            .padding(12.dp)
                                     ) {
-                                        if (isSel) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.size(36.dp).clip(CircleShape).background(AppColors.Indigo.copy(alpha = 0.1f))
+                                        ) {
+                                            Text(
+                                                r.name.take(2).uppercase(),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = AppColors.Indigo
+                                            )
+                                        }
+                                        Spacer(Modifier.width(10.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(r.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                                            Text(r.email, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                                        }
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier
+                                                .size(20.dp)
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(if (isSel) AppColors.Indigo else Color.Transparent)
+                                                .border(1.5.dp, if (isSel) AppColors.Indigo else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                        ) {
+                                            if (isSel) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                        }
                                     }
                                 }
-                            } ?: Row(
+                            }
+                        } else Row(
                                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
@@ -2085,7 +2186,6 @@ private fun CreateAlarmSetSheet(
                                 Spacer(Modifier.width(8.dp))
                                 Text("Alıcılar yükleniyor...", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                             }
-                        }
 
                         // Summary card
                         Spacer(Modifier.height(8.dp))
@@ -2110,6 +2210,48 @@ private fun CreateAlarmSetSheet(
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Icon(Icons.Default.Notifications, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
                                 Text("${selectedChannels.size} kanal, ${selectedRecipients.size} alıcı", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                            }
+                        }
+
+                        duplicateMatch?.let { match ->
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFFF59E0B).copy(alpha = 0.08f))
+                                    .border(1.dp, Color(0xFFF59E0B).copy(alpha = 0.28f), RoundedCornerShape(12.dp))
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Icon(Icons.Default.Warning, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Ayni alarm zaten mevcut. '${match.name}' kurali ${match.statusLabel} durumda bulundu.",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                                )
+                            }
+                        }
+
+                        if (duplicateMatch == null && duplicateWarning != null) {
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFFEA580C).copy(alpha = 0.08f))
+                                    .border(1.dp, Color(0xFFEA580C).copy(alpha = 0.24f), RoundedCornerShape(12.dp))
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Icon(Icons.Default.Warning, null, tint = Color(0xFFEA580C), modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    duplicateWarning.orEmpty(),
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                                )
                             }
                         }
                     }
@@ -2163,16 +2305,28 @@ private fun CreateAlarmSetSheet(
                                 if (selectedVehicles.isEmpty()) { errorMsg = "En az bir araç seçin"; return@Button }
                                 currentStep = 3
                             }
-                            3 -> currentStep = 4
+                            3 -> {
+                                if (selectedType == "geofence_alarm" && selectedGeofence == null) {
+                                    errorMsg = "Lütfen bir bölge seçin"
+                                    return@Button
+                                }
+                                currentStep = 4
+                            }
                             4 -> scope.launch { save() }
                         }
                     },
-                    enabled = !isSaving,
+                    enabled = !isSaving && !(currentStep == 4 && (isCheckingDuplicate || duplicateMatch != null)),
                     modifier = Modifier.weight(if (currentStep > 1) 1.5f else 1f).height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (currentStep == 4) Color(0xFF22C55E) else MaterialTheme.colorScheme.onSurface),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (currentStep == 4) {
+                            if (duplicateMatch == null) Color(0xFF22C55E) else Color(0xFF94A3B8)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
+                    ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    if (isSaving) {
+                    if (isSaving || (currentStep == 4 && isCheckingDuplicate)) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
                     } else {
                         Text(

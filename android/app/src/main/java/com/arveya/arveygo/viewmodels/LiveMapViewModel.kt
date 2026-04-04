@@ -27,12 +27,14 @@ class LiveMapViewModel : ViewModel() {
 
     private val _wsStatus = MutableStateFlow<WSConnectionStatus>(WSConnectionStatus.Idle)
     val wsStatus: StateFlow<WSConnectionStatus> = _wsStatus
+    private val _filteredVehicles = MutableStateFlow<List<Vehicle>>(emptyList())
+    val filteredVehicles: StateFlow<List<Vehicle>> = _filteredVehicles
 
     val onlineCount: Int get() = _vehicles.value.count { it.status == VehicleStatus.IGNITION_ON }
     val offlineCount: Int get() = _vehicles.value.count { it.status == VehicleStatus.IGNITION_OFF || it.status == VehicleStatus.NO_DATA }
     val idleCount: Int get() = _vehicles.value.count { it.status == VehicleStatus.SLEEPING }
 
-    fun filteredVehicles(): List<Vehicle> {
+    private fun recomputeFilteredVehicles() {
         var result = _vehicles.value
         _statusFilter.value?.let { filter -> result = result.filter { it.status == filter } }
         val q = _searchText.value.lowercase()
@@ -42,14 +44,22 @@ class LiveMapViewModel : ViewModel() {
                         it.driver.lowercase().contains(q) || it.imei.lowercase().contains(q)
             }
         }
-        return result
+        _filteredVehicles.value = result
     }
 
-    fun setFilter(filter: VehicleStatus?) { _statusFilter.value = filter }
-    fun setSearch(text: String) { _searchText.value = text }
+    fun setFilter(filter: VehicleStatus?) {
+        _statusFilter.value = filter
+        recomputeFilteredVehicles()
+    }
+
+    fun setSearch(text: String) {
+        _searchText.value = text
+        recomputeFilteredVehicles()
+    }
 
     init {
         subscribeToWebSocket()
+        recomputeFilteredVehicles()
     }
 
     private fun subscribeToWebSocket() {
@@ -62,6 +72,7 @@ class LiveMapViewModel : ViewModel() {
                         val existing = currentMap[newVehicle.id]
                         existing?.mergeUpdate(newVehicle) ?: newVehicle
                     }
+                    recomputeFilteredVehicles()
                     _vehicleVersion.value++
                 }
             }
@@ -79,6 +90,7 @@ class LiveMapViewModel : ViewModel() {
                             val existing = currentMap[newVehicle.id]
                             existing?.mergeUpdate(newVehicle) ?: newVehicle
                         }
+                        recomputeFilteredVehicles()
                         _vehicleVersion.value++
                     }
                     is WSEvent.Update -> {
@@ -91,6 +103,7 @@ class LiveMapViewModel : ViewModel() {
                             current.add(event.vehicle)
                         }
                         _vehicles.value = current
+                        recomputeFilteredVehicles()
                         _vehicleVersion.value++
                     }
                     is WSEvent.StatusChanged -> _wsStatus.value = event.status

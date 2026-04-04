@@ -107,6 +107,7 @@ struct AlarmSet: Identifiable, Hashable {
     let channelCount: Int
     let recipientCount: Int
     let createdAt: String
+    let updatedAt: String
 
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: AlarmSet, rhs: AlarmSet) -> Bool { lhs.id == rhs.id }
@@ -201,7 +202,8 @@ struct AlarmSet: Identifiable, Hashable {
             targetCount: json["target_count"] as? Int ?? 0,
             channelCount: json["channel_count"] as? Int ?? 0,
             recipientCount: json["recipient_count"] as? Int ?? 0,
-            createdAt: json["created_at"] as? String ?? ""
+            createdAt: json["created_at"] as? String ?? "",
+            updatedAt: json["updated_at"] as? String ?? ""
         )
     }
 
@@ -275,6 +277,446 @@ struct AlarmCatalog {
         }
         return AlarmCatalog(vehicles: vehicles, recipients: recipients, geofences: geofences, types: types)
     }
+}
+
+struct AlarmDuplicateMatch: Equatable, Sendable {
+    let id: Int
+    let name: String
+    let status: String
+
+    var statusLabel: String {
+        switch status {
+        case "active": return "aktif"
+        case "paused": return "duraklatilmis"
+        case "draft": return "taslak"
+        case "archived": return "arsiv"
+        default: return status
+        }
+    }
+}
+
+private enum AlarmDuplicateGuardError: Error {
+    case timeout
+}
+
+private struct AlarmRuleSignature: Hashable, Sendable {
+    let description: String?
+    let alarmType: String
+    let evaluationMode: String
+    let sourceMode: String
+    let cooldownSec: Int
+    let startsAt: String?
+    let endsAt: String?
+    let conditionsJSON: String
+    let targetsJSON: String
+    let channelsJSON: String
+    let recipientsJSON: String
+
+    var cacheKey: String {
+        [
+            description ?? "",
+            alarmType,
+            evaluationMode,
+            sourceMode,
+            String(cooldownSec),
+            startsAt ?? "",
+            endsAt ?? "",
+            conditionsJSON,
+            targetsJSON,
+            channelsJSON,
+            recipientsJSON,
+        ].joined(separator: "|")
+    }
+}
+
+private struct AlarmRuleSnapshot: Sendable {
+    let id: Int
+    let name: String
+    let status: String
+    let updatedAt: String
+    let signature: AlarmRuleSignature
+
+    static func fromBody(_ body: [String: Any], nameOverride: String? = nil) -> AlarmRuleSnapshot {
+        let alarmType = stringValue(body["alarm_type"])
+        return AlarmRuleSnapshot(
+            id: intValue(body["id"]),
+            name: nameOverride ?? stringValue(body["name"]),
+            status: stringValue(body["status"], default: "active"),
+            updatedAt: stringValue(body["updated_at"]),
+            signature: AlarmRuleSignature(
+                description: normalizedOptionalString(body["description"]),
+                alarmType: alarmType,
+                evaluationMode: stringValue(body["evaluation_mode"], default: "live"),
+                sourceMode: stringValue(body["source_mode"], default: "derived"),
+                cooldownSec: intValue(body["cooldown_sec"], default: 300),
+                startsAt: normalizedOptionalString(body["starts_at"]),
+                endsAt: normalizedOptionalString(body["ends_at"]),
+                conditionsJSON: canonicalJSONString(normalizedRequestConditions(body, alarmType: alarmType)),
+                targetsJSON: canonicalJSONString(normalizedTargets(body["targets"] as? [[String: Any]] ?? [])),
+                channelsJSON: canonicalJSONString(normalizedChannels(body["channels"])),
+                recipientsJSON: canonicalJSONString(normalizedRecipients(body["recipient_ids"]))
+            )
+        )
+    }
+
+    static func fromDetail(_ json: [String: Any]) -> AlarmRuleSnapshot {
+        let alarmType = stringValue(json["alarm_type"])
+        return AlarmRuleSnapshot(
+            id: intValue(json["id"]),
+            name: stringValue(json["name"]),
+            status: stringValue(json["status"], default: "draft"),
+            updatedAt: stringValue(json["updated_at"]),
+            signature: AlarmRuleSignature(
+                description: normalizedOptionalString(json["description"]),
+                alarmType: alarmType,
+                evaluationMode: stringValue(json["evaluation_mode"], default: "live"),
+                sourceMode: stringValue(json["source_mode"], default: "derived"),
+                cooldownSec: intValue(json["cooldown_sec"], default: 300),
+                startsAt: normalizedOptionalString(json["starts_at"]),
+                endsAt: normalizedOptionalString(json["ends_at"]),
+                conditionsJSON: canonicalJSONString(normalizedExistingConditions(json["conditions"] as? [String: Any] ?? [:], alarmType: alarmType)),
+                targetsJSON: canonicalJSONString(normalizedTargets(json["targets"] as? [[String: Any]] ?? [])),
+                channelsJSON: canonicalJSONString(normalizedChannels(json["channels"])),
+                recipientsJSON: canonicalJSONString(normalizedExistingRecipients(json["recipients"]))
+            )
+        )
+    }
+}
+
+@MainActor
+final class AlarmDuplicateGuardStore {
+    static let shared = AlarmDuplicateGuardStore()
+
+    private struct CachedDetail {
+        let updatedAt: String
+        let snapshot: AlarmRuleSnapshot
+    }
+
+    private var summaries: [AlarmSet] = []
+    private var detailCache: [Int: CachedDetail] = [:]
+    private var lastSummaryRefreshAt: Date?
+    private let summaryTTL: TimeInterval = 90
+
+    private init() {}
+
+    func invalidate() {
+        summaries = []
+        detailCache.removeAll()
+        lastSummaryRefreshAt = nil
+    }
+
+    func duplicateMatch(
+        for body: [String: Any],
+        ignoreId: Int? = nil,
+        forceRefresh: Bool = false
+    ) async throws -> AlarmDuplicateMatch? {
+        try await duplicateMatch(
+            for: AlarmRuleSnapshot.fromBody(body),
+            ignoreId: ignoreId,
+            forceRefresh: forceRefresh
+        )
+    }
+
+    fileprivate func duplicateMatch(
+        for snapshot: AlarmRuleSnapshot,
+        ignoreId: Int? = nil,
+        forceRefresh: Bool = false
+    ) async throws -> AlarmDuplicateMatch? {
+        let signature = snapshot.signature
+        let currentSummaries = try await loadSummaries(forceRefresh: forceRefresh)
+
+        for summary in currentSummaries {
+            if let ignoreId, summary.id == ignoreId {
+                continue
+            }
+
+            let snapshot = try await loadSnapshot(for: summary)
+            if snapshot.signature == signature {
+                return AlarmDuplicateMatch(id: snapshot.id, name: snapshot.name, status: snapshot.status)
+            }
+        }
+
+        return nil
+    }
+
+    private func loadSummaries(forceRefresh: Bool) async throws -> [AlarmSet] {
+        if !forceRefresh,
+           let lastSummaryRefreshAt,
+           Date().timeIntervalSince(lastSummaryRefreshAt) < summaryTTL,
+           !summaries.isEmpty {
+            return summaries
+        }
+
+        var loaded: [AlarmSet] = []
+        var page = 1
+        var lastPage = 1
+
+        repeat {
+            let json = try await APIService.shared.get("/api/mobile/alarm-sets/?page=\(page)")
+            let data = json["data"] as? [[String: Any]] ?? []
+            let pagination = json["pagination"] as? [String: Any] ?? [:]
+            loaded.append(contentsOf: data.map(AlarmSet.from(json:)))
+            lastPage = pagination["last_page"] as? Int ?? 1
+            page += 1
+        } while page <= lastPage
+
+        summaries = loaded
+        lastSummaryRefreshAt = Date()
+        return loaded
+    }
+
+    private func loadSnapshot(for summary: AlarmSet) async throws -> AlarmRuleSnapshot {
+        if let cached = detailCache[summary.id],
+           cached.updatedAt == summary.updatedAt {
+            return cached.snapshot
+        }
+
+        let json = try await APIService.shared.get("/api/mobile/alarm-sets/\(summary.id)")
+        let detail = json["data"] as? [String: Any] ?? [:]
+        let snapshot = AlarmRuleSnapshot.fromDetail(detail)
+        detailCache[summary.id] = CachedDetail(updatedAt: summary.updatedAt, snapshot: snapshot)
+        return snapshot
+    }
+}
+
+private func stringValue(_ value: Any?, default defaultValue: String = "") -> String {
+    if let value = value as? String {
+        return value
+    }
+    if let value = value {
+        return String(describing: value)
+    }
+    return defaultValue
+}
+
+private func normalizedOptionalString(_ value: Any?) -> String? {
+    let string = stringValue(value).trimmingCharacters(in: .whitespacesAndNewlines)
+    return string.isEmpty ? nil : string
+}
+
+private func intValue(_ value: Any?, default defaultValue: Int = 0) -> Int {
+    switch value {
+    case let value as Int:
+        return value
+    case let value as Double:
+        return Int(value)
+    case let value as NSNumber:
+        return value.intValue
+    case let value as String:
+        return Int(value) ?? defaultValue
+    default:
+        return defaultValue
+    }
+}
+
+private func boolValue(_ value: Any?, default defaultValue: Bool = false) -> Bool {
+    switch value {
+    case let value as Bool:
+        return value
+    case let value as NSNumber:
+        return value.boolValue
+    case let value as String:
+        return ["1", "true", "yes"].contains(value.lowercased())
+    default:
+        return defaultValue
+    }
+}
+
+private func csvValues(_ value: Any?) -> [String] {
+    if let values = value as? [String] {
+        return values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.sorted()
+    }
+    if let values = value as? [Any] {
+        return values.map { stringValue($0).trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.sorted()
+    }
+
+    let raw = stringValue(value)
+    if raw.isEmpty {
+        return []
+    }
+
+    return raw
+        .split(separator: ",")
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+        .sorted()
+}
+
+private func normalizedTargets(_ targets: [[String: Any]]) -> [[String: Any]] {
+    targets
+        .map {
+            [
+                "scope": stringValue($0["scope"]),
+                "id": intValue($0["id"])
+            ]
+        }
+        .filter { !stringValue($0["scope"]).isEmpty && intValue($0["id"]) > 0 }
+        .sorted {
+            let leftScope = stringValue($0["scope"])
+            let rightScope = stringValue($1["scope"])
+            if leftScope == rightScope {
+                return intValue($0["id"]) < intValue($1["id"])
+            }
+            return leftScope < rightScope
+        }
+}
+
+private func normalizedChannels(_ channels: Any?) -> [String] {
+    let values: [String]
+    if let valuesArray = channels as? [String] {
+        values = valuesArray
+    } else if let valuesArray = channels as? [Any] {
+        values = valuesArray.map { stringValue($0) }
+    } else {
+        values = csvValues(channels)
+    }
+
+    return Array(Set(values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })).sorted()
+}
+
+private func normalizedRecipients(_ recipients: Any?) -> [Int] {
+    let values: [Int]
+    if let recipientIds = recipients as? [Int] {
+        values = recipientIds
+    } else if let recipientIds = recipients as? [Any] {
+        values = recipientIds.map { intValue($0) }
+    } else {
+        values = []
+    }
+
+    return Array(Set(values.filter { $0 > 0 })).sorted()
+}
+
+private func normalizedExistingRecipients(_ recipients: Any?) -> [Int] {
+    guard let recipientList = recipients as? [[String: Any]] else {
+        return normalizedRecipients(recipients)
+    }
+
+    return Array(
+        Set(
+            recipientList
+                .filter { boolValue($0["is_active"], default: true) }
+                .map { intValue($0["id"] ?? $0["user_id"]) }
+                .filter { $0 > 0 }
+        )
+    ).sorted()
+}
+
+private func normalizedRequestConditions(_ validated: [String: Any], alarmType: String) -> [String: Any] {
+    switch alarmType {
+    case "speed_violation":
+        return [
+            "native_alarm_codes": csvValues(validated["condition_native_alarm_codes"]),
+            "native_alarm_categories": csvValues(validated["condition_native_alarm_categories"]),
+            "speed_limit_kmh": intValue(validated["condition_speed_limit_kmh"] ?? validated["condition_speed_threshold_kmh"], default: 120),
+            "speed_duration_sec": intValue(validated["condition_speed_duration_sec"], default: 30)
+        ]
+    case "movement_detection":
+        return [
+            "native_alarm_codes": csvValues(validated["condition_native_alarm_codes"]),
+            "native_alarm_categories": csvValues(validated["condition_native_alarm_categories"]),
+            "motion_sensitivity": stringValue(validated["condition_motion_sensitivity"], default: "medium"),
+            "motion_duration_sec": intValue(validated["condition_motion_duration_sec"], default: 5)
+        ]
+    case "idle_alarm":
+        return [
+            "idle_after_sec": intValue(validated["condition_idle_after_sec"], default: 300),
+            "speed_threshold_kmh": intValue(validated["condition_speed_threshold_kmh"], default: 0),
+            "require_ignition": boolValue(validated["condition_require_ignition"], default: true)
+        ]
+    case "off_hours_usage":
+        let days = normalizedRecipients(validated["condition_days"])
+            .filter { (1...7).contains($0) }
+        return [
+            "timezone": stringValue(validated["condition_timezone"], default: "Europe/Istanbul"),
+            "days": Array(Set(days)).sorted(),
+            "start_local": stringValue(validated["condition_start_local"], default: "08:00"),
+            "end_local": stringValue(validated["condition_end_local"], default: "18:00"),
+            "require_ignition": boolValue(validated["condition_require_ignition"], default: true),
+            "min_speed_kmh": intValue(validated["condition_min_speed_kmh"], default: 1)
+        ]
+    case "geofence_alarm":
+        return [
+            "geofence_id": intValue(validated["condition_geofence_id"], default: 0),
+            "geofence_trigger": stringValue(validated["condition_geofence_trigger"], default: "both")
+        ]
+    case "ignition_on", "ignition_off":
+        return [:]
+    default:
+        return [:]
+    }
+}
+
+private func normalizedExistingConditions(_ conditions: [String: Any], alarmType: String) -> [String: Any] {
+    switch alarmType {
+    case "speed_violation":
+        return [
+            "native_alarm_codes": csvValues(conditions["native_alarm_codes"]),
+            "native_alarm_categories": csvValues(conditions["native_alarm_categories"]),
+            "speed_limit_kmh": intValue(conditions["speed_limit_kmh"], default: 120),
+            "speed_duration_sec": intValue(conditions["speed_duration_sec"], default: 30)
+        ]
+    case "movement_detection":
+        return [
+            "native_alarm_codes": csvValues(conditions["native_alarm_codes"]),
+            "native_alarm_categories": csvValues(conditions["native_alarm_categories"]),
+            "motion_sensitivity": stringValue(conditions["motion_sensitivity"], default: "medium"),
+            "motion_duration_sec": intValue(conditions["motion_duration_sec"], default: 5)
+        ]
+    case "idle_alarm":
+        return [
+            "idle_after_sec": intValue(conditions["idle_after_sec"], default: 300),
+            "speed_threshold_kmh": intValue(conditions["speed_threshold_kmh"], default: 0),
+            "require_ignition": boolValue(conditions["require_ignition"], default: true)
+        ]
+    case "off_hours_usage":
+        let days = normalizedRecipients(conditions["days"])
+            .filter { (1...7).contains($0) }
+        return [
+            "timezone": stringValue(conditions["timezone"], default: "Europe/Istanbul"),
+            "days": Array(Set(days)).sorted(),
+            "start_local": stringValue(conditions["start_local"], default: "08:00"),
+            "end_local": stringValue(conditions["end_local"], default: "18:00"),
+            "require_ignition": boolValue(conditions["require_ignition"], default: true),
+            "min_speed_kmh": intValue(conditions["min_speed_kmh"], default: 1)
+        ]
+    case "geofence_alarm":
+        return [
+            "geofence_id": intValue(conditions["geofence_id"], default: 0),
+            "geofence_trigger": stringValue(conditions["geofence_trigger"], default: "both")
+        ]
+    case "ignition_on", "ignition_off":
+        return [:]
+    default:
+        return conditions
+    }
+}
+
+private func canonicalJSONString(_ value: Any) -> String {
+    if let dictionary = value as? [String: Any] {
+        let orderedKeys = dictionary.keys.sorted()
+        let parts = orderedKeys.map { key in
+            "\"\(key)\":\(canonicalJSONString(dictionary[key] ?? NSNull()))"
+        }
+        return "{\(parts.joined(separator: ","))}"
+    }
+
+    if let array = value as? [Any] {
+        return "[\(array.map(canonicalJSONString).joined(separator: ","))]"
+    }
+
+    if let string = value as? String {
+        let escaped = string
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(escaped)\""
+    }
+
+    if value is NSNull {
+        return "null"
+    }
+
+    return String(describing: value)
 }
 
 // MARK: - Alarms View
@@ -423,9 +865,20 @@ struct AlarmsView: View {
         isLoadingSets = true
         setsError = nil
         do {
-            let json = try await APIService.shared.get("/api/mobile/alarm-sets/")
-            let dataArr = json["data"] as? [[String: Any]] ?? []
-            alarmSets = dataArr.map { AlarmSet.from(json: $0) }
+            var loadedSets: [AlarmSet] = []
+            var page = 1
+            var lastPage = 1
+
+            repeat {
+                let json = try await APIService.shared.get("/api/mobile/alarm-sets/?page=\(page)")
+                let dataArr = json["data"] as? [[String: Any]] ?? []
+                let pagination = json["pagination"] as? [String: Any] ?? [:]
+                loadedSets.append(contentsOf: dataArr.map { AlarmSet.from(json: $0) })
+                lastPage = pagination["last_page"] as? Int ?? 1
+                page += 1
+            } while page <= lastPage
+
+            alarmSets = loadedSets
         } catch {
             setsError = "Alarm kuralları yüklenemedi"
         }
@@ -443,6 +896,7 @@ struct AlarmsView: View {
         actionLoadingId = set.id
         let action = set.status == "active" ? "pause" : "activate"
         _ = try? await APIService.shared.post("/api/mobile/alarm-sets/\(set.id)/\(action)")
+        AlarmDuplicateGuardStore.shared.invalidate()
         await fetchAlarmSets()
         actionLoadingId = nil
     }
@@ -450,6 +904,7 @@ struct AlarmsView: View {
     private func archiveAlarmSet(_ set: AlarmSet) async {
         actionLoadingId = set.id
         _ = try? await APIService.shared.post("/api/mobile/alarm-sets/\(set.id)/archive")
+        AlarmDuplicateGuardStore.shared.invalidate()
         await fetchAlarmSets()
         actionLoadingId = nil
     }
@@ -1376,6 +1831,9 @@ struct CreateAlarmSetView: View {
     @State private var isSaving = false
     @State private var errorMsg: String? = nil
     @State private var vehicleSearch = ""
+    @State private var duplicateMatch: AlarmDuplicateMatch? = nil
+    @State private var duplicateWarning: String? = nil
+    @State private var isCheckingDuplicate = false
 
     var typeOptions: [AlarmTypeOption] {
         catalog?.types ?? [
@@ -1413,6 +1871,60 @@ struct CreateAlarmSetView: View {
         case "ignition_off": return Color(red: 0.937, green: 0.267, blue: 0.267)
         default: return AppTheme.indigo
         }
+    }
+
+    private var duplicateValidationBody: [String: Any]? {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty, !selectedVehicles.isEmpty, !selectedChannels.isEmpty, !selectedRecipients.isEmpty else {
+            return nil
+        }
+
+        if selectedType == "geofence_alarm", selectedGeofence == nil {
+            return nil
+        }
+
+        var body: [String: Any] = [
+            "name": trimmedName,
+            "alarm_type": selectedType,
+            "status": "active",
+            "evaluation_mode": "live",
+            "source_mode": selectedType == "speed_violation" ? "existing" : "derived",
+            "cooldown_sec": 300,
+            "is_active": true,
+            "condition_require_ignition": true,
+            "targets": selectedVehicles.sorted().map { ["scope": "assignment", "id": $0] },
+            "channels": Array(selectedChannels).sorted(),
+            "recipient_ids": Array(selectedRecipients).sorted(),
+        ]
+
+        switch selectedType {
+        case "speed_violation":
+            body["condition_speed_limit_kmh"] = Int(speedLimit) ?? 80
+            body["condition_speed_duration_sec"] = 5
+        case "idle_alarm":
+            body["condition_idle_after_sec"] = Int(idleAfterSec) ?? 300
+            body["condition_speed_threshold_kmh"] = 0
+        case "geofence_alarm":
+            body["condition_geofence_id"] = selectedGeofence
+            body["condition_geofence_trigger"] = "both"
+        case "off_hours_usage":
+            body["condition_start_local"] = "08:00"
+            body["condition_end_local"] = "18:00"
+            body["condition_timezone"] = "Europe/Istanbul"
+            body["condition_min_speed_kmh"] = 1
+            body["condition_days"] = [1, 2, 3, 4, 5]
+        default:
+            break
+        }
+
+        return body
+    }
+
+    private var duplicateCheckToken: String {
+        guard currentStep == 4, let body = duplicateValidationBody else {
+            return "inactive-\(currentStep)"
+        }
+        return AlarmRuleSnapshot.fromBody(body).signature.cacheKey
     }
 
     var body: some View {
@@ -1542,6 +2054,10 @@ struct CreateAlarmSetView: View {
                         if selectedVehicles.isEmpty { errorMsg = "En az bir araç seçin"; return }
                         currentStep = 3
                     case 3:
+                        if selectedType == "geofence_alarm", selectedGeofence == nil {
+                            errorMsg = "Lütfen bir bölge seçin"
+                            return
+                        }
                         currentStep = 4
                     case 4:
                         Task { await save() }
@@ -1549,7 +2065,7 @@ struct CreateAlarmSetView: View {
                     }
                 }) {
                     HStack(spacing: 6) {
-                        if isSaving {
+                        if isSaving || (currentStep == 4 && isCheckingDuplicate) {
                             ProgressView()
                                 .scaleEffect(0.8)
                                 .tint(.white)
@@ -1565,16 +2081,25 @@ struct CreateAlarmSetView: View {
                     .frame(height: 48)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(currentStep == 4 ? Color(red: 0.133, green: 0.773, blue: 0.369) : ds.text1)
+                            .fill(currentStep == 4 ? (duplicateMatch == nil ? Color(red: 0.133, green: 0.773, blue: 0.369) : Color(red: 148/255, green: 163/255, blue: 184/255)) : ds.text1)
                     )
                 }
-                .disabled(isSaving)
+                .disabled(isSaving || (currentStep == 4 && (isCheckingDuplicate || duplicateMatch != nil)))
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
             .background(ds.cardBg)
         }
         .background(ds.pageBg)
+        .task(id: duplicateCheckToken) {
+            guard currentStep == 4 else {
+                duplicateMatch = nil
+                duplicateWarning = nil
+                isCheckingDuplicate = false
+                return
+            }
+            await validateDuplicate(debounced: true, forceRefresh: false)
+        }
         .onAppear {
             // Pre-select vehicle by plate
             if !preSelectedPlate.isEmpty, let vehicles = catalog?.vehicles {
@@ -1710,58 +2235,60 @@ struct CreateAlarmSetView: View {
             let filtered = vehicleSearch.isEmpty ? vehicles : vehicles.filter {
                 $0.plate.localizedCaseInsensitiveContains(vehicleSearch) || $0.label.localizedCaseInsensitiveContains(vehicleSearch)
             }
-            ForEach(filtered) { v in
-                let isVSel = selectedVehicles.contains(v.assignmentId)
-                Button(action: {
-                    if isVSel { selectedVehicles.remove(v.assignmentId) }
-                    else { selectedVehicles.insert(v.assignmentId) }
-                }) {
-                    HStack(spacing: 10) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(isVSel ? AppTheme.indigo : .clear)
-                                .frame(width: 20, height: 20)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .stroke(isVSel ? AppTheme.indigo : ds.text3, lineWidth: 1.5)
-                                )
+            LazyVStack(spacing: 8) {
+                ForEach(filtered) { v in
+                    let isVSel = selectedVehicles.contains(v.assignmentId)
+                    Button(action: {
+                        if isVSel { selectedVehicles.remove(v.assignmentId) }
+                        else { selectedVehicles.insert(v.assignmentId) }
+                    }) {
+                        HStack(spacing: 10) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(isVSel ? AppTheme.indigo : .clear)
+                                    .frame(width: 20, height: 20)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .stroke(isVSel ? AppTheme.indigo : ds.text3, lineWidth: 1.5)
+                                    )
+                                if isVSel {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(.white)
+                                }
+                            }
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(v.label)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(ds.text1)
+                                if !v.plate.isEmpty && v.plate != v.label {
+                                    Text(v.plate)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(ds.text3)
+                                }
+                            }
+
+                            Spacer()
+
                             if isVSel {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundColor(.white)
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(AppTheme.indigo)
                             }
                         }
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(v.label)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(ds.text1)
-                            if !v.plate.isEmpty && v.plate != v.label {
-                                Text(v.plate)
-                                    .font(.system(size: 11))
-                                    .foregroundColor(ds.text3)
-                            }
-                        }
-
-                        Spacer()
-
-                        if isVSel {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 16))
-                                .foregroundColor(AppTheme.indigo)
-                        }
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(isVSel ? AppTheme.indigo.opacity(0.06) : ds.cardBg)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(isVSel ? AppTheme.indigo.opacity(0.2) : ds.divider, lineWidth: 1)
+                        )
                     }
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(isVSel ? AppTheme.indigo.opacity(0.06) : ds.cardBg)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(isVSel ? AppTheme.indigo.opacity(0.2) : ds.divider, lineWidth: 1)
-                    )
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         } else {
             HStack {
@@ -1990,6 +2517,7 @@ struct CreateAlarmSetView: View {
         channelsList
         recipientsList
         summaryCard
+        duplicateStatusCard
     }
 
     @ViewBuilder
@@ -2080,53 +2608,55 @@ struct CreateAlarmSetView: View {
             .foregroundColor(ds.text3)
 
         if let recipients = catalog?.recipients {
-            ForEach(recipients) { r in
-                let isSel = selectedRecipients.contains(r.id)
-                Button(action: {
-                    if isSel { selectedRecipients.remove(r.id) }
-                    else { selectedRecipients.insert(r.id) }
-                }) {
-                    HStack(spacing: 10) {
-                        ZStack {
-                            Circle()
-                                .fill(AppTheme.indigo.opacity(0.1))
-                                .frame(width: 36, height: 36)
-                            Text(String(r.name.prefix(2)).uppercased())
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(AppTheme.indigo)
-                        }
+            LazyVStack(spacing: 8) {
+                ForEach(recipients) { r in
+                    let isSel = selectedRecipients.contains(r.id)
+                    Button(action: {
+                        if isSel { selectedRecipients.remove(r.id) }
+                        else { selectedRecipients.insert(r.id) }
+                    }) {
+                        HStack(spacing: 10) {
+                            ZStack {
+                                Circle()
+                                    .fill(AppTheme.indigo.opacity(0.1))
+                                    .frame(width: 36, height: 36)
+                                Text(String(r.name.prefix(2)).uppercased())
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(AppTheme.indigo)
+                            }
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(r.name)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(ds.text1)
-                            Text(r.email)
-                                .font(.system(size: 11))
-                                .foregroundColor(ds.text3)
-                        }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(r.name)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(ds.text1)
+                                Text(r.email)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(ds.text3)
+                            }
 
-                        Spacer()
+                            Spacer()
 
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(isSel ? AppTheme.indigo : .clear)
-                                .frame(width: 20, height: 20)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .stroke(isSel ? AppTheme.indigo : ds.text3, lineWidth: 1.5)
-                                )
-                            if isSel {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.white)
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(isSel ? AppTheme.indigo : .clear)
+                                    .frame(width: 20, height: 20)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .stroke(isSel ? AppTheme.indigo : ds.text3, lineWidth: 1.5)
+                                    )
+                                if isSel {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                }
                             }
                         }
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(isSel ? AppTheme.indigo.opacity(0.06) : ds.cardBg))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(isSel ? AppTheme.indigo.opacity(0.2) : ds.divider, lineWidth: 1))
                     }
-                    .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(isSel ? AppTheme.indigo.opacity(0.06) : ds.cardBg))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(isSel ? AppTheme.indigo.opacity(0.2) : ds.divider, lineWidth: 1))
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         } else {
             HStack {
@@ -2179,56 +2709,124 @@ struct CreateAlarmSetView: View {
         .padding(.top, 8)
     }
 
+    @ViewBuilder
+    private var duplicateStatusCard: some View {
+        if let duplicateMatch {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(Color(red: 0.924, green: 0.592, blue: 0.074))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Aynı alarm zaten mevcut")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(ds.text1)
+                    Text("'\(duplicateMatch.name)' kuralı \(duplicateMatch.statusLabel) durumda bulundu. Kaydetme kapatıldı.")
+                        .font(.system(size: 11))
+                        .foregroundColor(ds.text2)
+                }
+                Spacer()
+            }
+            .padding(14)
+            .background(Color(red: 0.924, green: 0.592, blue: 0.074).opacity(0.08))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color(red: 0.924, green: 0.592, blue: 0.074).opacity(0.28), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        } else if let duplicateWarning {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.system(size: 14))
+                    .foregroundColor(Color(red: 0.886, green: 0.494, blue: 0.078))
+                Text(duplicateWarning)
+                    .font(.system(size: 11))
+                    .foregroundColor(ds.text2)
+                Spacer()
+            }
+            .padding(14)
+            .background(Color(red: 0.886, green: 0.494, blue: 0.078).opacity(0.08))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color(red: 0.886, green: 0.494, blue: 0.078).opacity(0.24), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+    }
+
     private func save() async {
         guard !name.isEmpty else { errorMsg = "Kural adı gerekli"; return }
         guard !selectedVehicles.isEmpty else { errorMsg = "En az bir araç seçin"; return }
         guard !selectedChannels.isEmpty else { errorMsg = "En az bir bildirim kanalı seçin"; return }
         guard !selectedRecipients.isEmpty else { errorMsg = "En az bir alıcı seçin"; return }
+        guard selectedType != "geofence_alarm" || selectedGeofence != nil else {
+            errorMsg = "Lütfen bir bölge seçin"
+            return
+        }
+
+        guard let body = duplicateValidationBody else {
+            errorMsg = "Alarm bilgileri tamamlanamadı"
+            return
+        }
 
         isSaving = true
         errorMsg = nil
 
-        var body: [String: Any] = [
-            "name": name,
-            "alarm_type": selectedType,
-            "status": "active",
-            "evaluation_mode": "live",
-            "source_mode": selectedType == "speed_violation" ? "existing" : "derived",
-            "cooldown_sec": 300,
-            "is_active": true,
-            "condition_require_ignition": true,
-            "targets": selectedVehicles.map { ["scope": "assignment", "id": $0] },
-            "channels": Array(selectedChannels),
-            "recipient_ids": Array(selectedRecipients)
-        ]
-
-        switch selectedType {
-        case "speed_violation":
-            body["condition_speed_limit_kmh"] = Int(speedLimit) ?? 80
-            body["condition_speed_duration_sec"] = 5
-        case "idle_alarm":
-            body["condition_idle_after_sec"] = Int(idleAfterSec) ?? 300
-            body["condition_speed_threshold_kmh"] = 0
-        case "geofence_alarm":
-            if let gf = selectedGeofence { body["condition_geofence_id"] = gf }
-            body["condition_geofence_trigger"] = "both"
-        case "off_hours_usage":
-            body["condition_start_local"] = "08:00"
-            body["condition_end_local"] = "18:00"
-            body["condition_timezone"] = "Europe/Istanbul"
-            body["condition_min_speed_kmh"] = 1
-            body["condition_days"] = [1, 2, 3, 4, 5]
-        default: break
-        }
-
         do {
+            await validateDuplicate(debounced: false, forceRefresh: true)
+            if duplicateMatch != nil {
+                isSaving = false
+                return
+            }
             _ = try await APIService.shared.post("/api/mobile/alarm-sets/", body: body)
+            AlarmDuplicateGuardStore.shared.invalidate()
             onCreated()
         } catch {
             errorMsg = "Kayıt başarısız: \(error.localizedDescription)"
         }
 
         isSaving = false
+    }
+
+    private func validateDuplicate(debounced: Bool, forceRefresh: Bool) async {
+        guard let body = duplicateValidationBody else {
+            duplicateMatch = nil
+            duplicateWarning = nil
+            isCheckingDuplicate = false
+            return
+        }
+        let snapshot = AlarmRuleSnapshot.fromBody(body)
+
+        if debounced {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            if Task.isCancelled { return }
+        }
+
+        isCheckingDuplicate = true
+        duplicateWarning = nil
+
+        do {
+            let match = try await withThrowingTaskGroup(of: AlarmDuplicateMatch?.self) { group in
+                group.addTask {
+                    try await AlarmDuplicateGuardStore.shared.duplicateMatch(for: snapshot, forceRefresh: forceRefresh)
+                }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 5_000_000_000)
+                    throw AlarmDuplicateGuardError.timeout
+                }
+
+                let result = try await group.next() ?? nil
+                group.cancelAll()
+                return result
+            }
+
+            duplicateMatch = match
+            duplicateWarning = nil
+        } catch {
+            duplicateMatch = nil
+            duplicateWarning = "Mevcut alarmlar zamanında doğrulanamadı. Kaydetmeye devam edebilirsiniz."
+        }
+
+        isCheckingDuplicate = false
     }
 }
 

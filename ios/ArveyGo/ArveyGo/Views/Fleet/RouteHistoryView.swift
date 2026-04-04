@@ -1,6 +1,7 @@
 import SwiftUI
 import MapKit
 import Combine
+import QuartzCore
 
 // MARK: - Speed Category
 enum SpeedCategory: Int, CaseIterable {
@@ -162,6 +163,7 @@ struct RouteHistoryView: View {
     @State private var isAutoAdvancing = false  // true when auto-jumping to next trip
     @State private var followVehicle = true     // camera follows vehicle during playback
     @State private var hasAppliedInitialVehicle = false
+    @State private var lastPlaybackFollowAt: TimeInterval = 0
 
     @StateObject private var vm = RouteHistoryViewModel()
 
@@ -1218,11 +1220,15 @@ struct RouteHistoryView: View {
                     // Follow vehicle camera – keep user's zoom level
                     if followVehicle, playbackIndex < route.points.count {
                         let pt = route.points[playbackIndex]
-                        withAnimation(.easeOut(duration: 0.35)) {
-                            mapCameraPosition = .region(MKCoordinateRegion(
-                                center: CLLocationCoordinate2D(latitude: pt.lat, longitude: pt.lng),
-                                span: userZoomSpan
-                            ))
+                        let now = CACurrentMediaTime()
+                        if now - lastPlaybackFollowAt >= 0.8 {
+                            lastPlaybackFollowAt = now
+                            withAnimation(.easeOut(duration: 0.35)) {
+                                mapCameraPosition = .region(MKCoordinateRegion(
+                                    center: CLLocationCoordinate2D(latitude: pt.lat, longitude: pt.lng),
+                                    span: userZoomSpan
+                                ))
+                            }
                         }
                     }
                 } else {

@@ -349,12 +349,15 @@ fun RouteHistoryScreen() {
     }
 
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
+    val playbackMarkerRef = remember { mutableStateOf<Marker?>(null) }
+    var lastPlaybackCameraAt by remember { mutableLongStateOf(0L) }
 
     // Draw routes on map when trip is selected or trips change
     LaunchedEffect(selectedTrip, trips) {
         val mapView = mapViewRef.value ?: return@LaunchedEffect
         // Clear previous overlays
         mapView.overlays.clear()
+        playbackMarkerRef.value = null
 
         // Draw all trip polylines (non-selected in lighter color)
         for (trip in trips) {
@@ -801,15 +804,21 @@ fun RouteHistoryScreen() {
                         playbackIndex++
                         val pt = trip.points[playbackIndex]
                         mapViewRef.value?.let { mv ->
-                            mv.overlays.removeAll { it is Marker && (it as Marker).title == "__playback__" }
-                            val marker = Marker(mv).apply {
-                                position = GeoPoint(pt.lat, pt.lng)
+                            val target = GeoPoint(pt.lat, pt.lng)
+                            val marker = playbackMarkerRef.value ?: Marker(mv).apply {
                                 title = "__playback__"
                                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                                position = target
+                                mv.overlays.add(this)
+                                playbackMarkerRef.value = this
                             }
-                            mv.overlays.add(marker)
+                            marker.position = target
                             if (followVehicle) {
-                                mv.controller.animateTo(GeoPoint(pt.lat, pt.lng))
+                                val now = System.currentTimeMillis()
+                                if (now - lastPlaybackCameraAt >= 800L) {
+                                    lastPlaybackCameraAt = now
+                                    mv.controller.animateTo(target)
+                                }
                             }
                             mv.invalidate()
                         }
